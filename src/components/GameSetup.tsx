@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Clock, Trophy } from "lucide-react";
 
 interface GameSetupProps {
@@ -15,18 +16,20 @@ export interface GameConfig {
   gameDuration: number;
   totalTime: number;
   courts: number;
+  startTime: string;
 }
 
 export const GameSetup = ({ playerCount, onComplete, onBack }: GameSetupProps) => {
   const [gameDuration, setGameDuration] = useState<number>(10);
   const [totalTime, setTotalTime] = useState<number>(60);
   const [courts, setCourts] = useState<number>(2);
+  const [startTime, setStartTime] = useState<string>("09:00");
 
   const maxCourts = Math.floor(playerCount / 2);
   const totalTimeOptions = Array.from({ length: 12 }, (_, i) => (i + 1) * 15);
 
   const handleSubmit = () => {
-    onComplete({ gameDuration, totalTime, courts });
+    onComplete({ gameDuration, totalTime, courts, startTime });
   };
 
   return (
@@ -64,6 +67,19 @@ export const GameSetup = ({ playerCount, onComplete, onBack }: GameSetupProps) =
               ))}
             </div>
           </RadioGroup>
+        </div>
+
+        <div className="space-y-4">
+          <Label htmlFor="start-time" className="text-base font-semibold">
+            Start Time
+          </Label>
+          <Input
+            id="start-time"
+            type="time"
+            value={startTime}
+            onChange={(e) => setStartTime(e.target.value)}
+            className="h-12 text-lg"
+          />
         </div>
 
         <div className="space-y-4">

@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Match } from "@/lib/scheduler";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Trophy, Clock, Users } from "lucide-react";
+import { ArrowLeft, Trophy, Clock, Users, Share2, Medal } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface ScheduleViewProps {
   matches: Match[];
@@ -12,6 +13,7 @@ interface ScheduleViewProps {
 }
 
 export const ScheduleView = ({ matches, onBack }: ScheduleViewProps) => {
+  const { toast } = useToast();
   const [matchScores, setMatchScores] = useState<Map<string, { team1: number; team2: number }>>(
     new Map()
   );
@@ -27,6 +29,74 @@ export const ScheduleView = ({ matches, onBack }: ScheduleViewProps) => {
     acc[timeSlot].push(match);
     return acc;
   }, {} as Record<string, Match[]>);
+
+  const leaderboard = useMemo(() => {
+    const playerScores = new Map<string, { wins: number; losses: number; points: number }>();
+    
+    matches.forEach((match) => {
+      const scores = matchScores.get(match.id);
+      if (!scores) return;
+      
+      const allPlayers = [...match.team1, ...match.team2];
+      allPlayers.forEach((player) => {
+        if (!playerScores.has(player)) {
+          playerScores.set(player, { wins: 0, losses: 0, points: 0 });
+        }
+      });
+      
+      const [p1, p2] = match.team1;
+      const [p3, p4] = match.team2;
+      
+      if (scores.team1 > scores.team2) {
+        playerScores.get(p1)!.wins++;
+        playerScores.get(p2)!.wins++;
+        playerScores.get(p3)!.losses++;
+        playerScores.get(p4)!.losses++;
+      } else if (scores.team2 > scores.team1) {
+        playerScores.get(p3)!.wins++;
+        playerScores.get(p4)!.wins++;
+        playerScores.get(p1)!.losses++;
+        playerScores.get(p2)!.losses++;
+      }
+      
+      playerScores.get(p1)!.points += scores.team1;
+      playerScores.get(p2)!.points += scores.team1;
+      playerScores.get(p3)!.points += scores.team2;
+      playerScores.get(p4)!.points += scores.team2;
+    });
+    
+    return Array.from(playerScores.entries())
+      .map(([player, stats]) => ({ player, ...stats }))
+      .sort((a, b) => b.wins - a.wins || b.points - a.points);
+  }, [matches, matchScores]);
+
+  const handleShare = async () => {
+    const shareText = `🏆 Match Results 🏆\n\n` +
+      `Leaderboard:\n` +
+      leaderboard.map((entry, idx) => 
+        `${idx + 1}. ${entry.player} - ${entry.wins}W/${entry.losses}L (${entry.points} pts)`
+      ).join('\n') +
+      `\n\n` +
+      `Total Matches: ${matches.length}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({ text: shareText });
+        toast({ title: "Shared successfully!" });
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') {
+          copyToClipboard(shareText);
+        }
+      }
+    } else {
+      copyToClipboard(shareText);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: "Copied to clipboard!" });
+  };
 
   return (
     <div className="space-y-6">
@@ -54,7 +124,11 @@ export const ScheduleView = ({ matches, onBack }: ScheduleViewProps) => {
               <div className="flex items-center gap-2 sticky top-0 bg-background/95 backdrop-blur py-2 z-10">
                 <Clock className="w-5 h-5 text-primary" />
                 <h3 className="text-lg font-semibold text-foreground">
-                  {start} - {end} min
+                  {slotMatches[0].clockStartTime ? (
+                    `${slotMatches[0].clockStartTime} - ${slotMatches[0].clockEndTime}`
+                  ) : (
+                    `${start} - ${end} min`
+                  )}
                 </h3>
                 <Badge variant="secondary" className="ml-2">
                   {slotMatches.length} {slotMatches.length === 1 ? "court" : "courts"}
@@ -127,6 +201,54 @@ export const ScheduleView = ({ matches, onBack }: ScheduleViewProps) => {
           );
         })}
       </div>
+
+      {leaderboard.length > 0 && (
+        <Card className="p-6 mt-8 bg-gradient-to-br from-primary/5 to-accent/5">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                <Medal className="w-6 h-6 text-primary-foreground" />
+              </div>
+              <h2 className="text-2xl font-bold text-foreground">Leaderboard</h2>
+            </div>
+            <Button onClick={handleShare} className="gap-2">
+              <Share2 className="w-4 h-4" />
+              Share Results
+            </Button>
+          </div>
+          
+          <div className="space-y-3">
+            {leaderboard.map((entry, idx) => (
+              <div
+                key={entry.player}
+                className={`flex items-center justify-between p-4 rounded-lg ${
+                  idx === 0
+                    ? "bg-gradient-to-r from-primary/20 to-accent/20 border-2 border-primary"
+                    : "bg-secondary/50"
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                    idx === 0 ? "bg-primary text-primary-foreground text-lg" :
+                    idx === 1 ? "bg-accent text-accent-foreground" :
+                    idx === 2 ? "bg-muted text-muted-foreground" :
+                    "bg-secondary text-secondary-foreground"
+                  }`}>
+                    {idx + 1}
+                  </div>
+                  <div>
+                    <div className="font-semibold text-lg">{entry.player}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {entry.wins}W / {entry.losses}L • {entry.points} pts
+                    </div>
+                  </div>
+                </div>
+                {idx === 0 && <Trophy className="w-8 h-8 text-primary" />}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   );
 };

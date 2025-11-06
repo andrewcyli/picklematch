@@ -3,6 +3,8 @@ export interface Match {
   court: number;
   startTime: number;
   endTime: number;
+  clockStartTime?: string;
+  clockEndTime?: string;
   team1: [string, string];
   team2: [string, string];
   score?: {
@@ -23,7 +25,8 @@ export function generateSchedule(
   players: string[],
   gameDuration: number,
   totalTime: number,
-  courts: number
+  courts: number,
+  startTime?: string
 ): Match[] {
   const matches: Match[] = [];
   const playerStats = new Map<string, PlayerStats>();
@@ -54,14 +57,14 @@ export function generateSchedule(
   let matchId = 0;
 
   for (let slot = 0; slot < totalSlots; slot++) {
-    const startTime = slot * gameDuration;
-    const endTime = startTime + gameDuration;
+    const slotStartTime = slot * gameDuration;
+    const slotEndTime = slotStartTime + gameDuration;
     const availablePlayers = new Set(players);
     
     // Remove players who just played (need rest)
     players.forEach((player) => {
       const stats = playerStats.get(player)!;
-      if (stats.lastMatchEnd === startTime) {
+      if (stats.lastMatchEnd === slotStartTime) {
         // Player just finished, can rest
         if (Math.random() > 0.5 && availablePlayers.size > playersPerMatch * matchesPerSlot) {
           availablePlayers.delete(player);
@@ -74,19 +77,33 @@ export function generateSchedule(
         Array.from(availablePlayers),
         playerStats,
         allTeams,
-        startTime,
-        endTime,
+        slotStartTime,
+        slotEndTime,
         court + 1
       );
 
       if (match) {
-        matches.push({ ...match, id: `match-${matchId++}` });
+        const matchWithId = { ...match, id: `match-${matchId++}` };
+        
+        // Calculate clock times if start time provided
+        if (startTime) {
+          const [hours, minutes] = startTime.split(':').map(Number);
+          const baseMinutes = hours * 60 + minutes;
+          
+          const matchStartMinutes = baseMinutes + slotStartTime;
+          const matchEndMinutes = matchStartMinutes + gameDuration;
+          
+          matchWithId.clockStartTime = formatTime(matchStartMinutes);
+          matchWithId.clockEndTime = formatTime(matchEndMinutes);
+        }
+        
+        matches.push(matchWithId);
         
         // Update player stats
         [...match.team1, ...match.team2].forEach((player) => {
           const stats = playerStats.get(player)!;
           stats.playTime += gameDuration;
-          stats.lastMatchEnd = endTime;
+          stats.lastMatchEnd = slotEndTime;
           availablePlayers.delete(player);
 
           // Update partners and opponents
@@ -215,4 +232,10 @@ function calculateMatchScore(
   score -= playTimeVariance / 10;
 
   return score;
+}
+
+function formatTime(totalMinutes: number): string {
+  const hours = Math.floor(totalMinutes / 60) % 24;
+  const minutes = totalMinutes % 60;
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 }

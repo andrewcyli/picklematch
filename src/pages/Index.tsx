@@ -23,7 +23,8 @@ const Index = () => {
       players,
       config.gameDuration,
       config.totalTime,
-      config.courts
+      config.courts,
+      config.startTime
     );
     setMatches(schedule);
     setStep("schedule");
