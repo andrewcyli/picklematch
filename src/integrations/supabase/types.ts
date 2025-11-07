@@ -14,13 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      games: {
+        Row: {
+          created_at: string
+          game_code: string
+          game_config: Json
+          id: string
+          matches: Json
+          players: string[]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          game_code: string
+          game_config: Json
+          id?: string
+          matches?: Json
+          players: string[]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          game_code?: string
+          game_config?: Json
+          id?: string
+          matches?: Json
+          players?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_game_code: { Args: never; Returns: string }
     }
     Enums: {
       [_ in never]: never
