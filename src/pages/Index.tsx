@@ -1,55 +1,175 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
-import { PlayerSetup } from "@/components/PlayerSetup";
-import { GameSetup, GameConfig } from "@/components/GameSetup";
+import { CombinedSetup } from "@/components/CombinedSetup";
+import { GameCodeDialog } from "@/components/GameCodeDialog";
 import { ScheduleView } from "@/components/ScheduleView";
 import { generateSchedule, Match } from "@/lib/scheduler";
 import { Trophy } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { GameConfig } from "@/components/GameSetup";
 
-type Step = "players" | "setup" | "schedule";
+type Step = "start" | "setup" | "schedule";
 
 const Index = () => {
-  const [step, setStep] = useState<Step>("players");
+  const [step, setStep] = useState<Step>("start");
   const [players, setPlayers] = useState<string[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [gameConfig, setGameConfig] = useState<GameConfig | null>(null);
+  const [gameId, setGameId] = useState<string | null>(null);
+  const [gameCode, setGameCode] = useState<string>("");
+  const [showGameCodeDialog, setShowGameCodeDialog] = useState(true);
 
-  const handlePlayersComplete = (playerList: string[]) => {
-    setPlayers(playerList);
+  useEffect(() => {
+    if (!gameId) return;
+
+    const channel = supabase
+      .channel('game-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'games',
+          filter: `id=eq.${gameId}`
+        },
+        (payload) => {
+          if (payload.eventType === 'UPDATE') {
+            const updatedGame = payload.new;
+            setPlayers(updatedGame.players || []);
+            setMatches((updatedGame.matches as unknown as Match[]) || []);
+            setGameConfig(updatedGame.game_config as unknown as GameConfig);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [gameId]);
+
+  const createNewGame = async () => {
+    setShowGameCodeDialog(false);
     setStep("setup");
   };
 
-  const handleGameSetupComplete = (config: GameConfig) => {
+  const joinExistingGame = async (code: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('games')
+        .select('*')
+        .eq('game_code', code)
+        .single();
+
+      if (error || !data) {
+        toast.error("Game not found. Please check the code and try again.");
+        return;
+      }
+
+      setGameId(data.id);
+      setGameCode(data.game_code);
+      setPlayers(data.players || []);
+      setGameConfig(data.game_config as unknown as GameConfig);
+      setMatches((data.matches as unknown as Match[]) || []);
+      setShowGameCodeDialog(false);
+      
+      if (data.matches && Array.isArray(data.matches) && data.matches.length > 0) {
+        setStep("schedule");
+      } else {
+        setStep("setup");
+      }
+      
+      toast.success(`Joined game: ${code}`);
+    } catch (error) {
+      toast.error("Failed to join game");
+      console.error(error);
+    }
+  };
+
+  const handleSetupComplete = async (playerList: string[], config: GameConfig) => {
     setGameConfig(config);
     const schedule = generateSchedule(
-      players,
+      playerList,
       config.gameDuration,
       config.totalTime,
       config.courts,
       config.startTime
     );
     setMatches(schedule);
-    setStep("schedule");
+    setPlayers(playerList);
+
+    try {
+      if (gameId) {
+        const { error } = await supabase
+          .from('games')
+          .update({
+            players: playerList,
+            game_config: config as any,
+            matches: schedule as any,
+          })
+          .eq('id', gameId);
+
+        if (error) throw error;
+      } else {
+        const { data: codeData } = await supabase.rpc('generate_game_code');
+        const newGameCode = codeData as string;
+
+        const { data, error } = await supabase
+          .from('games')
+          .insert({
+            game_code: newGameCode,
+            players: playerList,
+            game_config: config as any,
+            matches: schedule as any,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        
+        setGameId(data.id);
+        setGameCode(newGameCode);
+        toast.success(`Game created! Code: ${newGameCode}`);
+      }
+      
+      setStep("schedule");
+    } catch (error) {
+      toast.error("Failed to save game");
+      console.error(error);
+    }
   };
 
-  const handleScheduleUpdate = (newMatches: Match[], newPlayers: string[]) => {
+  const handleScheduleUpdate = async (newMatches: Match[], newPlayers: string[]) => {
     setMatches(newMatches);
     setPlayers(newPlayers);
-  };
 
-  const handleBack = () => {
-    if (step === "setup") {
-      setStep("players");
-    } else if (step === "schedule") {
-      setStep("setup");
+    if (gameId) {
+      try {
+        const { error } = await supabase
+          .from('games')
+          .update({
+            matches: newMatches as any,
+            players: newPlayers,
+          })
+          .eq('id', gameId);
+
+        if (error) throw error;
+      } catch (error) {
+        toast.error("Failed to update game");
+        console.error(error);
+      }
     }
   };
 
   const resetApp = () => {
-    setStep("players");
+    setStep("start");
     setPlayers([]);
     setMatches([]);
     setGameConfig(null);
+    setGameId(null);
+    setGameCode("");
+    setShowGameCodeDialog(true);
   };
 
   return (
@@ -69,25 +189,35 @@ const Index = () => {
           </p>
         </header>
 
+        <GameCodeDialog
+          open={showGameCodeDialog}
+          onOpenChange={setShowGameCodeDialog}
+          onJoinGame={joinExistingGame}
+          onCreateGame={createNewGame}
+        />
+
         <Card className="p-6 sm:p-8 md:p-10 shadow-xl">
-          {step === "players" && <PlayerSetup onComplete={handlePlayersComplete} />}
-          
           {step === "setup" && (
-            <GameSetup
-              playerCount={players.length}
-              onComplete={handleGameSetupComplete}
-              onBack={handleBack}
-            />
+            <CombinedSetup onComplete={handleSetupComplete} />
           )}
           
           {step === "schedule" && gameConfig && (
-            <ScheduleView
-              matches={matches}
-              onBack={resetApp}
-              gameConfig={gameConfig}
-              allPlayers={players}
-              onScheduleUpdate={handleScheduleUpdate}
-            />
+            <div className="space-y-4">
+              {gameCode && (
+                <div className="text-center p-4 bg-primary/10 rounded-lg border border-primary/20">
+                  <p className="text-sm text-muted-foreground mb-1">Game Code</p>
+                  <p className="text-2xl font-bold font-mono tracking-wider text-primary">{gameCode}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Share this code with other players</p>
+                </div>
+              )}
+              <ScheduleView
+                matches={matches}
+                onBack={resetApp}
+                gameConfig={gameConfig}
+                allPlayers={players}
+                onScheduleUpdate={handleScheduleUpdate}
+              />
+            </div>
           )}
         </Card>
 
