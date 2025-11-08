@@ -152,7 +152,10 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
 
     onScheduleUpdate(newMatches, updatedPlayers);
     setEditingMatch(null);
-    toast({ title: "Players updated", description: "Schedule regenerated" });
+    
+    const matchIdx = matches.filter(m => m.court === match.court && m.endTime <= match.endTime).length;
+    const matchNumber = `${String.fromCharCode(64 + match.court)}${matchIdx}`;
+    toast({ title: "Players updated", description: `Match ${matchNumber} adjusted, schedule regenerated` });
   };
 
   const cancelEditingPlayers = () => {
@@ -341,7 +344,10 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
           );
 
           onScheduleUpdate(newMatches, allPlayers);
-          toast({ title: "Schedule adjusted", description: `Resolved conflicts for: ${conflicts.join(', ')}` });
+          
+          const laterMatchIdx = matches.filter(m => m.court === later.court && m.endTime <= later.endTime).length;
+          const laterMatchNumber = `${String.fromCharCode(64 + later.court)}${laterMatchIdx}`;
+          toast({ title: "Schedule adjusted", description: `Match ${laterMatchNumber} adjusted to resolve conflicts for: ${conflicts.join(', ')}` });
           return;
         }
       }
@@ -386,11 +392,13 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
 
         onScheduleUpdate(newMatches, allPlayers);
         
+        const completedMatchIdx = matches.filter(m => m.court === completedMatch.court && m.endTime <= completedMatch.endTime).length;
+        const completedMatchNumber = `${String.fromCharCode(64 + completedMatch.court)}${completedMatchIdx}`;
         const matchDiff = newMatches.length - matches.length;
         if (matchDiff > 0) {
-          toast({ title: "Schedule adjusted", description: `Added ${matchDiff} match(es) due to faster pace` });
+          toast({ title: "Schedule adjusted", description: `After match ${completedMatchNumber}, added ${matchDiff} match(es) due to faster pace` });
         } else if (matchDiff < 0) {
-          toast({ title: "Schedule adjusted", description: `Removed ${Math.abs(matchDiff)} match(es) due to slower pace` });
+          toast({ title: "Schedule adjusted", description: `After match ${completedMatchNumber}, removed ${Math.abs(matchDiff)} match(es) due to slower pace` });
         }
       }
     }
@@ -430,7 +438,10 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     );
 
     onScheduleUpdate(newMatches, allPlayers);
-    toast({ title: "Court type updated", description: "Schedule regenerated" });
+    
+    const courtLetter = String.fromCharCode(64 + courtNumber);
+    const typeText = updatedConfigs.find(c => c.courtNumber === courtNumber)?.type === 'singles' ? '1v1' : '2v2';
+    toast({ title: "Court type updated", description: `Court ${courtLetter} changed to ${typeText}, schedule regenerated` });
   };
 
   const scrollToCurrentMatch = (courtNumber: number) => {
@@ -488,7 +499,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
               {/* Court Header */}
               <div className="flex items-center justify-between gap-2">
                 <Badge className="bg-primary/20 text-primary text-sm px-2 py-1">
-                  Court {courtConfig.courtNumber}
+                  Court {String.fromCharCode(64 + courtConfig.courtNumber)}
                 </Badge>
                 
                 <div className="flex items-center gap-2">
@@ -567,7 +578,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                                   ? 'bg-muted text-muted-foreground'
                                   : 'bg-secondary text-secondary-foreground'
                               }>
-                                {isCurrentMatch ? 'Current Match' : isNextMatch ? 'Up Next' : isPreviousMatch ? 'Completed' : `Match ${idx + 1}`}
+                                {String.fromCharCode(64 + courtConfig.courtNumber)}{idx + 1} {isCurrentMatch ? '• Current' : isNextMatch ? '• Up Next' : isPreviousMatch ? '• Done' : ''}
                               </Badge>
                               <Badge variant="outline" className="text-xs">
                                 <Clock className="w-3 h-3 mr-1" />
