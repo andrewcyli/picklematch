@@ -428,7 +428,8 @@ export function regenerateScheduleFromSlot(
   courts: number,
   startTime?: string,
   teammatePairs: TeammatePair[] = [],
-  courtConfigs: CourtConfig[] = []
+  courtConfigs: CourtConfig[] = [],
+  existingMatches: Match[] = []
 ): Match[] {
   const playerStats = new Map<string, PlayerStats>();
 
@@ -496,8 +497,102 @@ export function regenerateScheduleFromSlot(
   const totalSlots = Math.floor(totalTime / gameDuration);
   const matchesPerSlot = courts;
   
+  // Find the first unplayed slot
+  const firstUnplayedSlot = Math.floor(fromSlotStart / gameDuration);
+  
+  // Preserve the current and up next matches (first 2 time slots) from existing schedule
+  const preservedMatches: Match[] = [];
+  if (existingMatches.length > 0) {
+    const currentSlotStart = firstUnplayedSlot * gameDuration;
+    const upNextSlotStart = (firstUnplayedSlot + 1) * gameDuration;
+    
+    // Get matches from current and up next slots
+    const slotsToPreserve = [currentSlotStart, upNextSlotStart];
+    
+    slotsToPreserve.forEach(slotStart => {
+      const matchesInSlot = existingMatches.filter(m => m.startTime === slotStart);
+      
+      // Check for court conflicts within this slot
+      const playersInSlot = new Set<string>();
+      let hasConflict = false;
+      
+      for (const match of matchesInSlot) {
+        const matchPlayers = [...match.team1, ...match.team2];
+        for (const player of matchPlayers) {
+          if (playersInSlot.has(player)) {
+            hasConflict = true;
+            break;
+          }
+          playersInSlot.add(player);
+        }
+        if (hasConflict) break;
+      }
+      
+      // Only preserve if no conflicts
+      if (!hasConflict && matchesInSlot.length > 0) {
+        preservedMatches.push(...matchesInSlot);
+        
+        // Update player stats for preserved matches
+        matchesInSlot.forEach(match => {
+          [...match.team1, ...match.team2].forEach((player) => {
+            const stats = playerStats.get(player);
+            if (stats) {
+              stats.playTime += gameDuration;
+              stats.lastMatchEnd = match.endTime;
+              stats.consecutiveMatches++;
+
+              if (match.isSingles) {
+                const opponent = match.team1[0] === player ? match.team2[0] : match.team1[0];
+                stats.opponents.add(opponent);
+                stats.recentOpponents.unshift(opponent);
+                if (stats.recentOpponents.length > 6) stats.recentOpponents.pop();
+              } else {
+                const [p1, p2] = match.team1 as [string, string];
+                const [p3, p4] = match.team2 as [string, string];
+                
+                if (player === p1) {
+                  stats.partners.add(p2);
+                  stats.recentPartners.unshift(p2);
+                  stats.opponents.add(p3);
+                  stats.opponents.add(p4);
+                  stats.recentOpponents.unshift(p3, p4);
+                } else if (player === p2) {
+                  stats.partners.add(p1);
+                  stats.recentPartners.unshift(p1);
+                  stats.opponents.add(p3);
+                  stats.opponents.add(p4);
+                  stats.recentOpponents.unshift(p3, p4);
+                } else if (player === p3) {
+                  stats.partners.add(p4);
+                  stats.recentPartners.unshift(p4);
+                  stats.opponents.add(p1);
+                  stats.opponents.add(p2);
+                  stats.recentOpponents.unshift(p1, p2);
+                } else if (player === p4) {
+                  stats.partners.add(p3);
+                  stats.recentPartners.unshift(p3);
+                  stats.opponents.add(p1);
+                  stats.opponents.add(p2);
+                  stats.recentOpponents.unshift(p1, p2);
+                }
+                
+                if (stats.recentPartners.length > 3) stats.recentPartners.pop();
+                if (stats.recentOpponents.length > 6) stats.recentOpponents.pop();
+              }
+            }
+          });
+        });
+      }
+    });
+    
+    // Add preserved matches to newMatches
+    newMatches.push(...preservedMatches);
+  }
+  
+  const preservedSlots = new Set(preservedMatches.map(m => m.startTime));
+  
   // Initialize court configs if not provided (default to doubles)
-  const finalCourtConfigs = courtConfigs.length > 0 
+  const finalCourtConfigs = courtConfigs.length > 0
     ? courtConfigs 
     : Array.from({ length: courts }, (_, i) => ({ courtNumber: i + 1, type: 'doubles' as const }));
 
@@ -508,12 +603,17 @@ export function regenerateScheduleFromSlot(
     }
   }
 
-  let matchId = playedMatches.length;
+  let matchId = playedMatches.length + preservedMatches.length;
   const startSlot = Math.floor(fromSlotStart / gameDuration);
 
   for (let slot = startSlot; slot < totalSlots; slot++) {
     const slotStartTime = slot * gameDuration;
     const slotEndTime = slotStartTime + gameDuration;
+    
+    // Skip if this slot was preserved
+    if (preservedSlots.has(slotStartTime)) {
+      continue;
+    }
     const availablePlayers = new Set(players);
     
     // Get players scheduled in previous slot by court to prevent cross-court disruptions

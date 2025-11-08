@@ -146,7 +146,8 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
       gameConfig.courts,
       undefined,
       gameConfig.teammatePairs,
-      courtConfigs
+      courtConfigs,
+      matches
     );
 
     onScheduleUpdate(newMatches, updatedPlayers);
@@ -335,7 +336,8 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
             gameConfig.courts,
             undefined,
             gameConfig.teammatePairs,
-            courtConfigs
+            courtConfigs,
+            matches
           );
 
           onScheduleUpdate(newMatches, allPlayers);
@@ -378,7 +380,8 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
           gameConfig.courts,
           undefined,
           gameConfig.teammatePairs,
-          courtConfigs
+          courtConfigs,
+          matches
         );
 
         onScheduleUpdate(newMatches, allPlayers);
@@ -422,7 +425,8 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
       gameConfig.courts,
       undefined,
       gameConfig.teammatePairs,
-      updatedConfigs
+      updatedConfigs,
+      matches
     );
 
     onScheduleUpdate(newMatches, allPlayers);
@@ -442,7 +446,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     }
   };
 
-  // Auto-scroll to current match when component is displayed or carousels are ready
+  // Auto-scroll to current match when component is displayed, carousels are ready, or matches change
   useEffect(() => {
     if (carouselApis.size > 0) {
       // Small delay to ensure carousel is fully rendered
@@ -452,7 +456,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
         });
       }, 100);
     }
-  }, [carouselApis.size]);
+  }, [carouselApis.size, matches, matchScores]);
 
   useEffect(() => {
     checkPlayerConflicts(matchScores);
