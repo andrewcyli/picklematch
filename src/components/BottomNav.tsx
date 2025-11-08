@@ -20,7 +20,7 @@ export const BottomNav = ({
 
           <button onClick={() => onSectionChange("scheduler")} disabled={disabled} className={cn("flex flex-col items-center gap-1 px-6 py-2 rounded-lg transition-all relative", activeSection === "scheduler" ? "text-primary" : "text-muted-foreground hover:text-foreground")}>
             <div className={cn("w-14 h-14 rounded-full flex items-center justify-center transition-all", activeSection === "scheduler" ? "bg-gradient-to-br from-primary to-accent shadow-lg scale-110" : "bg-muted hover:bg-muted/80")}>
-              <Calendar className="w-7 h-7 text-white" />
+              <Calendar className={cn("w-7 h-7", activeSection === "scheduler" ? "text-white" : "text-foreground")} />
             </div>
             <span className="text-xs font-medium mt-1">Matches</span>
           </button>
