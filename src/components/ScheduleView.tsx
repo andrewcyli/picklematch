@@ -28,13 +28,12 @@ interface ScheduleViewProps {
   };
   allPlayers: string[];
   onScheduleUpdate: (newMatches: Match[], newPlayers: string[]) => void;
+  matchScores: Map<string, { team1: number; team2: number }>;
+  onMatchScoresUpdate: (scores: Map<string, { team1: number; team2: number }>) => void;
 }
 
-export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onScheduleUpdate }: ScheduleViewProps) => {
+export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onScheduleUpdate, matchScores, onMatchScoresUpdate }: ScheduleViewProps) => {
   const { toast } = useToast();
-  const [matchScores, setMatchScores] = useState<Map<string, { team1: number | string; team2: number | string }>>(
-    new Map()
-  );
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [pendingScores, setPendingScores] = useState<Map<string, { team1: number | string; team2: number | string }>>(new Map());
   const [courtConfigs, setCourtConfigs] = useState<CourtConfig[]>(
@@ -80,7 +79,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
 
     const newScores = new Map(matchScores);
     newScores.set(matchId, { team1: team1Score, team2: team2Score });
-    setMatchScores(newScores);
+    onMatchScoresUpdate(newScores);
     
     const newPending = new Map(pendingScores);
     newPending.delete(matchId);
@@ -115,7 +114,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
       
       const newScores = new Map(matchScores);
       newScores.delete(matchId);
-      setMatchScores(newScores);
+      onMatchScoresUpdate(newScores);
     }
   };
 

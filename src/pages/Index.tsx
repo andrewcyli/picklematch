@@ -240,7 +240,7 @@ const Index = () => {
               <GameSetup onComplete={handleGameConfigComplete} />
             </div>}
           
-          {activeSection === "scheduler" && gameConfig && matches.length > 0 && <ScheduleView matches={matches} onBack={resetApp} gameConfig={gameConfig} allPlayers={players} onScheduleUpdate={handleScheduleUpdate} />}
+          {activeSection === "scheduler" && gameConfig && matches.length > 0 && <ScheduleView matches={matches} onBack={resetApp} gameConfig={gameConfig} allPlayers={players} onScheduleUpdate={handleScheduleUpdate} matchScores={matchScores} onMatchScoresUpdate={setMatchScores} />}
 
           {activeSection === "scheduler" && (!gameConfig || matches.length === 0) && <div className="text-center py-12">
               <p className="text-muted-foreground">Please complete game setup and add players first</p>
