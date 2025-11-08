@@ -361,6 +361,29 @@ const Index = () => {
       }
     }
   };
+  
+  const handleCourtConfigUpdate = async (courtConfigs: any[]) => {
+    if (!gameConfig) return;
+    
+    const updatedConfig = {
+      ...gameConfig,
+      courtConfigs
+    };
+    setGameConfig(updatedConfig);
+    
+    if (gameId) {
+      try {
+        const { error } = await supabase.from('games').update({
+          game_config: updatedConfig as any
+        }).eq('id', gameId);
+        if (error) throw error;
+      } catch (error) {
+        toast.error("Failed to update court configuration");
+        console.error(error);
+      }
+    }
+  };
+  
   const resetApp = () => {
     setActiveSection("setup");
     setPlayers([]);
@@ -446,7 +469,7 @@ const Index = () => {
               <GameSetup onComplete={handleGameConfigComplete} gameCode={gameCode} />
             </div>}
           
-          {activeSection === "matches" && gameConfig && matches.length > 0 && <ScheduleView matches={matches} onBack={resetApp} gameConfig={gameConfig} allPlayers={players} onScheduleUpdate={handleScheduleUpdate} matchScores={matchScores} onMatchScoresUpdate={setMatchScores} />}
+          {activeSection === "matches" && gameConfig && matches.length > 0 && <ScheduleView matches={matches} onBack={resetApp} gameConfig={gameConfig} allPlayers={players} onScheduleUpdate={handleScheduleUpdate} matchScores={matchScores} onMatchScoresUpdate={setMatchScores} onCourtConfigUpdate={handleCourtConfigUpdate} />}
 
           {activeSection === "matches" && (!gameConfig || matches.length === 0) && <div className="text-center py-12">
               <p className="text-muted-foreground">Please complete game setup and add players first</p>

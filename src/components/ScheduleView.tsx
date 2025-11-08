@@ -33,9 +33,10 @@ interface ScheduleViewProps {
   onScheduleUpdate: (newMatches: Match[], newPlayers: string[]) => void;
   matchScores: Map<string, { team1: number; team2: number }>;
   onMatchScoresUpdate: (scores: Map<string, { team1: number; team2: number }>) => void;
+  onCourtConfigUpdate?: (configs: CourtConfig[]) => void;
 }
 
-export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onScheduleUpdate, matchScores, onMatchScoresUpdate }: ScheduleViewProps) => {
+export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onScheduleUpdate, matchScores, onMatchScoresUpdate, onCourtConfigUpdate }: ScheduleViewProps) => {
   const { toast } = useToast();
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [pendingScores, setPendingScores] = useState<Map<string, { team1: number | string; team2: number | string }>>(new Map());
@@ -586,6 +587,11 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
         : config
     );
     setCourtConfigs(updatedConfigs);
+    
+    // Notify parent component of config change
+    if (onCourtConfigUpdate) {
+      onCourtConfigUpdate(updatedConfigs);
+    }
 
     const firstUnplayedMatchIndex = matches.findIndex(m => !matchScores.has(m.id));
     if (firstUnplayedMatchIndex === -1) return;
@@ -615,7 +621,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     onScheduleUpdate(newMatches, allPlayers);
     
     const courtLetter = String.fromCharCode(64 + courtNumber);
-    const typeText = updatedConfigs.find(c => c.courtNumber === courtNumber)?.type === 'singles' ? '1v1' : '2v2';
+    const typeText = updatedConfigs.find(c => c.courtNumber === courtNumber)?.type === 'singles' ? 'Singles' : 'Doubles';
     toast({ title: "Court type updated", description: `Court ${courtLetter} changed to ${typeText}, schedule regenerated` });
   };
 
@@ -681,8 +687,8 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                 <div className="flex items-center gap-2">
                   {/* Singles/Doubles Toggle */}
                   <div className="flex items-center gap-1.5 p-1.5 rounded-lg border bg-card text-xs">
-                    <span className={courtConfig.type === 'singles' ? 'text-muted-foreground' : 'text-foreground font-medium'}>
-                      2v2
+                    <span className={courtConfig.type === 'doubles' ? 'text-foreground font-medium' : 'text-muted-foreground'}>
+                      Doubles
                     </span>
                     <Switch
                       checked={courtConfig.type === 'singles'}
@@ -691,7 +697,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                       className="scale-75"
                     />
                     <span className={courtConfig.type === 'singles' ? 'text-foreground font-medium' : 'text-muted-foreground'}>
-                      1v1
+                      Singles
                     </span>
                   </div>
                   
