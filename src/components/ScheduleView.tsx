@@ -58,7 +58,6 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [pendingScores, setPendingScores] = useState<Map<string, { team1: number | string; team2: number | string }>>(new Map());
   const [showAllMatches, setShowAllMatches] = useState(false);
-  const [scrollY, setScrollY] = useState(0);
   const [editingMatch, setEditingMatch] = useState<string | null>(null);
   const [editPlayers, setEditPlayers] = useState<{ team1: string[]; team2: string[] }>({ team1: [], team2: [] });
   const [courtConfigs, setCourtConfigs] = useState<CourtConfig[]>(
@@ -70,19 +69,6 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     // currentTime will be managed by match completion rather than real clock time
     // This is now a relative time tracker
   }, []);
-
-  // Track scroll to expand full list
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrollY(window.scrollY);
-      // Auto-expand if scrolled more than 800px
-      if (window.scrollY > 800 && !showAllMatches) {
-        setShowAllMatches(true);
-      }
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [showAllMatches]);
 
   // Helper to normalize scores to numbers
   const normalizeScore = (score: { team1: number | string; team2: number | string } | undefined) => {
@@ -590,303 +576,295 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Current Matches Section */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-accent to-accent/80 flex items-center justify-center">
-            <Play className="w-5 h-5 text-accent-foreground" />
-          </div>
-          <div>
-            <h3 className="text-xl font-bold text-foreground">Current Matches</h3>
-            <p className="text-sm text-muted-foreground">Games in progress</p>
-          </div>
-        </div>
+      {/* Carousel-based Match View */}
+      <div className="space-y-8">
+        {courtConfigs.map((courtConfig) => {
+          // Get all matches for this court
+          const courtMatches = matches.filter(m => m.court === courtConfig.courtNumber);
+          
+          // Find current, previous, and next matches for this court
+          const currentMatchIndex = courtMatches.findIndex(m => !matchScores.has(m.id));
+          const currentMatchForCourt = currentMatchIndex >= 0 ? courtMatches[currentMatchIndex] : null;
+          const previousMatchForCourt = currentMatchIndex > 0 ? courtMatches[currentMatchIndex - 1] : null;
+          const nextMatchForCourt = currentMatchIndex >= 0 && currentMatchIndex < courtMatches.length - 1 
+            ? courtMatches[currentMatchIndex + 1] 
+            : null;
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {(() => {
-            // Find current time slot matches
-            const firstUnscored = matches.find(m => !matchScores.has(m.id));
-            if (!firstUnscored) return null;
-            
-            const currentSlotMatches = matches.filter(m => 
-              m.startTime === firstUnscored.startTime && m.endTime === firstUnscored.endTime
-            );
-
-            return currentSlotMatches.map((match) => {
-              const confirmedScores = matchScores.get(match.id);
-              const pendingForMatch = pendingScores.get(match.id);
-              const scores = pendingForMatch || confirmedScores || { team1: '', team2: '' };
-              const isCurrentMatch = match.id === currentMatch;
-              const isCompleted = matchScores.has(match.id);
-              const hasPending = pendingScores.has(match.id);
-              
-              return (
-                <Card
-                  key={match.id}
-                  className="p-5 border-l-4 border-l-accent bg-accent/5 ring-2 ring-accent/20"
-                >
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Badge className="bg-accent/10 text-accent hover:bg-accent/20 text-base px-3 py-1">
-                        Court {match.court}
-                      </Badge>
-                      <Badge className="bg-primary/10 text-primary border-primary/20">
-                        <Clock className="w-3 h-3 mr-1" />
-                        {match.clockStartTime || `${match.startTime} min`}
-                      </Badge>
-                    </div>
-
-                    <div className="space-y-3">
-                      {editingMatch === match.id ? (
-                        /* Edit Mode */
-                        <>
-                          {/* Team 1 */}
-                          <div className="p-3 rounded-lg bg-secondary/50 space-y-2">
-                            <Label className="text-xs text-muted-foreground">Team 1</Label>
-                            {match.isSingles ? (
-                              <Select value={editPlayers.team1[0]} onValueChange={(v) => handlePlayerChange('team1', 0, v)}>
-                                <SelectTrigger className="h-10">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {allPlayers.map(p => (
-                                    <SelectItem key={p} value={p}>{p}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <>
-                                <Select value={editPlayers.team1[0]} onValueChange={(v) => handlePlayerChange('team1', 0, v)}>
-                                  <SelectTrigger className="h-10">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {allPlayers.map(p => (
-                                      <SelectItem key={p} value={p}>{p}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <Select value={editPlayers.team1[1]} onValueChange={(v) => handlePlayerChange('team1', 1, v)}>
-                                  <SelectTrigger className="h-10">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {allPlayers.map(p => (
-                                      <SelectItem key={p} value={p}>{p}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </>
-                            )}
-                          </div>
-
-                          <div className="text-center text-sm font-semibold text-muted-foreground">VS</div>
-
-                          {/* Team 2 */}
-                          <div className="p-3 rounded-lg bg-secondary/50 space-y-2">
-                            <Label className="text-xs text-muted-foreground">Team 2</Label>
-                            {match.isSingles ? (
-                              <Select value={editPlayers.team2[0]} onValueChange={(v) => handlePlayerChange('team2', 0, v)}>
-                                <SelectTrigger className="h-10">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {allPlayers.map(p => (
-                                    <SelectItem key={p} value={p}>{p}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <>
-                                <Select value={editPlayers.team2[0]} onValueChange={(v) => handlePlayerChange('team2', 0, v)}>
-                                  <SelectTrigger className="h-10">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {allPlayers.map(p => (
-                                      <SelectItem key={p} value={p}>{p}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <Select value={editPlayers.team2[1]} onValueChange={(v) => handlePlayerChange('team2', 1, v)}>
-                                  <SelectTrigger className="h-10">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {allPlayers.map(p => (
-                                      <SelectItem key={p} value={p}>{p}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </>
-                            )}
-                          </div>
-
-                          <div className="flex gap-2">
-                            <Button 
-                              onClick={() => confirmEditMatch(match.id)}
-                              className="flex-1"
-                            >
-                              Confirm Changes
-                            </Button>
-                            <Button 
-                              onClick={() => setEditingMatch(null)}
-                              variant="outline"
-                              className="flex-1"
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </>
-                      ) : (
-                        /* View Mode */
-                        <>
-                          {/* Team 1 */}
-                          <div className="flex items-center justify-between p-4 rounded-lg bg-secondary/50">
-                            <div className="flex items-center gap-3 flex-1">
-                              <Users className="w-5 h-5 text-primary" />
-                              <div className="font-semibold text-base">
-                                <div>{match.team1[0]}</div>
-                                {!match.isSingles && match.team1[1] && (
-                                  <div className="text-muted-foreground text-sm">{match.team1[1]}</div>
-                                )}
-                              </div>
-                            </div>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={scores.team1}
-                              onChange={(e) => updatePendingScore(match.id, "team1", e.target.value)}
-                              placeholder="0"
-                              className="w-20 h-14 text-center text-2xl font-bold"
-                              disabled={isCompleted && !hasPending}
-                            />
-                          </div>
-
-                          <div className="text-center text-base font-bold text-muted-foreground">
-                            VS
-                          </div>
-
-                          {/* Team 2 */}
-                          <div className="flex items-center justify-between p-4 rounded-lg bg-secondary/50">
-                            <div className="flex items-center gap-3 flex-1">
-                              <Users className="w-5 h-5 text-accent" />
-                              <div className="font-semibold text-base">
-                                <div>{match.team2[0]}</div>
-                                {!match.isSingles && match.team2[1] && (
-                                  <div className="text-muted-foreground text-sm">{match.team2[1]}</div>
-                                )}
-                              </div>
-                            </div>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={scores.team2}
-                              onChange={(e) => updatePendingScore(match.id, "team2", e.target.value)}
-                              placeholder="0"
-                              className="w-20 h-14 text-center text-2xl font-bold"
-                              disabled={isCompleted && !hasPending}
-                            />
-                          </div>
-                        </>
-                      )}
-                    </div>
-
-                    {/* Edit Players Button for Current Match */}
-                    {!isCompleted && editingMatch !== match.id && (
-                      <Button 
-                        onClick={() => startEditMatch(match)}
-                        variant="outline"
-                        className="w-full gap-2"
-                      >
-                        <Edit className="w-4 h-4" />
-                        Override Players
-                      </Button>
-                    )}
-
-                    {/* Confirm/Edit Score Buttons */}
-                    {!isCompleted && editingMatch !== match.id && (
-                      <Button 
-                        onClick={() => confirmScore(match.id)}
-                        className="w-full mt-2 h-12 text-base"
-                        disabled={!hasPending}
-                      >
-                        Confirm Score & Next Match
-                      </Button>
-                    )}
-                    
-                    {isCompleted && !hasPending && editingMatch !== match.id && (
-                      <Button 
-                        onClick={() => editScore(match.id)}
-                        variant="outline"
-                        className="w-full mt-2"
-                      >
-                        Edit Score
-                      </Button>
-                    )}
-                  </div>
-                </Card>
-              );
-            });
-          })()}
-        </div>
-      </div>
-
-      {/* Next Matches - Condensed Preview */}
-      {(() => {
-        const firstUnscored = matches.find(m => !matchScores.has(m.id));
-        if (!firstUnscored) return null;
-        
-        // Find next time slot after current
-        const currentSlotEnd = firstUnscored.endTime;
-        const nextSlotMatches = matches.filter(m => 
-          m.startTime === currentSlotEnd && !matchScores.has(m.id)
-        );
-
-        if (nextSlotMatches.length === 0) return null;
-
-        return (
-          <div className="space-y-3 pt-6 border-t">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Clock className="w-5 h-5 text-muted-foreground" />
-                <h3 className="text-lg font-semibold text-foreground">Up Next</h3>
+          return (
+            <div key={courtConfig.courtNumber} className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-primary/20 text-primary text-base px-3 py-1">
+                    Court {courtConfig.courtNumber}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {courtConfig.type === 'singles' ? 'Singles' : 'Doubles'}
+                  </Badge>
+                </div>
               </div>
-              <Badge variant="outline">
-                {nextSlotMatches[0].clockStartTime || `${nextSlotMatches[0].startTime} min`}
-              </Badge>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {nextSlotMatches.map((match) => (
-                <Card key={match.id} className="p-4 bg-muted/30">
-                  <div className="flex items-center justify-between mb-2">
-                    <Badge variant="outline" className="text-xs">Court {match.court}</Badge>
-                    <Badge variant="secondary" className="text-xs">
-                      {match.isSingles ? 'Singles' : 'Doubles'}
-                    </Badge>
+
+              {/* Carousel Container */}
+              <div className="relative overflow-hidden">
+                <div className="flex items-center gap-3 px-2">
+                  {/* Previous Match - Dimmed */}
+                  <div className="flex-1 opacity-40 scale-90 transition-all">
+                    {previousMatchForCourt ? (
+                      <Card className="p-4 bg-muted/50 border-muted">
+                        <div className="space-y-2">
+                          <div className="text-center mb-2">
+                            <Badge variant="secondary" className="text-xs">Previous</Badge>
+                          </div>
+                          <div className="text-sm space-y-1">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1 flex-1">
+                                <span className="font-medium truncate">{previousMatchForCourt.team1[0]}</span>
+                                {!previousMatchForCourt.isSingles && previousMatchForCourt.team1[1] && (
+                                  <span className="text-xs text-muted-foreground truncate">& {previousMatchForCourt.team1[1]}</span>
+                                )}
+                              </div>
+                              <span className="font-bold ml-2">{matchScores.get(previousMatchForCourt.id)?.team1}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1 flex-1">
+                                <span className="font-medium truncate">{previousMatchForCourt.team2[0]}</span>
+                                {!previousMatchForCourt.isSingles && previousMatchForCourt.team2[1] && (
+                                  <span className="text-xs text-muted-foreground truncate">& {previousMatchForCourt.team2[1]}</span>
+                                )}
+                              </div>
+                              <span className="font-bold ml-2">{matchScores.get(previousMatchForCourt.id)?.team2}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    ) : (
+                      <div className="h-full flex items-center justify-center p-8">
+                        <span className="text-xs text-muted-foreground">No previous match</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{match.team1[0]}</span>
-                      {!match.isSingles && match.team1[1] && (
-                        <span className="text-muted-foreground">& {match.team1[1]}</span>
-                      )}
-                    </div>
-                    <div className="text-xs text-muted-foreground text-center">vs</div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{match.team2[0]}</span>
-                      {!match.isSingles && match.team2[1] && (
-                        <span className="text-muted-foreground">& {match.team2[1]}</span>
-                      )}
-                    </div>
+
+                  {/* Current Match - Centered & Featured */}
+                  <div className="flex-[2] scale-100 transition-all">
+                    {currentMatchForCourt ? (
+                      <Card className="p-5 border-2 border-accent bg-accent/5 shadow-lg">
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <Badge className="bg-accent text-accent-foreground">
+                              Current Match
+                            </Badge>
+                            <Badge variant="outline">
+                              <Clock className="w-3 h-3 mr-1" />
+                              {currentMatchForCourt.clockStartTime || `${currentMatchForCourt.startTime} min`}
+                            </Badge>
+                          </div>
+
+                          {editingMatch === currentMatchForCourt.id ? (
+                            /* Edit Mode */
+                            <div className="space-y-3">
+                              <div className="p-3 rounded-lg bg-secondary/50 space-y-2">
+                                <Label className="text-xs text-muted-foreground">Team 1</Label>
+                                {currentMatchForCourt.isSingles ? (
+                                  <Select value={editPlayers.team1[0]} onValueChange={(v) => handlePlayerChange('team1', 0, v)}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      {allPlayers.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <>
+                                    <Select value={editPlayers.team1[0]} onValueChange={(v) => handlePlayerChange('team1', 0, v)}>
+                                      <SelectTrigger><SelectValue /></SelectTrigger>
+                                      <SelectContent>
+                                        {allPlayers.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                                      </SelectContent>
+                                    </Select>
+                                    <Select value={editPlayers.team1[1]} onValueChange={(v) => handlePlayerChange('team1', 1, v)}>
+                                      <SelectTrigger><SelectValue /></SelectTrigger>
+                                      <SelectContent>
+                                        {allPlayers.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                                      </SelectContent>
+                                    </Select>
+                                  </>
+                                )}
+                              </div>
+                              <div className="text-center text-sm font-semibold">VS</div>
+                              <div className="p-3 rounded-lg bg-secondary/50 space-y-2">
+                                <Label className="text-xs text-muted-foreground">Team 2</Label>
+                                {currentMatchForCourt.isSingles ? (
+                                  <Select value={editPlayers.team2[0]} onValueChange={(v) => handlePlayerChange('team2', 0, v)}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      {allPlayers.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <>
+                                    <Select value={editPlayers.team2[0]} onValueChange={(v) => handlePlayerChange('team2', 0, v)}>
+                                      <SelectTrigger><SelectValue /></SelectTrigger>
+                                      <SelectContent>
+                                        {allPlayers.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                                      </SelectContent>
+                                    </Select>
+                                    <Select value={editPlayers.team2[1]} onValueChange={(v) => handlePlayerChange('team2', 1, v)}>
+                                      <SelectTrigger><SelectValue /></SelectTrigger>
+                                      <SelectContent>
+                                        {allPlayers.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                                      </SelectContent>
+                                    </Select>
+                                  </>
+                                )}
+                              </div>
+                              <div className="flex gap-2">
+                                <Button onClick={() => confirmEditMatch(currentMatchForCourt.id)} className="flex-1">
+                                  Confirm
+                                </Button>
+                                <Button onClick={() => setEditingMatch(null)} variant="outline" className="flex-1">
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            /* View Mode */
+                            <>
+                              <div className="space-y-3">
+                                {(() => {
+                                  const confirmedScores = matchScores.get(currentMatchForCourt.id);
+                                  const pendingForMatch = pendingScores.get(currentMatchForCourt.id);
+                                  const scores = pendingForMatch || confirmedScores || { team1: '', team2: '' };
+                                  const isCompleted = matchScores.has(currentMatchForCourt.id);
+                                  const hasPending = pendingScores.has(currentMatchForCourt.id);
+
+                                  return (
+                                    <>
+                                      {/* Team 1 */}
+                                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50">
+                                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                                          <Users className="w-5 h-5 text-primary flex-shrink-0" />
+                                          <div className="font-semibold text-sm min-w-0">
+                                            <div className="truncate">{currentMatchForCourt.team1[0]}</div>
+                                            {!currentMatchForCourt.isSingles && currentMatchForCourt.team1[1] && (
+                                              <div className="text-muted-foreground text-xs truncate">{currentMatchForCourt.team1[1]}</div>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          value={scores.team1}
+                                          onChange={(e) => updatePendingScore(currentMatchForCourt.id, "team1", e.target.value)}
+                                          placeholder="0"
+                                          className="w-16 h-12 text-center text-xl font-bold flex-shrink-0"
+                                          disabled={isCompleted && !hasPending}
+                                        />
+                                      </div>
+
+                                      <div className="text-center text-sm font-bold text-muted-foreground">VS</div>
+
+                                      {/* Team 2 */}
+                                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50">
+                                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                                          <Users className="w-5 h-5 text-accent flex-shrink-0" />
+                                          <div className="font-semibold text-sm min-w-0">
+                                            <div className="truncate">{currentMatchForCourt.team2[0]}</div>
+                                            {!currentMatchForCourt.isSingles && currentMatchForCourt.team2[1] && (
+                                              <div className="text-muted-foreground text-xs truncate">{currentMatchForCourt.team2[1]}</div>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          value={scores.team2}
+                                          onChange={(e) => updatePendingScore(currentMatchForCourt.id, "team2", e.target.value)}
+                                          placeholder="0"
+                                          className="w-16 h-12 text-center text-xl font-bold flex-shrink-0"
+                                          disabled={isCompleted && !hasPending}
+                                        />
+                                      </div>
+
+                                      {!isCompleted && (
+                                        <>
+                                          <Button 
+                                            onClick={() => startEditMatch(currentMatchForCourt)}
+                                            variant="outline"
+                                            size="sm"
+                                            className="w-full gap-2"
+                                          >
+                                            <Edit className="w-4 h-4" />
+                                            Override Players
+                                          </Button>
+                                          <Button 
+                                            onClick={() => confirmScore(currentMatchForCourt.id)}
+                                            className="w-full h-11"
+                                            disabled={!hasPending}
+                                          >
+                                            Confirm Score & Next
+                                          </Button>
+                                        </>
+                                      )}
+                                      
+                                      {isCompleted && !hasPending && (
+                                        <Button 
+                                          onClick={() => editScore(currentMatchForCourt.id)}
+                                          variant="outline"
+                                          className="w-full"
+                                        >
+                                          Edit Score
+                                        </Button>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </Card>
+                    ) : (
+                      <Card className="p-8 text-center bg-muted/30">
+                        <Trophy className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">All matches completed</p>
+                      </Card>
+                    )}
                   </div>
-                </Card>
-              ))}
+
+                  {/* Next Match - Preview */}
+                  <div className="flex-1 opacity-60 scale-90 transition-all">
+                    {nextMatchForCourt ? (
+                      <Card className="p-4 bg-muted/30 border-dashed">
+                        <div className="space-y-2">
+                          <div className="text-center mb-2">
+                            <Badge variant="outline" className="text-xs">Up Next</Badge>
+                          </div>
+                          <div className="text-xs space-y-1">
+                            <div className="flex items-center gap-1">
+                              <span className="font-medium truncate">{nextMatchForCourt.team1[0]}</span>
+                              {!nextMatchForCourt.isSingles && nextMatchForCourt.team1[1] && (
+                                <span className="text-muted-foreground truncate">& {nextMatchForCourt.team1[1]}</span>
+                              )}
+                            </div>
+                            <div className="text-center text-muted-foreground">vs</div>
+                            <div className="flex items-center gap-1">
+                              <span className="font-medium truncate">{nextMatchForCourt.team2[0]}</span>
+                              {!nextMatchForCourt.isSingles && nextMatchForCourt.team2[1] && (
+                                <span className="text-muted-foreground truncate">& {nextMatchForCourt.team2[1]}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    ) : (
+                      <div className="h-full flex items-center justify-center p-8">
+                        <span className="text-xs text-muted-foreground">No more matches</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })}
+      </div>
 
       {/* All Matches - Expandable */}
       {showAllMatches ? (
