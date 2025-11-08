@@ -48,6 +48,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
   const [isAddPlayerOpen, setIsAddPlayerOpen] = useState(false);
   const [playerToDelete, setPlayerToDelete] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState<number>(0);
+  const [pendingScores, setPendingScores] = useState<Map<string, { team1: number; team2: number }>>(new Map());
 
   // Update current time every minute
   useEffect(() => {
@@ -76,18 +77,46 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     return null;
   }, [matches, matchScores]);
 
-  const updateScore = (matchId: string, team: "team1" | "team2", score: number) => {
-    const current = matchScores.get(matchId) || { team1: 0, team2: 0 };
-    const newScores = new Map(matchScores.set(matchId, { ...current, [team]: score }));
-    setMatchScores(newScores);
+  const updatePendingScore = (matchId: string, team: "team1" | "team2", score: number) => {
+    const current = pendingScores.get(matchId) || matchScores.get(matchId) || { team1: 0, team2: 0 };
+    const newPending = new Map(pendingScores);
+    newPending.set(matchId, { ...current, [team]: score });
+    setPendingScores(newPending);
+  };
 
-    // Check if both scores are entered and this is the first complete score entry
-    const bothScoresEntered = (team === "team1" && current.team2 > 0) || (team === "team2" && current.team1 > 0);
+  const confirmScore = (matchId: string) => {
+    const pending = pendingScores.get(matchId);
+    if (!pending || pending.team1 <= 0 || pending.team2 <= 0) {
+      toast({ title: "Please enter both scores", variant: "destructive" });
+      return;
+    }
+
+    const newScores = new Map(matchScores);
+    newScores.set(matchId, pending);
+    setMatchScores(newScores);
     
-    if (bothScoresEntered && score > 0) {
-      // Calculate actual end time
-      const actualEndTime = currentTime;
-      checkScheduleAdjustment(matchId, actualEndTime);
+    // Remove from pending
+    const newPending = new Map(pendingScores);
+    newPending.delete(matchId);
+    setPendingScores(newPending);
+
+    // Calculate actual end time and check for schedule adjustment
+    const actualEndTime = currentTime;
+    checkScheduleAdjustment(matchId, actualEndTime);
+    
+    toast({ title: "Score confirmed" });
+  };
+
+  const editScore = (matchId: string) => {
+    const current = matchScores.get(matchId);
+    if (current) {
+      const newPending = new Map(pendingScores);
+      newPending.set(matchId, current);
+      setPendingScores(newPending);
+      
+      const newScores = new Map(matchScores);
+      newScores.delete(matchId);
+      setMatchScores(newScores);
     }
   };
 
@@ -410,9 +439,12 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {slotMatches.map((match) => {
-                  const scores = matchScores.get(match.id) || { team1: 0, team2: 0 };
+                  const confirmedScores = matchScores.get(match.id);
+                  const pendingForMatch = pendingScores.get(match.id);
+                  const scores = pendingForMatch || confirmedScores || { team1: 0, team2: 0 };
                   const isCurrentMatch = match.id === currentMatch;
-                  const isCompleted = matchScores.has(match.id) && scores.team1 > 0 && scores.team2 > 0;
+                  const isCompleted = matchScores.has(match.id) && confirmedScores && confirmedScores.team1 > 0 && confirmedScores.team2 > 0;
+                  const hasPending = pendingScores.has(match.id);
                   
                   return (
                     <Card
@@ -456,9 +488,9 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                               type="number"
                               min="0"
                               value={scores.team1}
-                              onChange={(e) => updateScore(match.id, "team1", Number(e.target.value))}
+                              onChange={(e) => updatePendingScore(match.id, "team1", Number(e.target.value))}
                               className="w-16 h-12 text-center text-xl font-bold"
-                              disabled={isCompleted}
+                              disabled={isCompleted && !hasPending}
                             />
                           </div>
 
@@ -479,12 +511,33 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                               type="number"
                               min="0"
                               value={scores.team2}
-                              onChange={(e) => updateScore(match.id, "team2", Number(e.target.value))}
+                              onChange={(e) => updatePendingScore(match.id, "team2", Number(e.target.value))}
                               className="w-16 h-12 text-center text-xl font-bold"
-                              disabled={isCompleted}
+                              disabled={isCompleted && !hasPending}
                             />
                           </div>
                         </div>
+
+                        {/* Confirm/Edit Score Buttons */}
+                        {!isCompleted && (
+                          <Button 
+                            onClick={() => confirmScore(match.id)}
+                            className="w-full mt-2"
+                            disabled={!hasPending || !pendingForMatch || pendingForMatch.team1 <= 0 || pendingForMatch.team2 <= 0}
+                          >
+                            Confirm Score & Next Match
+                          </Button>
+                        )}
+                        
+                        {isCompleted && !hasPending && (
+                          <Button 
+                            onClick={() => editScore(match.id)}
+                            variant="outline"
+                            className="w-full mt-2"
+                          >
+                            Edit Score
+                          </Button>
+                        )}
                       </div>
                     </Card>
                   );

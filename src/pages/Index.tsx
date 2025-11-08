@@ -8,6 +8,7 @@ import { Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { GameConfig } from "@/components/GameSetup";
+import { QRCodeSVG } from "qrcode.react";
 
 type Step = "start" | "setup" | "schedule";
 
@@ -205,10 +206,21 @@ const Index = () => {
           {step === "schedule" && gameConfig && (
             <div className="space-y-4">
               {gameCode && (
-                <div className="text-center p-4 bg-primary/10 rounded-lg border border-primary/20">
-                  <p className="text-sm text-muted-foreground mb-1">Game Code</p>
-                  <p className="text-2xl font-bold font-mono tracking-wider text-primary">{gameCode}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Share this code with other players</p>
+                <div className="flex flex-col items-center gap-4 p-6 bg-primary/10 rounded-lg border border-primary/20">
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground mb-1">Game Code</p>
+                    <p className="text-3xl font-bold font-mono tracking-wider text-primary">{gameCode}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Share this code with other players</p>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg">
+                    <QRCodeSVG 
+                      value={`${window.location.origin}?join=${gameCode}`}
+                      size={180}
+                      level="H"
+                      includeMargin={true}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Scan to join this game</p>
                 </div>
               )}
               <ScheduleView

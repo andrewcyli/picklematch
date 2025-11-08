@@ -102,84 +102,13 @@ export const CombinedSetup = ({ onComplete }: CombinedSetupProps) => {
         <h2 className="text-2xl font-bold text-foreground mb-6">Setup Your Game</h2>
       </div>
 
-      <div className="grid md:grid-cols-[2fr_1fr] gap-6">
-        {/* Game Configuration */}
-        <div className="space-y-6 order-2 md:order-1">
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-foreground">Game Settings</h3>
-            
-            <div className="space-y-3">
-              <Label htmlFor="game-duration" className="text-base">Game Duration</Label>
-              <RadioGroup
-                value={gameDuration.toString()}
-                onValueChange={(value) => setGameDuration(parseInt(value) as 5 | 10 | 15)}
-                className="flex gap-4"
-              >
-                {[5, 10, 15].map((duration) => (
-                  <div key={duration} className="flex items-center space-x-2">
-                    <RadioGroupItem value={duration.toString()} id={`duration-${duration}`} />
-                    <Label htmlFor={`duration-${duration}`} className="cursor-pointer">
-                      {duration} min
-                    </Label>
-                  </div>
-                ))}
-              </RadioGroup>
-            </div>
-
-            <div className="space-y-3">
-              <Label htmlFor="total-time" className="text-base">Total Play Time</Label>
-              <Select value={totalTime.toString()} onValueChange={(value) => setTotalTime(parseInt(value))}>
-                <SelectTrigger id="total-time">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {totalTimeOptions.map((time) => (
-                    <SelectItem key={time} value={time.toString()}>
-                      {time} minutes
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-3">
-              <Label htmlFor="courts" className="text-base">Number of Courts</Label>
-              <Select 
-                value={courts.toString()} 
-                onValueChange={(value) => setCourts(parseInt(value))}
-                disabled={players.length < 4}
-              >
-                <SelectTrigger id="courts">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: maxCourts || 1 }, (_, i) => i + 1).map((num) => (
-                    <SelectItem key={num} value={num.toString()}>
-                      {num} court{num > 1 ? "s" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {players.length < 4 && (
-                <p className="text-sm text-muted-foreground">Add at least 4 players to select courts</p>
-              )}
-            </div>
-
-            <div className="space-y-3">
-              <Label htmlFor="start-time" className="text-base">Start Time</Label>
-              <Input
-                id="start-time"
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="max-w-[200px]"
-              />
-            </div>
-          </div>
-
-          {/* Add Player Section */}
-          <div className="space-y-4 pt-6 border-t">
-            <h3 className="text-lg font-semibold text-foreground">Add Players</h3>
+      <div className="grid md:grid-cols-[1fr_2fr] gap-6">
+        {/* Player List and Add Player - Now First */}
+        <div className="space-y-4 order-1">
+          <h3 className="text-lg font-semibold text-foreground">Players</h3>
+          
+          {/* Add Player Section at Top */}
+          <div className="space-y-3">
             <div className="flex gap-3">
               <Input
                 value={currentName}
@@ -203,11 +132,8 @@ export const CombinedSetup = ({ onComplete }: CombinedSetupProps) => {
               {players.length < 2 && " (minimum 2 required)"}
             </p>
           </div>
-        </div>
 
-        {/* Player List */}
-        <div className="space-y-4 order-1 md:order-2">
-          <h3 className="text-lg font-semibold text-foreground">Players</h3>
+          {/* Player List */}
           <Card className="p-4 max-h-[500px] overflow-y-auto">
             {players.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">No players added yet</p>
@@ -286,6 +212,81 @@ export const CombinedSetup = ({ onComplete }: CombinedSetupProps) => {
               </div>
             )}
           </Card>
+        </div>
+
+        {/* Game Configuration - Now Second */}
+        <div className="space-y-6 order-2">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-foreground">Game Settings</h3>
+            
+            <div className="space-y-3">
+              <Label htmlFor="game-duration" className="text-base">Game Duration</Label>
+              <RadioGroup
+                value={gameDuration.toString()}
+                onValueChange={(value) => setGameDuration(parseInt(value) as 5 | 10 | 15)}
+                className="flex gap-4"
+              >
+                {[5, 10, 15].map((duration) => (
+                  <div key={duration} className="flex items-center space-x-2">
+                    <RadioGroupItem value={duration.toString()} id={`duration-${duration}`} />
+                    <Label htmlFor={`duration-${duration}`} className="cursor-pointer">
+                      {duration} min
+                    </Label>
+                  </div>
+                ))}
+              </RadioGroup>
+            </div>
+
+            <div className="space-y-3">
+              <Label htmlFor="total-time" className="text-base">Total Play Time</Label>
+              <Select value={totalTime.toString()} onValueChange={(value) => setTotalTime(parseInt(value))}>
+                <SelectTrigger id="total-time">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {totalTimeOptions.map((time) => (
+                    <SelectItem key={time} value={time.toString()}>
+                      {time} minutes
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-3">
+              <Label htmlFor="courts" className="text-base">Number of Courts</Label>
+              <Select 
+                value={courts.toString()} 
+                onValueChange={(value) => setCourts(parseInt(value))}
+                disabled={players.length < 4}
+              >
+                <SelectTrigger id="courts">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: maxCourts || 1 }, (_, i) => i + 1).map((num) => (
+                    <SelectItem key={num} value={num.toString()}>
+                      {num} court{num > 1 ? "s" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {players.length < 4 && (
+                <p className="text-sm text-muted-foreground">Add at least 4 players to select courts</p>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <Label htmlFor="start-time" className="text-base">Start Time</Label>
+              <Input
+                id="start-time"
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className="max-w-[200px]"
+              />
+            </div>
+          </div>
         </div>
       </div>
 
