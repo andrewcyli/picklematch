@@ -169,8 +169,9 @@ function generateCompleteSchedule(
 
     // Generate matches for ALL courts in this slot
     for (const courtConfig of courtConfigs) {
+      // CRITICAL: Exclude all players already used in THIS slot (current matches across courts)
       const excludedPlayers = new Set([
-        ...playersUsedThisSlot,
+        ...playersUsedThisSlot, // Players in current/next matches on ALL courts in this slot
         ...getPreviousSlotPlayersOnOtherCourts(schedule, slot, courtConfig.courtNumber),
         ...getRestingPlayers(restQueue, slot, players)
       ]);

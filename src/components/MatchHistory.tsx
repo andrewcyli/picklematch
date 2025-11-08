@@ -39,15 +39,26 @@ export const MatchHistory = ({ matches, matchScores }: MatchHistoryProps) => {
 
           const team1Won = score.team1 > score.team2;
           const team2Won = score.team2 > score.team1;
+          
+          // Calculate match number (e.g., A2, B3)
+          const courtLetter = String.fromCharCode(64 + match.court);
+          const courtMatches = completedMatches.filter(m => m.court === match.court);
+          const matchIndex = courtMatches.findIndex(m => m.id === match.id) + 1;
+          const matchNumber = `${courtLetter}${matchIndex}`;
 
           return (
             <Card key={match.id} className="p-4 hover:shadow-md transition-shadow">
               <div className="space-y-3">
                 {/* Match Header */}
                 <div className="flex items-center justify-between">
-                  <Badge variant="outline" className="text-xs">
-                    Court {match.court}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs font-semibold">
+                      {matchNumber}
+                    </Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      Court {String.fromCharCode(64 + match.court)}
+                    </Badge>
+                  </div>
                   <Badge variant="secondary" className="text-xs">
                     <Clock className="w-3 h-3 mr-1" />
                     {match.clockStartTime || `${match.startTime} min`}

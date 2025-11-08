@@ -175,6 +175,28 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     setEditedTeams({ team1: [], team2: [] });
   };
 
+  // Helper to check if a match is current or next-up on any court
+  const isCurrentOrNextMatch = (matchId: string, scores: Map<string, { team1: number; team2: number }>) => {
+    const unplayedMatches = matches.filter(m => !scores.has(m.id));
+    const courtGroups = new Map<number, Match[]>();
+    
+    unplayedMatches.forEach(match => {
+      if (!courtGroups.has(match.court)) {
+        courtGroups.set(match.court, []);
+      }
+      courtGroups.get(match.court)!.push(match);
+    });
+
+    for (const courtMatches of courtGroups.values()) {
+      const currentAndNext = courtMatches.slice(0, 2).map(m => m.id);
+      if (currentAndNext.includes(matchId)) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
   const confirmScore = (matchId: string) => {
     const pending = pendingScores.get(matchId);
     if (!pending || pending.team1 === '' || pending.team2 === '' || pending.team1 === undefined || pending.team2 === undefined) {
@@ -384,12 +406,16 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
       });
       onScheduleUpdate(merged, allPlayers);
       
-      const matchIdx = matches.filter(m => m.court === advanceMatch.court && m.endTime <= advanceMatch.endTime).length;
-      const matchNumber = `${String.fromCharCode(64 + advanceMatch.court)}${matchIdx}`;
-      toast({ 
-        title: "Game advanced", 
-        description: `Match ${matchNumber} roster advanced from slot ${replacementIndex + 1} to resolve conflicts for: ${conflicts.join(', ')}` 
-      });
+      // Only notify if it affects current or next-up matches
+      const affectedMatchIsCurrentOrNext = isCurrentOrNextMatch(advanceMatch.id, scores);
+      if (affectedMatchIsCurrentOrNext) {
+        const matchIdx = matches.filter(m => m.court === advanceMatch.court && m.endTime <= advanceMatch.endTime).length;
+        const matchNumber = `${String.fromCharCode(64 + advanceMatch.court)}${matchIdx}`;
+        toast({ 
+          title: "Game advanced", 
+          description: `Match ${matchNumber} roster advanced to resolve conflicts for: ${conflicts.join(', ')}` 
+        });
+      }
     } else {
       // Fallback: adjust players
       adjustUpcomingMatch(advanceMatch, conflicts, playersInUse, scores);
@@ -474,9 +500,13 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     });
     onScheduleUpdate(mergedMatches, allPlayers);
     
-    const matchIdx = matches.filter(m => m.court === upcomingMatch.court && m.endTime <= upcomingMatch.endTime).length;
-    const matchNumber = `${String.fromCharCode(64 + upcomingMatch.court)}${matchIdx}`;
-    toast({ title: "Upcoming game adjusted", description: `Match ${matchNumber} roster adjusted to avoid conflicts for: ${conflicts.join(', ')}` });
+    // Only notify if it affects current or next-up matches
+    const affectedMatchIsCurrentOrNext = isCurrentOrNextMatch(upcomingMatch.id, scores);
+    if (affectedMatchIsCurrentOrNext) {
+      const matchIdx = matches.filter(m => m.court === upcomingMatch.court && m.endTime <= upcomingMatch.endTime).length;
+      const matchNumber = `${String.fromCharCode(64 + upcomingMatch.court)}${matchIdx}`;
+      toast({ title: "Upcoming game adjusted", description: `Match ${matchNumber} roster adjusted to avoid conflicts for: ${conflicts.join(', ')}` });
+    }
   };
 
   const checkScheduleAdjustment = (
@@ -527,6 +557,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
 
         onScheduleUpdate(mergedMatches, allPlayers);
         
+        // Always notify schedule adjustments as they affect current/upcoming matches
         const completedMatchIdx = matches.filter(m => m.court === completedMatch.court && m.endTime <= completedMatch.endTime).length;
         const completedMatchNumber = `${String.fromCharCode(64 + completedMatch.court)}${completedMatchIdx}`;
         const matchDiff = mergedMatches.length - matches.length;
