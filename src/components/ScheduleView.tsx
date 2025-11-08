@@ -89,10 +89,18 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     const actualEndTime = currentTime;
     checkScheduleAdjustment(matchId, actualEndTime);
     
-    // Auto-scroll to next match
+    // Auto-scroll to next match on the same court
     const match = matches.find(m => m.id === matchId);
     if (match) {
-      setTimeout(() => scrollToCurrentMatch(match.court), 300);
+      setTimeout(() => {
+        const courtMatches = matches.filter(m => m.court === match.court);
+        const nextMatchIndex = courtMatches.findIndex(m => !newScores.has(m.id));
+        const api = carouselApis.get(match.court);
+        
+        if (api && nextMatchIndex >= 0) {
+          api.scrollTo(nextMatchIndex, true);
+        }
+      }, 100);
     }
     
     toast({ title: "Score confirmed" });

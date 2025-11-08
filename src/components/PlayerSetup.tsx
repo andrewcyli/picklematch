@@ -5,14 +5,18 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { X, Plus, Users, Link2 } from "lucide-react";
 import { toast } from "sonner";
+import { Leaderboard } from "./Leaderboard";
+import { Match } from "@/lib/scheduler";
 
 interface PlayerSetupProps {
   onComplete: (players: string[], teammatePairs?: { player1: string; player2: string }[]) => void;
   initialPlayers?: string[];
   initialTeammatePairs?: { player1: string; player2: string }[];
+  matches?: Match[];
+  matchScores?: Map<string, { team1: number; team2: number }>;
 }
 
-export const PlayerSetup = ({ onComplete, initialPlayers = [], initialTeammatePairs = [] }: PlayerSetupProps) => {
+export const PlayerSetup = ({ onComplete, initialPlayers = [], initialTeammatePairs = [], matches = [], matchScores = new Map() }: PlayerSetupProps) => {
   const [players, setPlayers] = useState<string[]>(initialPlayers);
   const [currentName, setCurrentName] = useState("");
   const [teammatePairs, setTeammatePairs] = useState<{ player1: string; player2: string }[]>(initialTeammatePairs);
@@ -180,6 +184,12 @@ export const PlayerSetup = ({ onComplete, initialPlayers = [], initialTeammatePa
           ))}
         </div>
       )}
+
+      <Leaderboard 
+        players={players} 
+        matches={matches} 
+        matchScores={matchScores}
+      />
 
       <Button
         onClick={() => onComplete(players, teammatePairs)}

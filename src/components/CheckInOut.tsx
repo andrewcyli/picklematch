@@ -166,6 +166,8 @@ export const CheckInOut = ({ gameCode, players, onPlayersUpdate, matches = [], m
         }}
         initialPlayers={players}
         initialTeammatePairs={teammatePairs}
+        matches={matches}
+        matchScores={matchScores}
       />
 
       {leaderboard.length > 0 && (
