@@ -17,6 +17,7 @@ export type Database = {
       games: {
         Row: {
           created_at: string
+          creator_id: string | null
           game_code: string
           game_config: Json
           id: string
@@ -26,6 +27,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          creator_id?: string | null
           game_code: string
           game_config: Json
           id?: string
@@ -35,6 +37,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          creator_id?: string | null
           game_code?: string
           game_config?: Json
           id?: string

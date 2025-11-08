@@ -22,6 +22,34 @@ const Index = () => {
   const [showGameCodeDialog, setShowGameCodeDialog] = useState(true);
   const [setupComplete, setSetupComplete] = useState(false);
   const [matchScores, setMatchScores] = useState<Map<string, { team1: number; team2: number }>>(new Map());
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // Initialize anonymous authentication
+  useEffect(() => {
+    const initAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        const { data, error } = await supabase.auth.signInAnonymously();
+        if (error) {
+          console.error('Anonymous auth error:', error);
+          toast.error('Failed to initialize app');
+          return;
+        }
+        setUserId(data.user?.id || null);
+      } else {
+        setUserId(session.user.id);
+      }
+    };
+
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUserId(session?.user?.id || null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (!gameId) return;
@@ -58,6 +86,11 @@ const Index = () => {
   };
 
   const joinExistingGame = async (code: string) => {
+    if (!userId) {
+      toast.error('Please wait for authentication to complete');
+      return;
+    }
+    
     try {
       const { data, error } = await supabase
         .from('games')
@@ -95,6 +128,11 @@ const Index = () => {
   };
 
   const handleGameConfigComplete = async (config: GameConfig) => {
+    if (!userId) {
+      toast.error('Please wait for authentication to complete');
+      return;
+    }
+    
     setGameConfig(config);
     setSetupComplete(true);
 
@@ -119,6 +157,7 @@ const Index = () => {
             game_config: config as any,
             players: [],
             matches: [],
+            creator_id: userId,
           }])
           .select()
           .single();
