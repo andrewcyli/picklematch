@@ -800,22 +800,28 @@ export function regenerateScheduleFromSlot(
 // ==================== UTILITIES ====================
 
 function finalizeMatches(matches: Match[], startTime?: string, gameDuration?: number): Match[] {
-  // First, remove duplicates by ID - keep the LAST occurrence (most recent)
+  // 1) Ensure each match has a stable, deterministic id
+  const withIds = matches.map((m) => {
+    const id = m.id && m.id.trim() !== "" ? m.id : `match-c${m.court}-t${m.startTime}`;
+    return { ...m, id };
+  });
+
+  // 2) Remove duplicates by ID - keep the LAST occurrence (most recent)
   const seenIds = new Map<string, Match>();
-  matches.forEach(match => {
+  withIds.forEach((match) => {
     seenIds.set(match.id, match);
   });
   const uniqueMatches = Array.from(seenIds.values());
   
-  // Sort by court and startTime to maintain order
+  // 3) Sort by court and startTime to maintain order
   uniqueMatches.sort((a, b) => {
     if (a.startTime !== b.startTime) return a.startTime - b.startTime;
     return a.court - b.court;
   });
   
+  // 4) Lock and compute display times
   return uniqueMatches.map((match) => {
-    // Lock all matches after generation for immutability
-    const finalMatch = { 
+    const finalMatch: Match = { 
       ...match,
       isLocked: match.isLocked !== false // Lock by default unless explicitly unlocked
     };

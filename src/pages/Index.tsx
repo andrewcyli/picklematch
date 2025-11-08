@@ -28,6 +28,18 @@ const Index = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [isRestoringSession, setIsRestoringSession] = useState(true);
 
+  // Ensure every match has a stable, unique id to prevent key collisions and score mismatches
+  const sanitizeMatches = (arr: Match[]): Match[] => {
+    const seen = new Map<string, number>();
+    return arr.map((m) => {
+      let baseId = (m.id && m.id.trim() !== "") ? m.id : `match-c${m.court}-t${m.startTime}`;
+      const count = seen.get(baseId) || 0;
+      seen.set(baseId, count + 1);
+      const id = count === 0 ? baseId : `${baseId}-v${count + 1}`;
+      return { ...m, id };
+    });
+  };
+
   // Restore session from localStorage on mount
   useEffect(() => {
     const restoreSession = async () => {
@@ -44,13 +56,14 @@ const Index = () => {
           
           if (!error && data) {
             const loadedMatches = data.matches as unknown as Match[] || [];
+            const sanitized = sanitizeMatches(loadedMatches);
             
             setGameId(data.id);
             setGameCode(data.game_code);
             setPlayers(data.players || []);
             setGameConfig(data.game_config as unknown as GameConfig);
-            setMatches(loadedMatches);
-            syncMatchScoresFromMatches(loadedMatches);
+            setMatches(sanitized);
+            syncMatchScoresFromMatches(sanitized);
             setShowGameCodeDialog(false);
             
             if (data.game_config) {
@@ -144,10 +157,12 @@ const Index = () => {
         const newPlayers = updatedGame.players || [];
         const newConfig = updatedGame.game_config as unknown as GameConfig;
         
+        const sanitized = sanitizeMatches(newMatches);
+        
         setPlayers(newPlayers);
-        setMatches(newMatches);
+        setMatches(sanitized);
         setGameConfig(newConfig);
-        syncMatchScoresFromMatches(newMatches);
+        syncMatchScoresFromMatches(sanitized);
       }
     }).subscribe();
     return () => {
@@ -176,13 +191,14 @@ const Index = () => {
         return;
       }
       const loadedMatches = data.matches as unknown as Match[] || [];
+      const sanitized = sanitizeMatches(loadedMatches);
       
       setGameId(data.id);
       setGameCode(data.game_code);
       setPlayers(data.players || []);
       setGameConfig(data.game_config as unknown as GameConfig);
-      setMatches(loadedMatches);
-      syncMatchScoresFromMatches(loadedMatches);
+      setMatches(sanitized);
+      syncMatchScoresFromMatches(sanitized);
       setShowGameCodeDialog(false);
       
       // Save session to localStorage
@@ -279,15 +295,14 @@ const Index = () => {
     }
   };
   const handleScheduleUpdate = async (newMatches: Match[], newPlayers: string[]) => {
-    // Matches should already have scores embedded, just save as-is
-    setMatches(newMatches);
+    // Sanitize IDs before saving to avoid duplicates
+    const sanitized = sanitizeMatches(newMatches);
+    setMatches(sanitized);
     setPlayers(newPlayers);
     if (gameId) {
       try {
-        const {
-          error
-        } = await supabase.from('games').update({
-          matches: newMatches as any,
+        const { error } = await supabase.from('games').update({
+          matches: sanitized as any,
           players: newPlayers
         }).eq('id', gameId);
         if (error) throw error;

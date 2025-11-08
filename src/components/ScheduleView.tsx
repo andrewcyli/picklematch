@@ -571,9 +571,10 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     }
   }, [carouselApis.size, matches, matchScores]);
 
-  useEffect(() => {
-    checkPlayerConflicts(matchScores);
-  }, [matches, matchScores]);
+// Conflict checks are performed after confirming a score to avoid render-loop adjustments
+// useEffect(() => {
+//   checkPlayerConflicts(matchScores);
+// }, []);
 
   return (
     <div className="pb-20 max-h-[calc(100vh-5rem)] overflow-y-auto">
