@@ -718,7 +718,10 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                               </Badge>
                               <Badge variant="outline" className="text-xs">
                                 <Clock className="w-3 h-3 mr-1" />
-                                {isCurrentMatch ? 'Started' : 'Est.'} {match.clockStartTime || `${match.startTime} min`}
+                                {isCurrentMatch 
+                                  ? `Started ${match.clockStartTime || new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+                                  : `Est. ${match.clockStartTime || new Date(Date.now() + match.startTime * 60000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+                                }
                               </Badge>
                             </div>
 

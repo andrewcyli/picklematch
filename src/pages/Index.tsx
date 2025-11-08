@@ -11,7 +11,8 @@ import { Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Leaderboard } from "@/components/Leaderboard";
-type Section = "setup" | "scheduler" | "checkin" | "leaderboard";
+import { MatchHistory } from "@/components/MatchHistory";
+type Section = "setup" | "players" | "matches" | "history" | "leaderboard";
 const Index = () => {
   const [activeSection, setActiveSection] = useState<Section>("setup");
   const [players, setPlayers] = useState<string[]>([]);
@@ -71,9 +72,9 @@ const Index = () => {
             }
             
             if (loadedMatches.length > 0) {
-              setActiveSection("scheduler");
+              setActiveSection("matches");
             } else if (data.players && data.players.length > 0) {
-              setActiveSection("checkin");
+              setActiveSection("players");
             } else {
               setActiveSection("setup");
             }
@@ -208,7 +209,7 @@ const Index = () => {
         setSetupComplete(true);
       }
       if (loadedMatches.length > 0) {
-        setActiveSection("scheduler");
+        setActiveSection("matches");
       } else {
         setActiveSection("setup");
       }
@@ -258,7 +259,7 @@ const Index = () => {
         
         toast.success(`Game created! Code: ${newGameCode}`);
       }
-      setActiveSection("checkin");
+      setActiveSection("players");
     } catch (error) {
       toast.error("Failed to save game");
       console.error(error);
@@ -389,17 +390,19 @@ const Index = () => {
               <GameSetup onComplete={handleGameConfigComplete} />
             </div>}
           
-          {activeSection === "scheduler" && gameConfig && matches.length > 0 && <ScheduleView matches={matches} onBack={resetApp} gameConfig={gameConfig} allPlayers={players} onScheduleUpdate={handleScheduleUpdate} matchScores={matchScores} onMatchScoresUpdate={setMatchScores} />}
+          {activeSection === "matches" && gameConfig && matches.length > 0 && <ScheduleView matches={matches} onBack={resetApp} gameConfig={gameConfig} allPlayers={players} onScheduleUpdate={handleScheduleUpdate} matchScores={matchScores} onMatchScoresUpdate={setMatchScores} />}
 
-          {activeSection === "scheduler" && (!gameConfig || matches.length === 0) && <div className="text-center py-12">
+          {activeSection === "matches" && (!gameConfig || matches.length === 0) && <div className="text-center py-12">
               <p className="text-muted-foreground">Please complete game setup and add players first</p>
             </div>}
 
-          {activeSection === "checkin" && gameCode && <CheckInOut gameCode={gameCode} players={players} onPlayersUpdate={handlePlayersUpdate} matches={matches} matchScores={matchScores} teammatePairs={gameConfig?.teammatePairs} onNavigateToMatches={() => setActiveSection("scheduler")} hasStartedMatches={matches.length > 0} />}
+          {activeSection === "players" && gameCode && <CheckInOut gameCode={gameCode} players={players} onPlayersUpdate={handlePlayersUpdate} matches={matches} matchScores={matchScores} teammatePairs={gameConfig?.teammatePairs} onNavigateToMatches={() => setActiveSection("matches")} hasStartedMatches={matches.length > 0} />}
 
-          {activeSection === "checkin" && !gameCode && <div className="text-center py-12">
+          {activeSection === "players" && !gameCode && <div className="text-center py-12">
               <p className="text-muted-foreground">Please complete game setup first</p>
             </div>}
+
+          {activeSection === "history" && <MatchHistory matches={matches} matchScores={matchScores} />}
 
           {activeSection === "leaderboard" && <div className="space-y-6">
               <div className="text-center mb-6">
