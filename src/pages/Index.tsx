@@ -100,6 +100,22 @@ const Index = () => {
     }
   }, [userId]);
 
+  // Handle URL parameter for joining via shared link
+  useEffect(() => {
+    if (!userId) return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const joinCode = urlParams.get('join');
+    
+    if (joinCode) {
+      // Remove the parameter from URL without reload
+      window.history.replaceState({}, '', window.location.pathname);
+      
+      // Join the game
+      joinExistingGame(joinCode);
+    }
+  }, [userId]);
+
   // Initialize anonymous authentication
   useEffect(() => {
     const initAuth = async () => {
