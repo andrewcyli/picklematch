@@ -5,7 +5,6 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { X, Plus, Users, Link2 } from "lucide-react";
 import { toast } from "sonner";
-import { Leaderboard } from "./Leaderboard";
 import { Match } from "@/lib/scheduler";
 
 interface PlayerSetupProps {
@@ -14,9 +13,10 @@ interface PlayerSetupProps {
   initialTeammatePairs?: { player1: string; player2: string }[];
   matches?: Match[];
   matchScores?: Map<string, { team1: number; team2: number }>;
+  hasStartedMatches?: boolean;
 }
 
-export const PlayerSetup = ({ onComplete, initialPlayers = [], initialTeammatePairs = [], matches = [], matchScores = new Map() }: PlayerSetupProps) => {
+export const PlayerSetup = ({ onComplete, initialPlayers = [], initialTeammatePairs = [], matches = [], matchScores = new Map(), hasStartedMatches = false }: PlayerSetupProps) => {
   const [players, setPlayers] = useState<string[]>(initialPlayers);
   const [currentName, setCurrentName] = useState("");
   const [teammatePairs, setTeammatePairs] = useState<{ player1: string; player2: string }[]>(initialTeammatePairs);
@@ -185,19 +185,13 @@ export const PlayerSetup = ({ onComplete, initialPlayers = [], initialTeammatePa
         </div>
       )}
 
-      <Leaderboard 
-        players={players} 
-        matches={matches} 
-        matchScores={matchScores}
-      />
-
       <Button
         onClick={() => onComplete(players, teammatePairs)}
         disabled={players.length < 2}
         size="lg"
         className="w-full h-14 text-lg font-semibold"
       >
-        Continue to Matches ({players.length} players)
+        {hasStartedMatches ? "Update Matches" : "Continue to Matches"} ({players.length} players)
       </Button>
     </div>
   );

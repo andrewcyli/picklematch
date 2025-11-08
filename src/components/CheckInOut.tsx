@@ -3,10 +3,9 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlayerSetup } from "@/components/PlayerSetup";
 import { QRCodeSVG } from "qrcode.react";
-import { Share2, Copy, Check, Medal, Trophy } from "lucide-react";
+import { Share2, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Match } from "@/lib/scheduler";
-import { Badge } from "@/components/ui/badge";
 
 interface CheckInOutProps {
   gameCode: string;
@@ -16,9 +15,10 @@ interface CheckInOutProps {
   matchScores?: Map<string, { team1: number; team2: number }>;
   teammatePairs?: { player1: string; player2: string }[];
   onNavigateToMatches?: () => void;
+  hasStartedMatches?: boolean;
 }
 
-export const CheckInOut = ({ gameCode, players, onPlayersUpdate, matches = [], matchScores = new Map(), teammatePairs = [], onNavigateToMatches }: CheckInOutProps) => {
+export const CheckInOut = ({ gameCode, players, onPlayersUpdate, matches = [], matchScores = new Map(), teammatePairs = [], onNavigateToMatches, hasStartedMatches = false }: CheckInOutProps) => {
   const [copied, setCopied] = useState(false);
   const gameUrl = `${window.location.origin}?join=${gameCode}`;
 
@@ -168,55 +168,8 @@ export const CheckInOut = ({ gameCode, players, onPlayersUpdate, matches = [], m
         initialTeammatePairs={teammatePairs}
         matches={matches}
         matchScores={matchScores}
+        hasStartedMatches={hasStartedMatches}
       />
-
-      {leaderboard.length > 0 && (
-        <Card className="p-6 bg-gradient-to-br from-primary/5 to-accent/5">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <Medal className="w-6 h-6 text-primary-foreground" />
-              </div>
-              <h2 className="text-2xl font-bold text-foreground">Leaderboard</h2>
-            </div>
-            <Button onClick={handleShare} className="gap-2">
-              <Share2 className="w-4 h-4" />
-              Share Results
-            </Button>
-          </div>
-          
-          <div className="space-y-3">
-            {leaderboard.map((entry, idx) => (
-              <div
-                key={entry.player}
-                className={`flex items-center justify-between p-4 rounded-lg ${
-                  idx === 0
-                    ? "bg-gradient-to-r from-primary/20 to-accent/20 border-2 border-primary"
-                    : "bg-secondary/50"
-                }`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                    idx === 0 ? "bg-primary text-primary-foreground text-lg" :
-                    idx === 1 ? "bg-accent text-accent-foreground" :
-                    idx === 2 ? "bg-muted text-muted-foreground" :
-                    "bg-secondary text-secondary-foreground"
-                  }`}>
-                    {idx + 1}
-                  </div>
-                  <div>
-                    <div className="font-semibold text-lg">{entry.player}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {entry.wins}W / {entry.losses}L • {entry.points} pts
-                    </div>
-                  </div>
-                </div>
-                {idx === 0 && <Trophy className="w-8 h-8 text-primary" />}
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
     </div>
   );
 };

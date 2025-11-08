@@ -9,7 +9,8 @@ import { generateSchedule, Match } from "@/lib/scheduler";
 import { Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-type Section = "setup" | "scheduler" | "checkin";
+import { Leaderboard } from "@/components/Leaderboard";
+type Section = "setup" | "scheduler" | "checkin" | "leaderboard";
 const Index = () => {
   const [activeSection, setActiveSection] = useState<Section>("setup");
   const [players, setPlayers] = useState<string[]>([]);
@@ -245,10 +246,20 @@ const Index = () => {
               <p className="text-muted-foreground">Please complete game setup and add players first</p>
             </div>}
 
-          {activeSection === "checkin" && gameCode && <CheckInOut gameCode={gameCode} players={players} onPlayersUpdate={handlePlayersUpdate} matches={matches} matchScores={matchScores} teammatePairs={gameConfig?.teammatePairs} onNavigateToMatches={() => setActiveSection("scheduler")} />}
+          {activeSection === "checkin" && gameCode && <CheckInOut gameCode={gameCode} players={players} onPlayersUpdate={handlePlayersUpdate} matches={matches} matchScores={matchScores} teammatePairs={gameConfig?.teammatePairs} onNavigateToMatches={() => setActiveSection("scheduler")} hasStartedMatches={matches.length > 0} />}
 
           {activeSection === "checkin" && !gameCode && <div className="text-center py-12">
               <p className="text-muted-foreground">Please complete game setup first</p>
+            </div>}
+
+          {activeSection === "leaderboard" && <div className="space-y-6">
+              <div className="text-center mb-6">
+                <h2 className="text-2xl font-bold text-foreground mb-2">Leaderboard</h2>
+                <p className="text-muted-foreground">Player rankings and stats</p>
+              </div>
+              {matchScores.size > 0 ? <Leaderboard players={players} matches={matches} matchScores={matchScores} /> : <div className="text-center py-12">
+                  <p className="text-muted-foreground">No completed matches yet</p>
+                </div>}
             </div>}
         </Card>
       </div>

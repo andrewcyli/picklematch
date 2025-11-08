@@ -1,8 +1,8 @@
-import { Settings, Calendar, Users } from "lucide-react";
+import { Settings, Calendar, Users, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 interface BottomNavProps {
-  activeSection: "setup" | "scheduler" | "checkin";
-  onSectionChange: (section: "setup" | "scheduler" | "checkin") => void;
+  activeSection: "setup" | "scheduler" | "checkin" | "leaderboard";
+  onSectionChange: (section: "setup" | "scheduler" | "checkin" | "leaderboard") => void;
   disabled?: boolean;
 }
 export const BottomNav = ({
@@ -28,6 +28,11 @@ export const BottomNav = ({
           <button onClick={() => onSectionChange("checkin")} disabled={disabled} className={cn("flex flex-col items-center gap-1 px-6 py-2 rounded-lg transition-all", activeSection === "checkin" ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-muted/50", disabled && "opacity-50 cursor-not-allowed")}>
             <Users className="w-6 h-6" />
             <span className="text-xs font-medium">Players</span>
+          </button>
+
+          <button onClick={() => onSectionChange("leaderboard")} disabled={disabled} className={cn("flex flex-col items-center gap-1 px-6 py-2 rounded-lg transition-all", activeSection === "leaderboard" ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-muted/50", disabled && "opacity-50 cursor-not-allowed")}>
+            <Trophy className="w-6 h-6" />
+            <span className="text-xs font-medium">Leaderboard</span>
           </button>
         </div>
       </div>
