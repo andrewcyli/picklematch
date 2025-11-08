@@ -183,8 +183,8 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
       if (m.id === matchId) {
         return { ...m, score: { team1: team1Score, team2: team2Score } };
       }
-      // Preserve existing scores from matchScores state
-      const existingScore = matchScores.get(m.id);
+      // Preserve existing scores using the latest scores map
+      const existingScore = newScores.get(m.id);
       if (existingScore) {
         return { ...m, score: existingScore };
       }
@@ -198,9 +198,9 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     newPending.delete(matchId);
     setPendingScores(newPending);
 
-    const actualEndTime = currentTime;
-    checkScheduleAdjustment(matchId, actualEndTime);
-    
+    const completedMatchRef = matches.find(m => m.id === matchId);
+    const actualEndTime = completedMatchRef ? completedMatchRef.endTime : 0;
+    checkScheduleAdjustment(matchId, actualEndTime, newScores);
     // Check for player conflicts in current matches
     checkPlayerConflicts(newScores);
     
@@ -363,7 +363,11 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
         matches
       );
 
-      onScheduleUpdate(newMatches, allPlayers);
+      const merged = newMatches.map(m => {
+        const sc = scores.get(m.id);
+        return sc ? { ...m, score: normalizeScore(sc) } : m;
+      });
+      onScheduleUpdate(merged, allPlayers);
       
       const matchIdx = matches.filter(m => m.court === advanceMatch.court && m.endTime <= advanceMatch.endTime).length;
       const matchNumber = `${String.fromCharCode(64 + advanceMatch.court)}${matchIdx}`;
@@ -449,14 +453,22 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
       matches
     );
 
-    onScheduleUpdate(newMatches, allPlayers);
+    const mergedMatches = newMatches.map(m => {
+      const sc = scores.get(m.id);
+      return sc ? { ...m, score: normalizeScore(sc) } : m;
+    });
+    onScheduleUpdate(mergedMatches, allPlayers);
     
     const matchIdx = matches.filter(m => m.court === upcomingMatch.court && m.endTime <= upcomingMatch.endTime).length;
     const matchNumber = `${String.fromCharCode(64 + upcomingMatch.court)}${matchIdx}`;
     toast({ title: "Upcoming game adjusted", description: `Match ${matchNumber} roster adjusted to avoid conflicts for: ${conflicts.join(', ')}` });
   };
 
-  const checkScheduleAdjustment = (completedMatchId: string, actualEndTime: number) => {
+  const checkScheduleAdjustment = (
+    completedMatchId: string,
+    actualEndTime: number,
+    scores: Map<string, { team1: number; team2: number }>
+  ) => {
     const completedMatch = matches.find(m => m.id === completedMatchId);
     if (!completedMatch) return;
 
@@ -466,7 +478,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     if (Math.abs(timeDifference) > 5) {
       const matchIndex = matches.findIndex(m => m.id === completedMatchId);
       const playedMatches = matches.slice(0, matchIndex + 1).map(m => {
-        const score = matchScores.get(m.id);
+        const score = scores.get(m.id);
         return {
           ...m,
           score: score ? normalizeScore(score) : m.score ? normalizeScore(m.score) : undefined,
@@ -492,11 +504,17 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
           matches
         );
 
-        onScheduleUpdate(newMatches, allPlayers);
+        // Merge existing confirmed scores back into regenerated matches
+        const mergedMatches = newMatches.map(m => {
+          const sc = scores.get(m.id);
+          return sc ? { ...m, score: normalizeScore(sc) } : m;
+        });
+
+        onScheduleUpdate(mergedMatches, allPlayers);
         
         const completedMatchIdx = matches.filter(m => m.court === completedMatch.court && m.endTime <= completedMatch.endTime).length;
         const completedMatchNumber = `${String.fromCharCode(64 + completedMatch.court)}${completedMatchIdx}`;
-        const matchDiff = newMatches.length - matches.length;
+        const matchDiff = mergedMatches.length - matches.length;
         if (matchDiff > 0) {
           toast({ title: "Schedule adjusted", description: `After match ${completedMatchNumber}, added ${matchDiff} match(es) due to faster pace` });
         } else if (matchDiff < 0) {
