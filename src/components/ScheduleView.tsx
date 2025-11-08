@@ -37,7 +37,6 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
   );
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [pendingScores, setPendingScores] = useState<Map<string, { team1: number | string; team2: number | string }>>(new Map());
-  const [showAllMatches, setShowAllMatches] = useState(false);
   const [courtConfigs, setCourtConfigs] = useState<CourtConfig[]>(
     gameConfig.courtConfigs || Array.from({ length: gameConfig.courts }, (_, i) => ({ courtNumber: i + 1, type: 'doubles' as const }))
   );
@@ -150,13 +149,6 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     }
   };
 
-  const groupedMatches = matches.reduce((acc, match) => {
-    const timeSlot = `${match.startTime}-${match.endTime}`;
-    if (!acc[timeSlot]) acc[timeSlot] = [];
-    acc[timeSlot].push(match);
-    return acc;
-  }, {} as Record<string, Match[]>);
-
   const toggleCourtType = (courtNumber: number) => {
     const updatedConfigs = courtConfigs.map(config => 
       config.courtNumber === courtNumber 
@@ -203,75 +195,67 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
   };
 
   return (
-    <div className="space-y-6 pb-20">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={onBack} size="sm" className="gap-2">
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Button>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
-              <Trophy className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-foreground">Match Schedule</h2>
-              <p className="text-sm text-muted-foreground">{matches.length} matches • {allPlayers.length} players</p>
-            </div>
+    <div className="pb-20 max-h-[calc(100vh-5rem)] overflow-y-auto">
+      {/* Header */}
+      <div className="sticky top-0 bg-background/95 backdrop-blur-sm z-10 pb-3 border-b mb-4">
+        <div className="flex items-center gap-3 px-4 pt-4">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
+            <Trophy className="w-5 h-5 text-primary-foreground" />
+          </div>
+          <div>
+            <h2 className="text-lg sm:text-xl font-bold text-foreground">Match Schedule</h2>
+            <p className="text-xs sm:text-sm text-muted-foreground">{matches.length} matches • {allPlayers.length} players</p>
           </div>
         </div>
       </div>
 
-      {/* Carousel-based Match View */}
-      <div className="space-y-8">
+      {/* Courts Grid - Responsive layout to fit both courts on screen */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 px-4">
         {courtConfigs.map((courtConfig) => {
           const courtMatches = matches.filter(m => m.court === courtConfig.courtNumber);
           const currentMatchIndex = courtMatches.findIndex(m => !matchScores.has(m.id));
 
           return (
-            <div key={courtConfig.courtNumber} className="space-y-3">
-              <div className="flex items-center justify-between flex-wrap gap-3">
-                <div className="flex items-center gap-2">
-                  <Badge className="bg-primary/20 text-primary text-base px-3 py-1">
-                    Court {courtConfig.courtNumber}
-                  </Badge>
-                </div>
+            <div key={courtConfig.courtNumber} className="space-y-2">
+              {/* Court Header */}
+              <div className="flex items-center justify-between gap-2">
+                <Badge className="bg-primary/20 text-primary text-sm px-2 py-1">
+                  Court {courtConfig.courtNumber}
+                </Badge>
                 
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 p-2 rounded-lg border bg-card">
-                    <span className={`text-xs ${courtConfig.type === 'singles' ? 'text-muted-foreground' : 'text-foreground font-medium'}`}>
-                      Doubles
+                <div className="flex items-center gap-2">
+                  {/* Singles/Doubles Toggle */}
+                  <div className="flex items-center gap-1.5 p-1.5 rounded-lg border bg-card text-xs">
+                    <span className={courtConfig.type === 'singles' ? 'text-muted-foreground' : 'text-foreground font-medium'}>
+                      2v2
                     </span>
                     <Switch
                       checked={courtConfig.type === 'singles'}
                       onCheckedChange={() => toggleCourtType(courtConfig.courtNumber)}
                       disabled={matchScores.size > 0}
+                      className="scale-75"
                     />
-                    <span className={`text-xs ${courtConfig.type === 'singles' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
-                      Singles
+                    <span className={courtConfig.type === 'singles' ? 'text-foreground font-medium' : 'text-muted-foreground'}>
+                      1v1
                     </span>
                   </div>
                   
+                  {/* Current Match Button */}
                   {currentMatchIndex >= 0 && (
                     <Button
                       onClick={() => scrollToCurrentMatch(courtConfig.courtNumber)}
                       variant="outline"
                       size="sm"
-                      className="gap-2"
+                      className="gap-1 h-8 text-xs"
                     >
-                      <Target className="w-4 h-4" />
-                      Current Match
+                      <Target className="w-3 h-3" />
+                      Current
                     </Button>
                   )}
                 </div>
               </div>
 
-              {matchScores.size > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  Court configuration can only be changed before any matches are scored
-                </p>
-              )}
-
+              {/* Carousel */}
               <Carousel
                 opts={{ align: "center", loop: false }}
                 className="w-full"
@@ -281,212 +265,145 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                   }
                 }}
               >
-                <CarouselContent>
+                <CarouselContent className="-ml-2 md:-ml-4">
                   {courtMatches.map((match, idx) => {
                     const isCurrentMatch = idx === currentMatchIndex;
                     const isPreviousMatch = idx < currentMatchIndex;
-                    const isNextMatch = idx > currentMatchIndex;
                     const confirmedScores = matchScores.get(match.id);
                     const pendingForMatch = pendingScores.get(match.id);
                     const scores = pendingForMatch || confirmedScores || { team1: '', team2: '' };
                     const isCompleted = matchScores.has(match.id);
                     const hasPending = pendingScores.has(match.id);
 
-                    return (
-                      <CarouselItem key={match.id}>
-                        <div className="p-1">
-                          <Card className={`p-5 transition-all ${
-                            isCurrentMatch 
-                              ? 'border-2 border-accent bg-accent/5 shadow-lg scale-100' 
-                              : isPreviousMatch
-                              ? 'bg-muted/50 border-muted opacity-60'
-                              : 'bg-muted/30 border-dashed opacity-70'
+                    // Condensed preview for non-current matches
+                    if (!isCurrentMatch) {
+                      return (
+                        <CarouselItem key={match.id} className="pl-2 md:pl-4 basis-1/3 sm:basis-1/4">
+                          <Card className={`p-2 transition-all ${
+                            isPreviousMatch ? 'bg-muted/40 opacity-50' : 'bg-muted/30 opacity-60'
                           }`}>
-                            <div className="space-y-4">
-                              <div className="flex items-center justify-between">
-                                <Badge className={
-                                  isCurrentMatch 
-                                    ? 'bg-accent text-accent-foreground'
-                                    : isPreviousMatch
-                                    ? 'bg-secondary text-secondary-foreground'
-                                    : 'bg-muted text-muted-foreground'
-                                }>
-                                  {isCurrentMatch ? 'Current Match' : isPreviousMatch ? 'Previous' : 'Up Next'}
-                                </Badge>
-                                <Badge variant="outline">
-                                  <Clock className="w-3 h-3 mr-1" />
-                                  {match.clockStartTime || `${match.startTime} min`}
-                                </Badge>
-                              </div>
-
-                              <div className="space-y-3">
-                                {/* Team 1 */}
-                                <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50">
-                                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                                    <Users className="w-5 h-5 text-primary flex-shrink-0" />
-                                    <div className="font-semibold text-sm min-w-0">
-                                      <div className="truncate">{match.team1[0]}</div>
-                                      {!match.isSingles && match.team1[1] && (
-                                        <div className="text-muted-foreground text-xs truncate">{match.team1[1]}</div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  {isCurrentMatch ? (
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      value={scores.team1}
-                                      onChange={(e) => updatePendingScore(match.id, "team1", e.target.value)}
-                                      placeholder="0"
-                                      className="w-16 h-12 text-center text-xl font-bold flex-shrink-0"
-                                      disabled={isCompleted && !hasPending}
-                                    />
-                                  ) : (
-                                    <span className="w-16 h-12 flex items-center justify-center text-xl font-bold">
-                                      {confirmedScores ? confirmedScores.team1 : '-'}
-                                    </span>
-                                  )}
+                            <div className="space-y-1">
+                              <Badge variant="outline" className="text-[10px] h-5">
+                                {isPreviousMatch ? 'Done' : 'Next'}
+                              </Badge>
+                              <div className="text-[10px] space-y-0.5">
+                                <div className="flex items-center justify-between">
+                                  <span className="truncate flex-1">{match.team1[0]}</span>
+                                  {confirmedScores && <span className="font-bold ml-1">{confirmedScores.team1}</span>}
                                 </div>
-
-                                <div className="text-center text-sm font-bold text-muted-foreground">VS</div>
-
-                                {/* Team 2 */}
-                                <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50">
-                                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                                    <Users className="w-5 h-5 text-accent flex-shrink-0" />
-                                    <div className="font-semibold text-sm min-w-0">
-                                      <div className="truncate">{match.team2[0]}</div>
-                                      {!match.isSingles && match.team2[1] && (
-                                        <div className="text-muted-foreground text-xs truncate">{match.team2[1]}</div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  {isCurrentMatch ? (
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      value={scores.team2}
-                                      onChange={(e) => updatePendingScore(match.id, "team2", e.target.value)}
-                                      placeholder="0"
-                                      className="w-16 h-12 text-center text-xl font-bold flex-shrink-0"
-                                      disabled={isCompleted && !hasPending}
-                                    />
-                                  ) : (
-                                    <span className="w-16 h-12 flex items-center justify-center text-xl font-bold">
-                                      {confirmedScores ? confirmedScores.team2 : '-'}
-                                    </span>
-                                  )}
-                                </div>
-
-                                {isCurrentMatch && !isCompleted && (
-                                  <Button 
-                                    onClick={() => confirmScore(match.id)}
-                                    className="w-full h-11"
-                                    disabled={!hasPending}
-                                  >
-                                    Confirm Score & Next
-                                  </Button>
+                                {!match.isSingles && match.team1[1] && (
+                                  <div className="text-muted-foreground truncate text-[9px]">{match.team1[1]}</div>
                                 )}
-                                
-                                {isCurrentMatch && isCompleted && !hasPending && (
-                                  <Button 
-                                    onClick={() => editScore(match.id)}
-                                    variant="outline"
-                                    className="w-full"
-                                  >
-                                    Edit Score
-                                  </Button>
+                                <div className="text-center text-muted-foreground font-bold">VS</div>
+                                <div className="flex items-center justify-between">
+                                  <span className="truncate flex-1">{match.team2[0]}</span>
+                                  {confirmedScores && <span className="font-bold ml-1">{confirmedScores.team2}</span>}
+                                </div>
+                                {!match.isSingles && match.team2[1] && (
+                                  <div className="text-muted-foreground truncate text-[9px]">{match.team2[1]}</div>
                                 )}
                               </div>
                             </div>
                           </Card>
-                        </div>
+                        </CarouselItem>
+                      );
+                    }
+
+                    // Full view for current match
+                    return (
+                      <CarouselItem key={match.id} className="pl-2 md:pl-4">
+                        <Card className="border-2 border-accent bg-accent/5 shadow-lg p-3 sm:p-4">
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <Badge className="bg-accent text-accent-foreground text-xs">
+                                Current Match
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                <Clock className="w-3 h-3 mr-1" />
+                                {match.clockStartTime || `${match.startTime} min`}
+                              </Badge>
+                            </div>
+
+                            <div className="space-y-2">
+                              {/* Team 1 */}
+                              <div className="flex items-center gap-2 p-2 rounded-lg bg-secondary/50">
+                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                  <Users className="w-4 h-4 text-primary flex-shrink-0" />
+                                  <div className="font-semibold text-xs sm:text-sm min-w-0">
+                                    <div className="truncate">{match.team1[0]}</div>
+                                    {!match.isSingles && match.team1[1] && (
+                                      <div className="text-muted-foreground text-[10px] sm:text-xs truncate">{match.team1[1]}</div>
+                                    )}
+                                  </div>
+                                </div>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  value={scores.team1}
+                                  onChange={(e) => updatePendingScore(match.id, "team1", e.target.value)}
+                                  placeholder="0"
+                                  className="w-12 sm:w-14 h-10 sm:h-12 text-center text-lg sm:text-xl font-bold flex-shrink-0"
+                                  disabled={isCompleted && !hasPending}
+                                />
+                              </div>
+
+                              <div className="text-center text-xs font-bold text-muted-foreground">VS</div>
+
+                              {/* Team 2 */}
+                              <div className="flex items-center gap-2 p-2 rounded-lg bg-secondary/50">
+                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                  <Users className="w-4 h-4 text-accent flex-shrink-0" />
+                                  <div className="font-semibold text-xs sm:text-sm min-w-0">
+                                    <div className="truncate">{match.team2[0]}</div>
+                                    {!match.isSingles && match.team2[1] && (
+                                      <div className="text-muted-foreground text-[10px] sm:text-xs truncate">{match.team2[1]}</div>
+                                    )}
+                                  </div>
+                                </div>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  value={scores.team2}
+                                  onChange={(e) => updatePendingScore(match.id, "team2", e.target.value)}
+                                  placeholder="0"
+                                  className="w-12 sm:w-14 h-10 sm:h-12 text-center text-lg sm:text-xl font-bold flex-shrink-0"
+                                  disabled={isCompleted && !hasPending}
+                                />
+                              </div>
+
+                              {!isCompleted && (
+                                <Button 
+                                  onClick={() => confirmScore(match.id)}
+                                  className="w-full h-9 sm:h-10 text-xs sm:text-sm"
+                                  disabled={!hasPending}
+                                >
+                                  Confirm Score & Next
+                                </Button>
+                              )}
+                              
+                              {isCompleted && !hasPending && (
+                                <Button 
+                                  onClick={() => editScore(match.id)}
+                                  variant="outline"
+                                  className="w-full h-9 text-xs sm:text-sm"
+                                >
+                                  Edit Score
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </Card>
                       </CarouselItem>
                     );
                   })}
                 </CarouselContent>
-                <CarouselPrevious className="left-2" />
-                <CarouselNext className="right-2" />
+                <CarouselPrevious className="left-0 h-8 w-8" />
+                <CarouselNext className="right-0 h-8 w-8" />
               </Carousel>
             </div>
           );
         })}
       </div>
-
-      {/* All Matches - Expandable */}
-      {showAllMatches ? (
-        <div className="space-y-6 pt-8 border-t">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-foreground">All Matches</h3>
-            <Button variant="ghost" size="sm" onClick={() => setShowAllMatches(false)}>
-              Hide
-            </Button>
-          </div>
-          {Object.entries(groupedMatches).map(([timeSlot, slotMatches]) => {
-            const [start, end] = timeSlot.split("-").map(Number);
-            return (
-              <div key={timeSlot} className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-muted-foreground" />
-                  <h4 className="text-sm font-semibold text-foreground">
-                    {slotMatches[0].clockStartTime ? (
-                      `${slotMatches[0].clockStartTime} - ${slotMatches[0].clockEndTime}`
-                    ) : (
-                      `${start} - ${end} min`
-                    )}
-                  </h4>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {slotMatches.map((match) => {
-                    const scores = matchScores.get(match.id);
-                    const isCompleted = matchScores.has(match.id);
-                    
-                    return (
-                      <Card key={match.id} className={`p-3 ${isCompleted ? 'opacity-60' : ''}`}>
-                        <div className="flex items-center justify-between mb-2">
-                          <Badge variant="outline" className="text-xs">Court {match.court}</Badge>
-                          {isCompleted && <Badge variant="secondary" className="text-xs">Done</Badge>}
-                        </div>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 flex-1">
-                              <span className="font-medium">{match.team1[0]}</span>
-                              {!match.isSingles && match.team1[1] && (
-                                <span className="text-muted-foreground text-xs">& {match.team1[1]}</span>
-                              )}
-                            </div>
-                            {scores && <span className="font-bold">{scores.team1}</span>}
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 flex-1">
-                              <span className="font-medium">{match.team2[0]}</span>
-                              {!match.isSingles && match.team2[1] && (
-                                <span className="text-muted-foreground text-xs">& {match.team2[1]}</span>
-                              )}
-                            </div>
-                            {scores && <span className="font-bold">{scores.team2}</span>}
-                          </div>
-                        </div>
-                      </Card>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="pt-6 border-t">
-          <Button 
-            variant="outline" 
-            className="w-full" 
-            onClick={() => setShowAllMatches(true)}
-          >
-            Show All Matches ({matches.length})
-          </Button>
-        </div>
-      )}
     </div>
   );
 };
