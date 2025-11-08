@@ -384,7 +384,7 @@ function createDeterministicMatch(
   let bestScore = -Infinity;
   
   for (const [team1, team2] of configs) {
-    const score = evaluateMatchDeterministic(team1, team2, playerStats, teammatePairs);
+    const score = evaluateMatchDeterministic(team1, team2, playerStats, teammatePairs, court);
     
     if (score > bestScore) {
       bestScore = score;
@@ -451,7 +451,8 @@ function evaluateMatchDeterministic(
   team1: [string, string],
   team2: [string, string],
   playerStats: Map<string, PlayerStats>,
-  teammatePairs: TeammatePair[] = []
+  teammatePairs: TeammatePair[] = [],
+  court: number = 1
 ): number {
   let score = 0;
   const [p1, p2] = team1;
@@ -467,6 +468,17 @@ function evaluateMatchDeterministic(
   const avgPlayTime = playTimes.reduce((a, b) => a + b, 0) / 4;
   const variance = playTimes.reduce((sum, time) => sum + Math.abs(time - avgPlayTime), 0);
   score -= variance * 10; // Increased weight for fairness
+  
+  // 1.5 COURT DISTRIBUTION - Penalize players who have played many games on this court recently
+  const courtCounts = [
+    stats1.matchesPerCourt.get(court) || 0,
+    stats2.matchesPerCourt.get(court) || 0,
+    stats3.matchesPerCourt.get(court) || 0,
+    stats4.matchesPerCourt.get(court) || 0,
+  ];
+  const avgCourtCount = courtCounts.reduce((a, b) => a + b, 0) / 4;
+  const courtVariance = courtCounts.reduce((sum, count) => sum + Math.abs(count - avgCourtCount), 0);
+  score -= courtVariance * 8; // Penalize uneven court distribution
   
   // 2. BOUND PAIRS - Strong reward
   const isBoundPair1 = teammatePairs.some(pair => 

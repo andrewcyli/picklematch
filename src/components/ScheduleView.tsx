@@ -131,6 +131,14 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
       }
     }
 
+    // Validate no cross-team duplicates
+    const allMatchPlayers = [...editedTeams.team1, ...editedTeams.team2].filter(p => p.trim());
+    const uniqueMatchPlayers = new Set(allMatchPlayers);
+    if (allMatchPlayers.length !== uniqueMatchPlayers.size) {
+      toast({ title: "Invalid match", description: "Players cannot be on both teams", variant: "destructive" });
+      return;
+    }
+
     const allEditedPlayers = [...editedTeams.team1, ...editedTeams.team2].filter(p => p.trim());
     const updatedPlayers = [...new Set([...allEditedPlayers, ...allPlayers])];
 
@@ -147,6 +155,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
       ...match,
       team1: match.isSingles ? [editedTeams.team1[0]] as [string] : editedTeams.team1 as [string, string],
       team2: match.isSingles ? [editedTeams.team2[0]] as [string] : editedTeams.team2 as [string, string],
+      isLocked: true, // Lock this manually edited match
     };
 
     const newMatches = regenerateScheduleFromSlot(
@@ -167,7 +176,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     
     const matchIdx = matches.filter(m => m.court === match.court && m.endTime <= match.endTime).length;
     const matchNumber = `${String.fromCharCode(64 + match.court)}${matchIdx}`;
-    toast({ title: "Players updated", description: `Match ${matchNumber} adjusted, schedule regenerated` });
+    toast({ title: "Players updated", description: `Match ${matchNumber} locked, schedule regenerated from next slot` });
   };
 
   const cancelEditingPlayers = () => {
