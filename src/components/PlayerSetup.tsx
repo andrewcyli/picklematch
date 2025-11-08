@@ -37,10 +37,6 @@ export const PlayerSetup = ({ onComplete, initialPlayers = [], initialTeammatePa
       return;
     }
 
-    if (players.length >= 20) {
-      toast.error("Maximum of 20 players allowed");
-      return;
-    }
 
     // Check for duplicate names (case-insensitive)
     if (players.some(p => p.toLowerCase() === trimmedName.toLowerCase())) {
@@ -108,7 +104,7 @@ export const PlayerSetup = ({ onComplete, initialPlayers = [], initialTeammatePa
         </div>
         <div>
           <h2 className="text-2xl font-bold text-foreground">Add Players</h2>
-          <p className="text-muted-foreground text-sm">Add up to 20 players</p>
+          <p className="text-muted-foreground text-sm">Add as many players as you need</p>
         </div>
       </div>
 
@@ -125,7 +121,7 @@ export const PlayerSetup = ({ onComplete, initialPlayers = [], initialTeammatePa
         </div>
         <Button
           onClick={addPlayer}
-          disabled={!currentName.trim() || players.length >= 20}
+          disabled={!currentName.trim()}
           size="lg"
           className="h-12 px-6"
         >
@@ -134,7 +130,7 @@ export const PlayerSetup = ({ onComplete, initialPlayers = [], initialTeammatePa
       </div>
 
       <div className="text-sm text-muted-foreground">
-        {players.length} / 20 players added
+        {players.length} players added
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto">

@@ -79,7 +79,8 @@ function generateCompleteSchedule(
   startTime?: string,
   teammatePairs: TeammatePair[] = []
 ): Match[] {
-  const totalSlots = Math.floor(totalTime / gameDuration);
+  // Pre-generate 50 games per court
+  const totalSlots = 50;
   const playerStats = initializePlayerStats(players, courtConfigs.length);
   const schedule: ScheduleSlot[] = [];
 
@@ -94,41 +95,76 @@ function generateCompleteSchedule(
 
     // Generate match for each court in this time slot
     for (const courtConfig of courtConfigs) {
-      const availablePlayers = getAvailablePlayers(
-        players,
-        playerStats,
-        playersUsedThisSlot,
-        slotStartTime,
-        gameDuration,
-        courtConfigs,
-        schedule,
-        courtConfig.courtNumber
-      );
-
-      const playersNeeded = courtConfig.type === 'singles' ? 2 : 4;
+      let match: Match | null = null;
+      let attemptCount = 0;
+      const maxAttempts = 100; // Look through up to 100 roster combinations
       
-      if (availablePlayers.length >= playersNeeded) {
-        const match = createOptimalMatch(
-          availablePlayers,
+      // Keep trying to find a conflict-free match
+      while (!match && attemptCount < maxAttempts) {
+        const availablePlayers = getAvailablePlayers(
+          players,
           playerStats,
+          playersUsedThisSlot,
           slotStartTime,
-          slotEndTime,
-          courtConfig.courtNumber,
-          teammatePairs,
-          courtConfig.type
+          gameDuration,
+          courtConfigs,
+          schedule,
+          courtConfig.courtNumber
         );
 
-        if (match) {
-          slotMatches.push(match);
-          
-          // Update player stats and mark players as used
-          const matchPlayers = [...match.team1, ...match.team2];
-          matchPlayers.forEach(player => {
-            playersUsedThisSlot.add(player);
-            updatePlayerStats(player, match, playerStats, gameDuration);
-          });
+        const playersNeeded = courtConfig.type === 'singles' ? 2 : 4;
+        
+        if (availablePlayers.length >= playersNeeded) {
+          const candidateMatch = createOptimalMatch(
+            availablePlayers,
+            playerStats,
+            slotStartTime,
+            slotEndTime,
+            courtConfig.courtNumber,
+            teammatePairs,
+            courtConfig.type
+          );
+
+          if (candidateMatch) {
+            // Check if this match creates cross-court conflicts
+            const matchPlayers = [...candidateMatch.team1, ...candidateMatch.team2];
+            const hasConflict = matchPlayers.some(p => playersUsedThisSlot.has(p));
+            
+            if (!hasConflict) {
+              match = candidateMatch;
+              slotMatches.push(match);
+              
+              // Update player stats and mark players as used
+              matchPlayers.forEach(player => {
+                playersUsedThisSlot.add(player);
+                updatePlayerStats(player, match!, playerStats, gameDuration);
+              });
+            } else {
+              // Conflict found, try next roster combination
+              attemptCount++;
+              // Temporarily mark these players as unavailable for this attempt
+              matchPlayers.forEach(p => {
+                const stats = playerStats.get(p);
+                if (stats) {
+                  stats.consecutiveMatches += 10; // Temporarily penalize to try different players
+                }
+              });
+            }
+          } else {
+            break; // Can't create a match
+          }
+        } else {
+          break; // Not enough players
         }
       }
+      
+      // Reset any temporary penalties
+      players.forEach(p => {
+        const stats = playerStats.get(p);
+        if (stats && stats.consecutiveMatches > 10) {
+          stats.consecutiveMatches = Math.min(stats.consecutiveMatches - 10, 3);
+        }
+      });
     }
 
     schedule.push({ timeSlot: slot, matches: slotMatches });
@@ -184,6 +220,20 @@ function getAvailablePlayers(
     });
   }
 
+  // Also check upcoming game on other courts (next slot conflicts)
+  const playersOnOtherCourtsNextSlot = new Set<string>();
+  const currentSlotIndex = schedule.length;
+  // Look ahead to check for conflicts between current game on this court and next game on other courts
+  if (currentSlotIndex < schedule.length) {
+    schedule.slice(currentSlotIndex).forEach(futureSlot => {
+      futureSlot.matches.forEach(match => {
+        if (match.court !== currentCourt && match.startTime === slotStartTime + gameDuration) {
+          [...match.team1, ...match.team2].forEach(p => playersOnOtherCourtsNextSlot.add(p));
+        }
+      });
+    });
+  }
+
   return allPlayers.filter(player => {
     // Already used in this time slot on another court
     if (playersUsedThisSlot.has(player)) return false;
@@ -191,13 +241,17 @@ function getAvailablePlayers(
     // Was on different court in previous slot (avoid cross-court rush)
     if (playersOnOtherCourtsPrevSlot.has(player)) return false;
 
+    // Will be on different court in next slot (avoid cross-court conflicts)
+    if (playersOnOtherCourtsNextSlot.has(player)) return false;
+
     const stats = playerStats.get(player)!;
     
     // Enforce rest requirements
     if (stats.lastMatchEnd === slotStartTime) {
       const availableCount = allPlayers.filter(p => 
         !playersUsedThisSlot.has(p) && 
-        !playersOnOtherCourtsPrevSlot.has(p)
+        !playersOnOtherCourtsPrevSlot.has(p) &&
+        !playersOnOtherCourtsNextSlot.has(p)
       ).length;
       
       // Hard limit: Force rest after 3 consecutive matches

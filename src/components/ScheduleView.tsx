@@ -253,105 +253,207 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
   const checkPlayerConflicts = (scores: Map<string, { team1: number; team2: number }>) => {
     const currentMatches = matches.filter(m => !scores.has(m.id));
     const currentMatchesByCourt = new Map<number, Match>();
+    const upcomingMatchesByCourt = new Map<number, Match>();
 
+    // Get current match (first unplayed) and upcoming match (second unplayed) for each court
     currentMatches.forEach(match => {
       if (!currentMatchesByCourt.has(match.court)) {
         currentMatchesByCourt.set(match.court, match);
+      } else if (!upcomingMatchesByCourt.has(match.court)) {
+        upcomingMatchesByCourt.set(match.court, match);
       }
     });
 
-    const list = Array.from(currentMatchesByCourt.values());
-    if (list.length <= 1) return;
+    // Check conflicts between current matches on different courts
+    const currentList = Array.from(currentMatchesByCourt.values());
+    if (currentList.length > 1) {
+      for (let i = 0; i < currentList.length; i++) {
+        for (let j = i + 1; j < currentList.length; j++) {
+          const m1 = currentList[i];
+          const m2 = currentList[j];
+          const set1 = new Set<string>([...m1.team1, ...m1.team2]);
+          const set2 = new Set<string>([...m2.team1, ...m2.team2]);
+          const conflicts = Array.from(set1).filter(p => set2.has(p));
 
-    for (let i = 0; i < list.length; i++) {
-      for (let j = i + 1; j < list.length; j++) {
-        const m1 = list[i];
-        const m2 = list[j];
-        const set1 = new Set<string>([...m1.team1, ...m1.team2]);
-        const set2 = new Set<string>([...m2.team1, ...m2.team2]);
-        const conflicts = Array.from(set1).filter(p => set2.has(p));
-
-        if (conflicts.length > 0) {
-          // Decide which match is 'latter' based on startTime, fallback to order in matches array
-          const [earlier, later] = m1.startTime <= m2.startTime ? [m1, m2] : [m2, m1];
-          const playersInUse = new Set<string>([...earlier.team1, ...earlier.team2]);
-
-          // Build updated teams for the later match avoiding playersInUse
-          const usedInLater = new Set<string>();
-
-          const t1 = (later.team1 as string[]).map(p => {
-            if (playersInUse.has(p)) return "";
-            usedInLater.add(p);
-            return p;
-          });
-          const t2 = (later.team2 as string[]).map(p => {
-            if (playersInUse.has(p)) return "";
-            usedInLater.add(p);
-            return p;
-          });
-
-          const candidates = allPlayers.filter(p => !playersInUse.has(p) && !usedInLater.has(p));
-          const pickNext = (exclude: string[]) => {
-            const pick = candidates.find(c => !exclude.includes(c));
-            if (!pick) return null;
-            usedInLater.add(pick);
-            const idx = candidates.indexOf(pick);
-            if (idx >= 0) candidates.splice(idx, 1);
-            return pick;
-          };
-
-          if (later.isSingles) {
-            if (!t1[0]) t1[0] = pickNext([]) || "";
-            if (!t2[0]) t2[0] = pickNext([]) || "";
-          } else {
-            if (!t1[0]) t1[0] = pickNext([t1[1]].filter(Boolean) as string[]) || "";
-            if (!t1[1]) t1[1] = pickNext([t1[0]].filter(Boolean) as string[]) || "";
-            if (!t2[0]) t2[0] = pickNext([t2[1]].filter(Boolean) as string[]) || "";
-            if (!t2[1]) t2[1] = pickNext([t2[0]].filter(Boolean) as string[]) || "";
-          }
-
-          if (t1.some(x => !x) || t2.some(x => !x)) {
-            toast({ title: "Conflict detected", description: "Not enough available players to adjust.", variant: "destructive" });
+          if (conflicts.length > 0) {
+            resolveConflictByAdvancing(m1, m2, conflicts, scores);
             return;
           }
-
-          const updatedMatch: Match = {
-            ...later,
-            team1: later.isSingles ? [t1[0]] as [string] : [t1[0], t1[1]] as [string, string],
-            team2: later.isSingles ? [t2[0]] as [string] : [t2[0], t2[1]] as [string, string],
-          };
-
-          const laterIndex = matches.findIndex(m => m.id === later.id);
-          const playedMatches = matches.slice(0, laterIndex).map(m => {
-            const score = scores.get(m.id);
-            return {
-              ...m,
-              score: score ? normalizeScore(score) : m.score ? normalizeScore(m.score) : undefined
-            };
-          });
-
-          const newMatches = regenerateScheduleFromSlot(
-            allPlayers,
-            [...playedMatches, updatedMatch],
-            later.endTime,
-            gameConfig.gameDuration,
-            gameConfig.totalTime,
-            gameConfig.courts,
-            undefined,
-            gameConfig.teammatePairs,
-            courtConfigs,
-            matches
-          );
-
-          onScheduleUpdate(newMatches, allPlayers);
-          
-          const laterMatchIdx = matches.filter(m => m.court === later.court && m.endTime <= later.endTime).length;
-          const laterMatchNumber = `${String.fromCharCode(64 + later.court)}${laterMatchIdx}`;
-          toast({ title: "Schedule adjusted", description: `Match ${laterMatchNumber} adjusted to resolve conflicts for: ${conflicts.join(', ')}` });
-          return;
         }
       }
     }
+
+    // Check conflicts between court A's current game and court B's upcoming game (and vice versa)
+    currentMatchesByCourt.forEach((currentMatch, courtA) => {
+      upcomingMatchesByCourt.forEach((upcomingMatch, courtB) => {
+        if (courtA !== courtB) {
+          const currentPlayers = new Set<string>([...currentMatch.team1, ...currentMatch.team2]);
+          const upcomingPlayers = new Set<string>([...upcomingMatch.team1, ...upcomingMatch.team2]);
+          const conflicts = Array.from(currentPlayers).filter(p => upcomingPlayers.has(p));
+
+          if (conflicts.length > 0) {
+            // Adjust the upcoming match to resolve conflicts
+            adjustUpcomingMatch(upcomingMatch, conflicts, currentPlayers, scores);
+            return;
+          }
+        }
+      });
+    });
+  };
+
+  const resolveConflictByAdvancing = (
+    m1: Match, 
+    m2: Match, 
+    conflicts: string[], 
+    scores: Map<string, { team1: number; team2: number }>
+  ) => {
+    // Find which match to advance (the one with more conflicts or later in the list)
+    const [keepMatch, advanceMatch] = m1.startTime <= m2.startTime ? [m1, m2] : [m2, m1];
+    const playersInUse = new Set<string>([...keepMatch.team1, ...keepMatch.team2]);
+
+    // Look down the roster to find the first conflict-free match
+    const courtMatches = matches.filter(m => m.court === advanceMatch.court && !scores.has(m.id));
+    const advanceMatchIndex = courtMatches.findIndex(m => m.id === advanceMatch.id);
+    
+    let replacementMatch: Match | null = null;
+    let replacementIndex = -1;
+
+    for (let i = advanceMatchIndex + 1; i < courtMatches.length; i++) {
+      const candidate = courtMatches[i];
+      const candidatePlayers = [...candidate.team1, ...candidate.team2];
+      const hasConflict = candidatePlayers.some(p => playersInUse.has(p));
+      
+      if (!hasConflict) {
+        replacementMatch = candidate;
+        replacementIndex = i;
+        break;
+      }
+    }
+
+    if (replacementMatch) {
+      // Swap the matches
+      const advanceGlobalIndex = matches.findIndex(m => m.id === advanceMatch.id);
+      const replacementGlobalIndex = matches.findIndex(m => m.id === replacementMatch.id);
+
+      const playedMatches = matches.slice(0, advanceGlobalIndex).map(m => {
+        const score = scores.get(m.id);
+        return {
+          ...m,
+          score: score ? normalizeScore(score) : m.score ? normalizeScore(m.score) : undefined
+        };
+      });
+
+      // Swap the rosters
+      const swappedMatch = {
+        ...advanceMatch,
+        team1: replacementMatch.team1,
+        team2: replacementMatch.team2,
+      };
+
+      const newMatches = regenerateScheduleFromSlot(
+        allPlayers,
+        [...playedMatches, swappedMatch],
+        advanceMatch.endTime,
+        gameConfig.gameDuration,
+        gameConfig.totalTime,
+        gameConfig.courts,
+        undefined,
+        gameConfig.teammatePairs,
+        courtConfigs,
+        matches
+      );
+
+      onScheduleUpdate(newMatches, allPlayers);
+      
+      const matchIdx = matches.filter(m => m.court === advanceMatch.court && m.endTime <= advanceMatch.endTime).length;
+      const matchNumber = `${String.fromCharCode(64 + advanceMatch.court)}${matchIdx}`;
+      toast({ 
+        title: "Game advanced", 
+        description: `Match ${matchNumber} roster advanced from slot ${replacementIndex + 1} to resolve conflicts for: ${conflicts.join(', ')}` 
+      });
+    } else {
+      // Fallback: adjust players
+      adjustUpcomingMatch(advanceMatch, conflicts, playersInUse, scores);
+    }
+  };
+
+  const adjustUpcomingMatch = (
+    upcomingMatch: Match, 
+    conflicts: string[], 
+    playersInUse: Set<string>,
+    scores: Map<string, { team1: number; team2: number }>
+  ) => {
+    const usedInMatch = new Set<string>();
+
+    const t1 = (upcomingMatch.team1 as string[]).map(p => {
+      if (playersInUse.has(p)) return "";
+      usedInMatch.add(p);
+      return p;
+    });
+    const t2 = (upcomingMatch.team2 as string[]).map(p => {
+      if (playersInUse.has(p)) return "";
+      usedInMatch.add(p);
+      return p;
+    });
+
+    const candidates = allPlayers.filter(p => !playersInUse.has(p) && !usedInMatch.has(p));
+    const pickNext = (exclude: string[]) => {
+      const pick = candidates.find(c => !exclude.includes(c));
+      if (!pick) return null;
+      usedInMatch.add(pick);
+      const idx = candidates.indexOf(pick);
+      if (idx >= 0) candidates.splice(idx, 1);
+      return pick;
+    };
+
+    if (upcomingMatch.isSingles) {
+      if (!t1[0]) t1[0] = pickNext([]) || "";
+      if (!t2[0]) t2[0] = pickNext([]) || "";
+    } else {
+      if (!t1[0]) t1[0] = pickNext([t1[1]].filter(Boolean) as string[]) || "";
+      if (!t1[1]) t1[1] = pickNext([t1[0]].filter(Boolean) as string[]) || "";
+      if (!t2[0]) t2[0] = pickNext([t2[1]].filter(Boolean) as string[]) || "";
+      if (!t2[1]) t2[1] = pickNext([t2[0]].filter(Boolean) as string[]) || "";
+    }
+
+    if (t1.some(x => !x) || t2.some(x => !x)) {
+      toast({ title: "Conflict detected", description: "Not enough available players to adjust.", variant: "destructive" });
+      return;
+    }
+
+    const updatedMatch: Match = {
+      ...upcomingMatch,
+      team1: upcomingMatch.isSingles ? [t1[0]] as [string] : [t1[0], t1[1]] as [string, string],
+      team2: upcomingMatch.isSingles ? [t2[0]] as [string] : [t2[0], t2[1]] as [string, string],
+    };
+
+    const matchIndex = matches.findIndex(m => m.id === upcomingMatch.id);
+    const playedMatches = matches.slice(0, matchIndex).map(m => {
+      const score = scores.get(m.id);
+      return {
+        ...m,
+        score: score ? normalizeScore(score) : m.score ? normalizeScore(m.score) : undefined
+      };
+    });
+
+    const newMatches = regenerateScheduleFromSlot(
+      allPlayers,
+      [...playedMatches, updatedMatch],
+      upcomingMatch.endTime,
+      gameConfig.gameDuration,
+      gameConfig.totalTime,
+      gameConfig.courts,
+      undefined,
+      gameConfig.teammatePairs,
+      courtConfigs,
+      matches
+    );
+
+    onScheduleUpdate(newMatches, allPlayers);
+    
+    const matchIdx = matches.filter(m => m.court === upcomingMatch.court && m.endTime <= upcomingMatch.endTime).length;
+    const matchNumber = `${String.fromCharCode(64 + upcomingMatch.court)}${matchIdx}`;
+    toast({ title: "Upcoming game adjusted", description: `Match ${matchNumber} roster adjusted to avoid conflicts for: ${conflicts.join(', ')}` });
   };
 
   const checkScheduleAdjustment = (completedMatchId: string, actualEndTime: number) => {
