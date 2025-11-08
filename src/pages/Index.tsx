@@ -94,7 +94,8 @@ const Index = () => {
       config.gameDuration,
       config.totalTime,
       config.courts,
-      config.startTime
+      config.startTime,
+      config.teammatePairs
     );
     setMatches(schedule);
     setPlayers(playerList);

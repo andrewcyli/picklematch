@@ -11,6 +11,13 @@ export interface Match {
     team1: number;
     team2: number;
   };
+  status?: 'scheduled' | 'in-progress' | 'completed';
+  actualEndTime?: number;
+}
+
+export interface TeammatePair {
+  player1: string;
+  player2: string;
 }
 
 interface PlayerStats {
@@ -26,7 +33,8 @@ export function generateSchedule(
   gameDuration: number,
   totalTime: number,
   courts: number,
-  startTime?: string
+  startTime?: string,
+  teammatePairs: TeammatePair[] = []
 ): Match[] {
   const matches: Match[] = [];
   const playerStats = new Map<string, PlayerStats>();
@@ -79,7 +87,8 @@ export function generateSchedule(
         allTeams,
         slotStartTime,
         slotEndTime,
-        court + 1
+        court + 1,
+        teammatePairs
       );
 
       if (match) {
@@ -141,7 +150,8 @@ function createOptimalMatch(
   allTeams: [string, string][],
   startTime: number,
   endTime: number,
-  court: number
+  court: number,
+  teammatePairs: TeammatePair[] = []
 ): Match | null {
   if (availablePlayers.length < 4) return null;
 
@@ -152,6 +162,11 @@ function createOptimalMatch(
     return statsA.playTime - statsB.playTime;
   });
 
+  // Check if we have any bound pairs that can play together
+  const availablePairs = teammatePairs.filter(pair => 
+    availablePlayers.includes(pair.player1) && availablePlayers.includes(pair.player2)
+  );
+
   // Try to form teams with minimal repeats
   let bestScore = -Infinity;
   let bestMatch: Match | null = null;
@@ -160,28 +175,68 @@ function createOptimalMatch(
   const maxAttempts = Math.min(100, sortedPlayers.length * 10);
   
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    // Pick 4 players
-    const selectedIndices = new Set<number>();
-    while (selectedIndices.size < 4) {
-      // Bias towards players who played less
-      const idx = Math.floor(Math.pow(Math.random(), 2) * sortedPlayers.length);
-      selectedIndices.add(idx);
+    let selected: string[];
+    let configs: [[string, string], [string, string]][];
+
+    // If we have bound pairs, try to use at least one
+    if (availablePairs.length > 0 && Math.random() < 0.7) {
+      const pair = availablePairs[Math.floor(Math.random() * availablePairs.length)];
+      const remainingPlayers = sortedPlayers.filter(p => p !== pair.player1 && p !== pair.player2);
+      
+      if (remainingPlayers.length >= 2) {
+        const selectedIndices = new Set<number>();
+        while (selectedIndices.size < 2) {
+          const idx = Math.floor(Math.pow(Math.random(), 2) * remainingPlayers.length);
+          selectedIndices.add(idx);
+        }
+        const otherTwo = Array.from(selectedIndices).map(i => remainingPlayers[i]);
+        selected = [pair.player1, pair.player2, ...otherTwo];
+        
+        // Only try configs where the bound pair stays together
+        configs = [
+          [[selected[0], selected[1]], [selected[2], selected[3]]],
+        ];
+      } else {
+        continue;
+      }
+    } else {
+      // Pick 4 players normally
+      const selectedIndices = new Set<number>();
+      while (selectedIndices.size < 4) {
+        const idx = Math.floor(Math.pow(Math.random(), 2) * sortedPlayers.length);
+        selectedIndices.add(idx);
+      }
+      
+      selected = Array.from(selectedIndices).map(i => sortedPlayers[i]);
+      
+      const [p1, p2, p3, p4] = selected;
+      
+      // Check for bound pairs and respect them
+      const isBoundPair12 = teammatePairs.some(pair => 
+        (pair.player1 === p1 && pair.player2 === p2) || (pair.player1 === p2 && pair.player2 === p1)
+      );
+      const isBoundPair34 = teammatePairs.some(pair => 
+        (pair.player1 === p3 && pair.player2 === p4) || (pair.player1 === p4 && pair.player2 === p3)
+      );
+      
+      // Generate configs that respect bound pairs
+      if (isBoundPair12 && isBoundPair34) {
+        configs = [[[p1, p2], [p3, p4]]];
+      } else if (isBoundPair12) {
+        configs = [[[p1, p2], [p3, p4]]];
+      } else if (isBoundPair34) {
+        configs = [[[p1, p3], [p2, p4]], [[p1, p4], [p2, p3]]];
+      } else {
+        configs = [
+          [[p1, p2], [p3, p4]],
+          [[p1, p3], [p2, p4]],
+          [[p1, p4], [p2, p3]],
+        ];
+      }
     }
-    
-    const selected = Array.from(selectedIndices).map(i => sortedPlayers[i]);
-    
-    // Form two teams
-    const [p1, p2, p3, p4] = selected;
-    
-    // Try different team configurations
-    const configs: [[string, string], [string, string]][] = [
-      [[p1, p2], [p3, p4]],
-      [[p1, p3], [p2, p4]],
-      [[p1, p4], [p2, p3]],
-    ];
 
     for (const [team1, team2] of configs) {
-      const score = calculateMatchScore(team1, team2, playerStats);
+      const score = calculateMatchScore(team1, team2, playerStats, teammatePairs);
       
       if (score > bestScore) {
         bestScore = score;
@@ -192,6 +247,7 @@ function createOptimalMatch(
           endTime,
           team1,
           team2,
+          status: 'scheduled',
         };
       }
     }
@@ -203,7 +259,8 @@ function createOptimalMatch(
 function calculateMatchScore(
   team1: [string, string],
   team2: [string, string],
-  playerStats: Map<string, PlayerStats>
+  playerStats: Map<string, PlayerStats>,
+  teammatePairs: TeammatePair[] = []
 ): number {
   let score = 0;
   const [p1, p2] = team1;
@@ -214,9 +271,19 @@ function calculateMatchScore(
   const stats3 = playerStats.get(p3)!;
   const stats4 = playerStats.get(p4)!;
 
-  // Penalize repeated partnerships
-  if (stats1.partners.has(p2)) score -= 10;
-  if (stats3.partners.has(p4)) score -= 10;
+  // Reward bound pairs playing together
+  const isBoundPair1 = teammatePairs.some(pair => 
+    (pair.player1 === p1 && pair.player2 === p2) || (pair.player1 === p2 && pair.player2 === p1)
+  );
+  const isBoundPair2 = teammatePairs.some(pair => 
+    (pair.player1 === p3 && pair.player2 === p4) || (pair.player1 === p4 && pair.player2 === p3)
+  );
+  if (isBoundPair1) score += 100;
+  if (isBoundPair2) score += 100;
+
+  // Penalize repeated partnerships (unless they're bound)
+  if (!isBoundPair1 && stats1.partners.has(p2)) score -= 10;
+  if (!isBoundPair2 && stats3.partners.has(p4)) score -= 10;
 
   // Penalize repeated opponents
   if (stats1.opponents.has(p3) || stats1.opponents.has(p4)) score -= 5;
@@ -247,7 +314,8 @@ export function regenerateScheduleFromSlot(
   gameDuration: number,
   totalTime: number,
   courts: number,
-  startTime?: string
+  startTime?: string,
+  teammatePairs: TeammatePair[] = []
 ): Match[] {
   const playerStats = new Map<string, PlayerStats>();
 
@@ -331,7 +399,8 @@ export function regenerateScheduleFromSlot(
         allTeams,
         slotStartTime,
         slotEndTime,
-        court + 1
+        court + 1,
+        teammatePairs
       );
 
       if (match) {

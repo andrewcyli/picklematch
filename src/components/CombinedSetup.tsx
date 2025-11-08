@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
-import { UserPlus, X, ArrowRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { UserPlus, X, ArrowRight, Link2 } from "lucide-react";
 import { GameConfig } from "./GameSetup";
 import { toast } from "sonner";
 
@@ -20,6 +21,8 @@ export const CombinedSetup = ({ onComplete }: CombinedSetupProps) => {
   const [totalTime, setTotalTime] = useState<number>(60);
   const [courts, setCourts] = useState<number>(2);
   const [startTime, setStartTime] = useState<string>("09:00");
+  const [teammatePairs, setTeammatePairs] = useState<{ player1: string; player2: string }[]>([]);
+  const [selectedForPairing, setSelectedForPairing] = useState<string | null>(null);
 
   const addPlayer = () => {
     const trimmedName = currentName.trim();
@@ -44,6 +47,37 @@ export const CombinedSetup = ({ onComplete }: CombinedSetupProps) => {
     }
   };
 
+  const togglePairSelection = (player: string) => {
+    if (selectedForPairing === player) {
+      setSelectedForPairing(null);
+    } else if (selectedForPairing === null) {
+      setSelectedForPairing(player);
+    } else {
+      // Check if pair already exists
+      const existingPair = teammatePairs.find(
+        pair => (pair.player1 === selectedForPairing && pair.player2 === player) ||
+                (pair.player1 === player && pair.player2 === selectedForPairing)
+      );
+      
+      if (existingPair) {
+        toast.error("These players are already paired");
+      } else {
+        setTeammatePairs([...teammatePairs, { player1: selectedForPairing, player2: player }]);
+        toast.success(`${selectedForPairing} & ${player} are now teammates`);
+      }
+      setSelectedForPairing(null);
+    }
+  };
+
+  const removePair = (pair: { player1: string; player2: string }) => {
+    setTeammatePairs(teammatePairs.filter(p => p !== pair));
+    toast.success("Pair removed");
+  };
+
+  const isPaired = (player: string) => {
+    return teammatePairs.some(pair => pair.player1 === player || pair.player2 === player);
+  };
+
   const handleSubmit = () => {
     if (players.length < 2) {
       toast.error("Please add at least 2 players");
@@ -54,6 +88,7 @@ export const CombinedSetup = ({ onComplete }: CombinedSetupProps) => {
       totalTime,
       courts,
       startTime,
+      teammatePairs,
     };
     onComplete(players, config);
   };
@@ -181,19 +216,73 @@ export const CombinedSetup = ({ onComplete }: CombinedSetupProps) => {
                 {players.map((player, index) => (
                   <div
                     key={index}
-                    className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors"
+                    className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+                      selectedForPairing === player
+                        ? "bg-primary/20 border-2 border-primary"
+                        : isPaired(player)
+                        ? "bg-accent/10"
+                        : "bg-secondary/50 hover:bg-secondary"
+                    }`}
                   >
-                    <span className="font-medium text-foreground">{player}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removePlayer(index)}
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-2 flex-1">
+                      <span className="font-medium text-foreground">{player}</span>
+                      {isPaired(player) && (
+                        <Badge variant="secondary" className="text-xs">
+                          <Link2 className="h-3 w-3 mr-1" />
+                          Paired
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => togglePairSelection(player)}
+                        className="h-8 w-8 text-muted-foreground hover:text-primary"
+                        title="Bind as teammates"
+                      >
+                        <Link2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removePlayer(index)}
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
+                
+                {selectedForPairing && (
+                  <div className="mt-3 p-3 bg-primary/10 rounded-lg border border-primary/20">
+                    <p className="text-sm text-muted-foreground">
+                      Click another player to pair with <strong>{selectedForPairing}</strong>
+                    </p>
+                  </div>
+                )}
+
+                {teammatePairs.length > 0 && (
+                  <div className="mt-4 pt-4 border-t space-y-2">
+                    <h4 className="text-sm font-semibold text-foreground">Teammate Pairs</h4>
+                    {teammatePairs.map((pair, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2 rounded bg-accent/10">
+                        <span className="text-sm">
+                          {pair.player1} & {pair.player2}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removePair(pair)}
+                          className="h-6 w-6"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </Card>

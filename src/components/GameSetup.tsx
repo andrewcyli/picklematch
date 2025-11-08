@@ -17,6 +17,7 @@ export interface GameConfig {
   totalTime: number;
   courts: number;
   startTime: string;
+  teammatePairs?: { player1: string; player2: string }[];
 }
 
 export const GameSetup = ({ playerCount, onComplete, onBack }: GameSetupProps) => {

@@ -1,10 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Match, regenerateScheduleFromSlot } from "@/lib/scheduler";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Trophy, Clock, Users, Share2, Medal, UserPlus } from "lucide-react";
+import { ArrowLeft, Trophy, Clock, Users, Share2, Medal, UserPlus, X, Play } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -13,6 +13,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 
 interface ScheduleViewProps {
@@ -23,6 +33,7 @@ interface ScheduleViewProps {
     totalTime: number;
     courts: number;
     startTime: string;
+    teammatePairs?: { player1: string; player2: string }[];
   };
   allPlayers: string[];
   onScheduleUpdate: (newMatches: Match[], newPlayers: string[]) => void;
@@ -35,10 +46,95 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
   );
   const [newPlayerName, setNewPlayerName] = useState("");
   const [isAddPlayerOpen, setIsAddPlayerOpen] = useState(false);
+  const [playerToDelete, setPlayerToDelete] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState<number>(0);
+
+  // Update current time every minute
+  useEffect(() => {
+    const updateCurrentTime = () => {
+      const now = new Date();
+      const [startHours, startMinutes] = gameConfig.startTime.split(':').map(Number);
+      const startTimeInMinutes = startHours * 60 + startMinutes;
+      const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
+      const elapsed = currentTimeInMinutes - startTimeInMinutes;
+      setCurrentTime(Math.max(0, elapsed));
+    };
+
+    updateCurrentTime();
+    const interval = setInterval(updateCurrentTime, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, [gameConfig.startTime]);
+
+  // Find current match based on time and scores
+  const currentMatch = useMemo(() => {
+    // First, find the first unscored match
+    const unscoredMatch = matches.find(m => !matchScores.has(m.id));
+    if (unscoredMatch) {
+      return unscoredMatch.id;
+    }
+    return null;
+  }, [matches, matchScores]);
 
   const updateScore = (matchId: string, team: "team1" | "team2", score: number) => {
     const current = matchScores.get(matchId) || { team1: 0, team2: 0 };
-    setMatchScores(new Map(matchScores.set(matchId, { ...current, [team]: score })));
+    const newScores = new Map(matchScores.set(matchId, { ...current, [team]: score }));
+    setMatchScores(newScores);
+
+    // Check if both scores are entered and this is the first complete score entry
+    const bothScoresEntered = (team === "team1" && current.team2 > 0) || (team === "team2" && current.team1 > 0);
+    
+    if (bothScoresEntered && score > 0) {
+      // Calculate actual end time
+      const actualEndTime = currentTime;
+      checkScheduleAdjustment(matchId, actualEndTime);
+    }
+  };
+
+  const checkScheduleAdjustment = (completedMatchId: string, actualEndTime: number) => {
+    const completedMatch = matches.find(m => m.id === completedMatchId);
+    if (!completedMatch) return;
+
+    const scheduledEndTime = completedMatch.endTime;
+    const timeDifference = actualEndTime - scheduledEndTime;
+
+    // If more than 5 minutes difference, adjust schedule
+    if (Math.abs(timeDifference) > 5) {
+      const matchIndex = matches.findIndex(m => m.id === completedMatchId);
+      const playedMatches = matches.slice(0, matchIndex + 1).map(m => ({
+        ...m,
+        score: matchScores.get(m.id),
+        actualEndTime: m.id === completedMatchId ? actualEndTime : m.endTime,
+      }));
+
+      // Determine if we need more or fewer matches
+      const remainingTime = gameConfig.totalTime - actualEndTime;
+      const potentialNewMatches = Math.floor(remainingTime / gameConfig.gameDuration) * gameConfig.courts;
+      const currentFutureMatches = matches.length - (matchIndex + 1);
+
+      if (potentialNewMatches !== currentFutureMatches) {
+        // Regenerate schedule
+        const newMatches = regenerateScheduleFromSlot(
+          allPlayers,
+          playedMatches,
+          actualEndTime,
+          gameConfig.gameDuration,
+          gameConfig.totalTime,
+          gameConfig.courts,
+          gameConfig.startTime,
+          gameConfig.teammatePairs
+        );
+
+        onScheduleUpdate(newMatches, allPlayers);
+        
+        const matchDiff = newMatches.length - matches.length;
+        if (matchDiff > 0) {
+          toast({ title: "Schedule adjusted", description: `Added ${matchDiff} match(es) due to faster pace` });
+        } else if (matchDiff < 0) {
+          toast({ title: "Schedule adjusted", description: `Removed ${Math.abs(matchDiff)} match(es) due to slower pace` });
+        }
+      }
+    }
   };
 
   const groupedMatches = matches.reduce((acc, match) => {
@@ -55,8 +151,8 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
       const scores = matchScores.get(match.id);
       if (!scores) return;
       
-      const allPlayers = [...match.team1, ...match.team2];
-      allPlayers.forEach((player) => {
+      const allMatchPlayers = [...match.team1, ...match.team2];
+      allMatchPlayers.forEach((player) => {
         if (!playerScores.has(player)) {
           playerScores.set(player, { wins: 0, losses: 0, points: 0 });
         }
@@ -128,7 +224,6 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
       return;
     }
 
-    // Find the first match without scores (not yet played)
     const firstUnplayedMatchIndex = matches.findIndex(m => !matchScores.has(m.id));
     
     if (firstUnplayedMatchIndex === -1) {
@@ -137,17 +232,13 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     }
 
     const firstUnplayedMatch = matches[firstUnplayedMatchIndex];
-    
-    // Keep matches that have been played
     const playedMatches = matches.slice(0, firstUnplayedMatchIndex);
     
-    // Add scores to played matches
     const matchesWithScores = playedMatches.map(m => ({
       ...m,
       score: matchScores.get(m.id)
     }));
 
-    // Regenerate from the next slot
     const updatedPlayers = [...allPlayers, trimmedName];
     const newMatches = regenerateScheduleFromSlot(
       updatedPlayers,
@@ -156,7 +247,8 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
       gameConfig.gameDuration,
       gameConfig.totalTime,
       gameConfig.courts,
-      gameConfig.startTime
+      gameConfig.startTime,
+      gameConfig.teammatePairs
     );
 
     onScheduleUpdate(newMatches, updatedPlayers);
@@ -165,9 +257,53 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     toast({ title: "Player added!", description: "Schedule updated from next slot onwards" });
   };
 
+  const handleDeletePlayer = (playerName: string) => {
+    const firstUnplayedMatchIndex = matches.findIndex(m => !matchScores.has(m.id));
+    
+    if (firstUnplayedMatchIndex === -1) {
+      toast({ title: "Cannot remove player", description: "All matches completed", variant: "destructive" });
+      return;
+    }
+
+    const firstUnplayedMatch = matches[firstUnplayedMatchIndex];
+    const playedMatches = matches.slice(0, firstUnplayedMatchIndex);
+    
+    const matchesWithScores = playedMatches.map(m => ({
+      ...m,
+      score: matchScores.get(m.id)
+    }));
+
+    const updatedPlayers = allPlayers.filter(p => p !== playerName);
+    
+    if (updatedPlayers.length < 4) {
+      toast({ title: "Cannot remove player", description: "Need at least 4 players", variant: "destructive" });
+      return;
+    }
+
+    // Remove player from teammate pairs if they're in one
+    const updatedPairs = (gameConfig.teammatePairs || []).filter(
+      pair => pair.player1 !== playerName && pair.player2 !== playerName
+    );
+
+    const newMatches = regenerateScheduleFromSlot(
+      updatedPlayers,
+      matchesWithScores,
+      firstUnplayedMatch.startTime,
+      gameConfig.gameDuration,
+      gameConfig.totalTime,
+      gameConfig.courts,
+      gameConfig.startTime,
+      updatedPairs
+    );
+
+    onScheduleUpdate(newMatches, updatedPlayers);
+    setPlayerToDelete(null);
+    toast({ title: "Player removed", description: "Schedule updated from next slot onwards" });
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-4">
           <Button variant="ghost" onClick={onBack} size="sm" className="gap-2">
             <ArrowLeft className="w-4 h-4" />
@@ -218,6 +354,41 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
         </Dialog>
       </div>
 
+      {/* Player List with Delete Option */}
+      <Card className="p-4">
+        <h3 className="text-sm font-semibold text-foreground mb-3">Active Players</h3>
+        <div className="flex flex-wrap gap-2">
+          {allPlayers.map((player) => (
+            <Badge key={player} variant="secondary" className="px-3 py-1 text-sm">
+              {player}
+              <button
+                onClick={() => setPlayerToDelete(player)}
+                className="ml-2 hover:text-destructive"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          ))}
+        </div>
+      </Card>
+
+      <AlertDialog open={!!playerToDelete} onOpenChange={(open) => !open && setPlayerToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Player</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove {playerToDelete} from the game? The schedule will be regenerated from the next unplayed match.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => playerToDelete && handleDeletePlayer(playerToDelete)}>
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="space-y-8">
         {Object.entries(groupedMatches).map(([timeSlot, slotMatches]) => {
           const [start, end] = timeSlot.split("-").map(Number);
@@ -240,10 +411,19 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {slotMatches.map((match) => {
                   const scores = matchScores.get(match.id) || { team1: 0, team2: 0 };
+                  const isCurrentMatch = match.id === currentMatch;
+                  const isCompleted = matchScores.has(match.id) && scores.team1 > 0 && scores.team2 > 0;
+                  
                   return (
                     <Card
                       key={match.id}
-                      className="p-5 hover:shadow-lg transition-all border-l-4 border-l-primary"
+                      className={`p-5 hover:shadow-lg transition-all border-l-4 ${
+                        isCurrentMatch 
+                          ? "border-l-primary bg-primary/5 ring-2 ring-primary/20" 
+                          : isCompleted
+                          ? "border-l-muted opacity-60"
+                          : "border-l-primary"
+                      }`}
                       style={{ boxShadow: "var(--shadow-match)" }}
                     >
                       <div className="space-y-4">
@@ -251,6 +431,15 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                           <Badge className="bg-primary/10 text-primary hover:bg-primary/20">
                             Court {match.court}
                           </Badge>
+                          {isCurrentMatch && (
+                            <Badge className="bg-accent/10 text-accent border-accent/20">
+                              <Play className="w-3 h-3 mr-1" />
+                              Current
+                            </Badge>
+                          )}
+                          {isCompleted && (
+                            <Badge variant="secondary">Completed</Badge>
+                          )}
                         </div>
 
                         <div className="space-y-3">
@@ -269,6 +458,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                               value={scores.team1}
                               onChange={(e) => updateScore(match.id, "team1", Number(e.target.value))}
                               className="w-16 h-12 text-center text-xl font-bold"
+                              disabled={isCompleted}
                             />
                           </div>
 
@@ -291,6 +481,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                               value={scores.team2}
                               onChange={(e) => updateScore(match.id, "team2", Number(e.target.value))}
                               className="w-16 h-12 text-center text-xl font-bold"
+                              disabled={isCompleted}
                             />
                           </div>
                         </div>
