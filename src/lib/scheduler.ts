@@ -356,11 +356,14 @@ function createDeterministicMatch(
   const playersNeeded = matchType === 'singles' ? 2 : 4;
   if (availablePlayers.length < playersNeeded) return null;
 
+  // Generate unique ID based on court and time slot to prevent duplicates
+  const uniqueId = `match-c${court}-t${startTime}`;
+
   // SINGLES: Take first 2 players from deterministic queue
   if (matchType === 'singles') {
     const [p1, p2] = availablePlayers.slice(0, 2);
     return {
-      id: "",
+      id: uniqueId,
       court,
       startTime,
       endTime,
@@ -385,7 +388,7 @@ function createDeterministicMatch(
     if (score > bestScore) {
       bestScore = score;
       bestMatch = {
-        id: "",
+        id: uniqueId,
         court,
         startTime,
         endTime,
@@ -797,11 +800,23 @@ export function regenerateScheduleFromSlot(
 // ==================== UTILITIES ====================
 
 function finalizeMatches(matches: Match[], startTime?: string, gameDuration?: number): Match[] {
-  return matches.map((match, index) => {
+  // First, remove duplicates by ID - keep the LAST occurrence (most recent)
+  const seenIds = new Map<string, Match>();
+  matches.forEach(match => {
+    seenIds.set(match.id, match);
+  });
+  const uniqueMatches = Array.from(seenIds.values());
+  
+  // Sort by court and startTime to maintain order
+  uniqueMatches.sort((a, b) => {
+    if (a.startTime !== b.startTime) return a.startTime - b.startTime;
+    return a.court - b.court;
+  });
+  
+  return uniqueMatches.map((match) => {
     // Lock all matches after generation for immutability
     const finalMatch = { 
-      ...match, 
-      id: match.id || `match-${index}`,
+      ...match,
       isLocked: match.isLocked !== false // Lock by default unless explicitly unlocked
     };
     
