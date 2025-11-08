@@ -98,24 +98,32 @@ export function generateSchedule(
         });
     }
     
-    // Enforce rest after consecutive matches or recent play
+    // Enforce rest after consecutive matches with graduated approach
     players.forEach((player) => {
       const stats = playerStats.get(player)!;
       const minPlayersNeeded = finalCourtConfigs.reduce((acc, config) => 
         acc + (config.type === 'singles' ? 2 : 4), 0
       );
       
-      // Force rest after playing in previous slot if played 2+ consecutive matches
-      if (stats.lastMatchEnd === slotStartTime && stats.consecutiveMatches >= 2) {
+      // Force rest after 3 consecutive matches (hard limit)
+      if (stats.lastMatchEnd === slotStartTime && stats.consecutiveMatches >= 3) {
         if (availablePlayers.size > minPlayersNeeded) {
           availablePlayers.delete(player);
           stats.restTime += gameDuration;
           stats.consecutiveMatches = 0;
         }
       }
-      // Encourage rest after playing in previous slot (70% chance)
+      // Strong encouragement (85%) to rest after 2 consecutive matches
+      else if (stats.lastMatchEnd === slotStartTime && stats.consecutiveMatches >= 2) {
+        if (availablePlayers.size > minPlayersNeeded && Math.random() < 0.85) {
+          availablePlayers.delete(player);
+          stats.restTime += gameDuration;
+          stats.consecutiveMatches = 0;
+        }
+      }
+      // Light encouragement (50%) to rest after 1 match
       else if (stats.lastMatchEnd === slotStartTime && availablePlayers.size > minPlayersNeeded) {
-        if (Math.random() < 0.7) {
+        if (Math.random() < 0.5) {
           availablePlayers.delete(player);
           stats.restTime += gameDuration;
           stats.consecutiveMatches = 0;
@@ -315,6 +323,10 @@ function createOptimalMatch(
   // Sample a subset of combinations for performance
   const maxAttempts = Math.min(100, sortedPlayers.length * 10);
   
+  // Hybrid approach: alternate between fairness-first and random selection
+  // Use startTime to determine strategy (consistent for regeneration)
+  const useFairnessFirst = Math.floor(startTime / 15) % 2 === 0;
+  
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     let selected: string[];
     let configs: [[string, string], [string, string]][];
@@ -327,7 +339,10 @@ function createOptimalMatch(
       if (remainingPlayers.length >= 2) {
         const selectedIndices = new Set<number>();
         while (selectedIndices.size < 2) {
-          const idx = Math.floor(Math.pow(Math.random(), 2) * remainingPlayers.length);
+          // Apply hybrid randomization strategy
+          const idx = useFairnessFirst 
+            ? Math.floor(Math.pow(Math.random(), 2) * remainingPlayers.length)
+            : Math.floor(Math.random() * remainingPlayers.length);
           selectedIndices.add(idx);
         }
         const otherTwo = Array.from(selectedIndices).map(i => remainingPlayers[i]);
@@ -341,10 +356,12 @@ function createOptimalMatch(
         continue;
       }
     } else {
-      // Pick 4 players normally
+      // Pick 4 players with hybrid randomization strategy
       const selectedIndices = new Set<number>();
       while (selectedIndices.size < 4) {
-        const idx = Math.floor(Math.pow(Math.random(), 2) * sortedPlayers.length);
+        const idx = useFairnessFirst
+          ? Math.floor(Math.pow(Math.random(), 2) * sortedPlayers.length) // Bias toward less-played
+          : Math.floor(Math.random() * sortedPlayers.length); // Pure random
         selectedIndices.add(idx);
       }
       
@@ -449,15 +466,26 @@ function calculateMatchScore(
   const totalConsecutive = stats1.consecutiveMatches + stats2.consecutiveMatches + 
                            stats3.consecutiveMatches + stats4.consecutiveMatches;
   score -= totalConsecutive * 15;
+  
+  // Heavy penalty for players who haven't rested yet
+  const noRestPlayers = [stats1, stats2, stats3, stats4].filter(s => s.consecutiveMatches > 0 && s.restTime === 0);
+  score -= noRestPlayers.length * 50;
 
-  // Reward balanced play time
+  // STRENGTHENED fairness: Reward balanced play time (3x stronger penalty)
   const avgPlayTime = (stats1.playTime + stats2.playTime + stats3.playTime + stats4.playTime) / 4;
   const playTimeVariance = 
     Math.abs(stats1.playTime - avgPlayTime) +
     Math.abs(stats2.playTime - avgPlayTime) +
     Math.abs(stats3.playTime - avgPlayTime) +
     Math.abs(stats4.playTime - avgPlayTime);
-  score -= playTimeVariance / 10;
+  score -= playTimeVariance / 3; // Was /10, now 3x stronger
+  
+  // Additional fairness: Heavy penalty for play count imbalance
+  const playTimes = [stats1.playTime, stats2.playTime, stats3.playTime, stats4.playTime];
+  const maxPlayTime = Math.max(...playTimes);
+  const minPlayTime = Math.min(...playTimes);
+  const playCountImbalance = maxPlayTime - minPlayTime;
+  score -= playCountImbalance * 2; // Penalize large gaps between most/least played
 
   return score;
 }
@@ -577,7 +605,7 @@ export function regenerateScheduleFromSlot(
         });
     }
     
-    // Enforce rest after consecutive matches or recent play
+    // Enforce rest after consecutive matches with graduated approach
     players.forEach((player) => {
       const stats = playerStats.get(player);
       if (!stats) return;
@@ -586,17 +614,25 @@ export function regenerateScheduleFromSlot(
         acc + (config.type === 'singles' ? 2 : 4), 0
       );
       
-      // Force rest after playing in previous slot if played 2+ consecutive matches
-      if (stats.lastMatchEnd === slotStartTime && stats.consecutiveMatches >= 2) {
+      // Force rest after 3 consecutive matches (hard limit)
+      if (stats.lastMatchEnd === slotStartTime && stats.consecutiveMatches >= 3) {
         if (availablePlayers.size > minPlayersNeeded) {
           availablePlayers.delete(player);
           stats.restTime += gameDuration;
           stats.consecutiveMatches = 0;
         }
       }
-      // Encourage rest after playing in previous slot (70% chance)
+      // Strong encouragement (85%) to rest after 2 consecutive matches
+      else if (stats.lastMatchEnd === slotStartTime && stats.consecutiveMatches >= 2) {
+        if (availablePlayers.size > minPlayersNeeded && Math.random() < 0.85) {
+          availablePlayers.delete(player);
+          stats.restTime += gameDuration;
+          stats.consecutiveMatches = 0;
+        }
+      }
+      // Light encouragement (50%) to rest after 1 match
       else if (stats.lastMatchEnd === slotStartTime && availablePlayers.size > minPlayersNeeded) {
-        if (Math.random() < 0.7) {
+        if (Math.random() < 0.5) {
           availablePlayers.delete(player);
           stats.restTime += gameDuration;
           stats.consecutiveMatches = 0;
