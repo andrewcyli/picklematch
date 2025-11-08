@@ -208,6 +208,18 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     }
   };
 
+  // Auto-scroll to current match when component is displayed or carousels are ready
+  useEffect(() => {
+    if (carouselApis.size > 0) {
+      // Small delay to ensure carousel is fully rendered
+      setTimeout(() => {
+        courtConfigs.forEach(config => {
+          scrollToCurrentMatch(config.courtNumber);
+        });
+      }, 100);
+    }
+  }, [carouselApis.size]);
+
   return (
     <div className="pb-20 max-h-[calc(100vh-5rem)] overflow-y-auto">
       {/* Header */}
