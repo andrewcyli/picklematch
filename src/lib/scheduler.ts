@@ -32,6 +32,9 @@ interface PlayerStats {
   partners: Set<string>;
   opponents: Set<string>;
   lastMatchEnd: number;
+  recentPartners: string[]; // Track last 3 partners
+  recentOpponents: string[]; // Track last 6 opponents
+  consecutiveMatches: number; // Count consecutive matches without rest
 }
 
 export function generateSchedule(
@@ -54,6 +57,9 @@ export function generateSchedule(
       partners: new Set(),
       opponents: new Set(),
       lastMatchEnd: 0,
+      recentPartners: [],
+      recentOpponents: [],
+      consecutiveMatches: 0,
     });
   });
 
@@ -80,28 +86,47 @@ export function generateSchedule(
     const slotEndTime = slotStartTime + gameDuration;
     const availablePlayers = new Set(players);
     
-    // Remove players who just played (need rest)
+    // Enforce rest after consecutive matches or recent play
     players.forEach((player) => {
       const stats = playerStats.get(player)!;
-      if (stats.lastMatchEnd === slotStartTime) {
-        // Player just finished, can rest
-        const minPlayersNeeded = finalCourtConfigs.reduce((acc, config) => 
-          acc + (config.type === 'singles' ? 2 : 4), 0
-        );
-        if (Math.random() > 0.5 && availablePlayers.size > minPlayersNeeded) {
+      const minPlayersNeeded = finalCourtConfigs.reduce((acc, config) => 
+        acc + (config.type === 'singles' ? 2 : 4), 0
+      );
+      
+      // Force rest after playing in previous slot if played 2+ consecutive matches
+      if (stats.lastMatchEnd === slotStartTime && stats.consecutiveMatches >= 2) {
+        if (availablePlayers.size > minPlayersNeeded) {
           availablePlayers.delete(player);
+          stats.restTime += gameDuration;
+          stats.consecutiveMatches = 0;
+        }
+      }
+      // Encourage rest after playing in previous slot (70% chance)
+      else if (stats.lastMatchEnd === slotStartTime && availablePlayers.size > minPlayersNeeded) {
+        if (Math.random() < 0.7) {
+          availablePlayers.delete(player);
+          stats.restTime += gameDuration;
+          stats.consecutiveMatches = 0;
         }
       }
     });
 
+    // Track which players are already scheduled in this time slot (prevents court conflicts)
+    const playersScheduledThisSlot = new Set<string>();
+    
     for (let court = 0; court < matchesPerSlot; court++) {
       const courtConfig = finalCourtConfigs[court];
       const playersNeeded = courtConfig.type === 'singles' ? 2 : 4;
       
-      if (availablePlayers.size < playersNeeded) continue;
+      // Filter out players already scheduled on other courts in this slot
+      const availableForThisCourt = Array.from(availablePlayers).filter(
+        p => !playersScheduledThisSlot.has(p)
+      );
+      
+      if (availableForThisCourt.length < playersNeeded) continue;
       
       const match = createOptimalMatch(
-        Array.from(availablePlayers),
+        availableForThisCourt,
         playerStats,
         allTeams,
         slotStartTime,
@@ -133,33 +158,49 @@ export function generateSchedule(
           const stats = playerStats.get(player)!;
           stats.playTime += gameDuration;
           stats.lastMatchEnd = slotEndTime;
+          stats.consecutiveMatches++;
           availablePlayers.delete(player);
+          playersScheduledThisSlot.add(player); // Prevent same player on multiple courts
 
           // Update partners and opponents
           if (match.isSingles) {
             const opponent = match.team1[0] === player ? match.team2[0] : match.team1[0];
             stats.opponents.add(opponent);
+            stats.recentOpponents.unshift(opponent);
+            if (stats.recentOpponents.length > 6) stats.recentOpponents.pop();
           } else {
             const [p1, p2] = match.team1 as [string, string];
             const [p3, p4] = match.team2 as [string, string];
             
             if (player === p1) {
               stats.partners.add(p2);
+              stats.recentPartners.unshift(p2);
               stats.opponents.add(p3);
               stats.opponents.add(p4);
+              stats.recentOpponents.unshift(p3, p4);
             } else if (player === p2) {
               stats.partners.add(p1);
+              stats.recentPartners.unshift(p1);
               stats.opponents.add(p3);
               stats.opponents.add(p4);
+              stats.recentOpponents.unshift(p3, p4);
             } else if (player === p3) {
               stats.partners.add(p4);
+              stats.recentPartners.unshift(p4);
               stats.opponents.add(p1);
               stats.opponents.add(p2);
+              stats.recentOpponents.unshift(p1, p2);
             } else {
               stats.partners.add(p3);
+              stats.recentPartners.unshift(p3);
               stats.opponents.add(p1);
               stats.opponents.add(p2);
+              stats.recentOpponents.unshift(p1, p2);
             }
+            
+            // Keep only last 3 partners and 6 opponents
+            if (stats.recentPartners.length > 3) stats.recentPartners.pop();
+            if (stats.recentOpponents.length > 6) stats.recentOpponents.pop();
           }
         });
       }
@@ -346,7 +387,7 @@ function calculateMatchScore(
   const stats3 = playerStats.get(p3)!;
   const stats4 = playerStats.get(p4)!;
 
-  // Reward bound pairs playing together
+  // Reward bound pairs playing together (highest priority)
   const isBoundPair1 = teammatePairs.some(pair => 
     (pair.player1 === p1 && pair.player2 === p2) || (pair.player1 === p2 && pair.player2 === p1)
   );
@@ -356,13 +397,33 @@ function calculateMatchScore(
   if (isBoundPair1) score += 100;
   if (isBoundPair2) score += 100;
 
-  // Penalize repeated partnerships (unless they're bound)
-  if (!isBoundPair1 && stats1.partners.has(p2)) score -= 10;
-  if (!isBoundPair2 && stats3.partners.has(p4)) score -= 10;
+  // Heavily penalize recent partnerships (unless they're bound)
+  if (!isBoundPair1) {
+    if (stats1.recentPartners[0] === p2) score -= 50; // Just played together
+    else if (stats1.recentPartners.includes(p2)) score -= 25; // Played together recently
+    else if (stats1.partners.has(p2)) score -= 10; // Played together before
+  }
+  if (!isBoundPair2) {
+    if (stats3.recentPartners[0] === p4) score -= 50;
+    else if (stats3.recentPartners.includes(p4)) score -= 25;
+    else if (stats3.partners.has(p4)) score -= 10;
+  }
 
-  // Penalize repeated opponents
+  // Heavily penalize recent opponents (reduces back-to-back rematches)
+  const p1RecentOpponents = stats1.recentOpponents.slice(0, 4);
+  const p2RecentOpponents = stats2.recentOpponents.slice(0, 4);
+  
+  if (p1RecentOpponents.includes(p3) || p1RecentOpponents.includes(p4)) score -= 30;
+  if (p2RecentOpponents.includes(p3) || p2RecentOpponents.includes(p4)) score -= 30;
+  
+  // Lighter penalty for all-time opponents
   if (stats1.opponents.has(p3) || stats1.opponents.has(p4)) score -= 5;
   if (stats2.opponents.has(p3) || stats2.opponents.has(p4)) score -= 5;
+
+  // Penalize players with high consecutive match counts
+  const totalConsecutive = stats1.consecutiveMatches + stats2.consecutiveMatches + 
+                           stats3.consecutiveMatches + stats4.consecutiveMatches;
+  score -= totalConsecutive * 15;
 
   // Reward balanced play time
   const avgPlayTime = (stats1.playTime + stats2.playTime + stats3.playTime + stats4.playTime) / 4;
@@ -403,6 +464,9 @@ export function regenerateScheduleFromSlot(
       partners: new Set(),
       opponents: new Set(),
       lastMatchEnd: 0,
+      recentPartners: [],
+      recentOpponents: [],
+      consecutiveMatches: 0,
     });
   });
 
@@ -413,27 +477,40 @@ export function regenerateScheduleFromSlot(
       if (stats) {
         stats.playTime += gameDuration;
         stats.lastMatchEnd = match.endTime;
+        stats.consecutiveMatches++;
 
         const [p1, p2] = match.team1;
         const [p3, p4] = match.team2;
         
         if (player === p1) {
           stats.partners.add(p2);
+          stats.recentPartners.unshift(p2);
           stats.opponents.add(p3);
           stats.opponents.add(p4);
+          stats.recentOpponents.unshift(p3, p4);
         } else if (player === p2) {
           stats.partners.add(p1);
+          stats.recentPartners.unshift(p1);
           stats.opponents.add(p3);
           stats.opponents.add(p4);
+          stats.recentOpponents.unshift(p3, p4);
         } else if (player === p3) {
           stats.partners.add(p4);
+          stats.recentPartners.unshift(p4);
           stats.opponents.add(p1);
           stats.opponents.add(p2);
+          stats.recentOpponents.unshift(p1, p2);
         } else if (player === p4) {
           stats.partners.add(p3);
+          stats.recentPartners.unshift(p3);
           stats.opponents.add(p1);
           stats.opponents.add(p2);
+          stats.recentOpponents.unshift(p1, p2);
         }
+        
+        // Keep only last 3 partners and 6 opponents
+        if (stats.recentPartners.length > 3) stats.recentPartners.pop();
+        if (stats.recentOpponents.length > 6) stats.recentOpponents.pop();
       }
     });
   });
@@ -463,26 +540,49 @@ export function regenerateScheduleFromSlot(
     const slotEndTime = slotStartTime + gameDuration;
     const availablePlayers = new Set(players);
     
+    // Enforce rest after consecutive matches or recent play
     players.forEach((player) => {
       const stats = playerStats.get(player);
-      if (stats && stats.lastMatchEnd === slotStartTime) {
-        const minPlayersNeeded = finalCourtConfigs.reduce((acc, config) => 
-          acc + (config.type === 'singles' ? 2 : 4), 0
-        );
-        if (Math.random() > 0.5 && availablePlayers.size > minPlayersNeeded) {
+      if (!stats) return;
+      
+      const minPlayersNeeded = finalCourtConfigs.reduce((acc, config) => 
+        acc + (config.type === 'singles' ? 2 : 4), 0
+      );
+      
+      // Force rest after playing in previous slot if played 2+ consecutive matches
+      if (stats.lastMatchEnd === slotStartTime && stats.consecutiveMatches >= 2) {
+        if (availablePlayers.size > minPlayersNeeded) {
           availablePlayers.delete(player);
+          stats.restTime += gameDuration;
+          stats.consecutiveMatches = 0;
+        }
+      }
+      // Encourage rest after playing in previous slot (70% chance)
+      else if (stats.lastMatchEnd === slotStartTime && availablePlayers.size > minPlayersNeeded) {
+        if (Math.random() < 0.7) {
+          availablePlayers.delete(player);
+          stats.restTime += gameDuration;
+          stats.consecutiveMatches = 0;
         }
       }
     });
 
+    // Track which players are already scheduled in this time slot (prevents court conflicts)
+    const playersScheduledThisSlot = new Set<string>();
+    
     for (let court = 0; court < matchesPerSlot; court++) {
       const courtConfig = finalCourtConfigs[court];
       const playersNeeded = courtConfig.type === 'singles' ? 2 : 4;
       
-      if (availablePlayers.size < playersNeeded) continue;
+      // Filter out players already scheduled on other courts in this slot
+      const availableForThisCourt = Array.from(availablePlayers).filter(
+        p => !playersScheduledThisSlot.has(p)
+      );
+      
+      if (availableForThisCourt.length < playersNeeded) continue;
       
       const match = createOptimalMatch(
-        Array.from(availablePlayers),
+        availableForThisCourt,
         playerStats,
         allTeams,
         slotStartTime,
@@ -512,32 +612,48 @@ export function regenerateScheduleFromSlot(
           const stats = playerStats.get(player)!;
           stats.playTime += gameDuration;
           stats.lastMatchEnd = slotEndTime;
+          stats.consecutiveMatches++;
           availablePlayers.delete(player);
+          playersScheduledThisSlot.add(player); // Prevent same player on multiple courts
 
           if (match.isSingles) {
             const opponent = match.team1[0] === player ? match.team2[0] : match.team1[0];
             stats.opponents.add(opponent);
+            stats.recentOpponents.unshift(opponent);
+            if (stats.recentOpponents.length > 6) stats.recentOpponents.pop();
           } else {
             const [p1, p2] = match.team1 as [string, string];
             const [p3, p4] = match.team2 as [string, string];
             
             if (player === p1) {
               stats.partners.add(p2);
+              stats.recentPartners.unshift(p2);
               stats.opponents.add(p3);
               stats.opponents.add(p4);
+              stats.recentOpponents.unshift(p3, p4);
             } else if (player === p2) {
               stats.partners.add(p1);
+              stats.recentPartners.unshift(p1);
               stats.opponents.add(p3);
               stats.opponents.add(p4);
+              stats.recentOpponents.unshift(p3, p4);
             } else if (player === p3) {
               stats.partners.add(p4);
+              stats.recentPartners.unshift(p4);
               stats.opponents.add(p1);
               stats.opponents.add(p2);
+              stats.recentOpponents.unshift(p1, p2);
             } else {
               stats.partners.add(p3);
+              stats.recentPartners.unshift(p3);
               stats.opponents.add(p1);
               stats.opponents.add(p2);
+              stats.recentOpponents.unshift(p1, p2);
             }
+            
+            // Keep only last 3 partners and 6 opponents
+            if (stats.recentPartners.length > 3) stats.recentPartners.pop();
+            if (stats.recentOpponents.length > 6) stats.recentOpponents.pop();
           }
         });
       }
