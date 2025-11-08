@@ -387,7 +387,7 @@ const Index = () => {
                   </div>
                 )}
               </div>
-              <GameSetup onComplete={handleGameConfigComplete} />
+              <GameSetup onComplete={handleGameConfigComplete} gameCode={gameCode} />
             </div>}
           
           {activeSection === "matches" && gameConfig && matches.length > 0 && <ScheduleView matches={matches} onBack={resetApp} gameConfig={gameConfig} allPlayers={players} onScheduleUpdate={handleScheduleUpdate} matchScores={matchScores} onMatchScoresUpdate={setMatchScores} />}

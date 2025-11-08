@@ -5,13 +5,17 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Clock, Trophy } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Clock, Trophy, Share2, Copy, Check } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+import { toast } from "sonner";
 import { CourtConfig } from "@/lib/scheduler";
 
 interface GameSetupProps {
   playerCount?: number;
   onComplete: (config: GameConfig) => void;
   onBack?: () => void;
+  gameCode?: string;
 }
 
 export interface GameConfig {
@@ -22,13 +26,16 @@ export interface GameConfig {
   courtConfigs?: CourtConfig[];
 }
 
-export const GameSetup = ({ playerCount = 4, onComplete, onBack }: GameSetupProps) => {
+export const GameSetup = ({ playerCount = 4, onComplete, onBack, gameCode }: GameSetupProps) => {
   const [gameDuration, setGameDuration] = useState<number>(10);
   const [totalTime, setTotalTime] = useState<number>(60);
   const [courts, setCourts] = useState<number>(2);
   const [courtConfigs, setCourtConfigs] = useState<CourtConfig[]>(
     Array.from({ length: 2 }, (_, i) => ({ courtNumber: i + 1, type: 'doubles' as const }))
   );
+  const [copied, setCopied] = useState(false);
+
+  const gameUrl = gameCode ? `${window.location.origin}?join=${gameCode}` : '';
 
   const maxCourts = Math.floor(playerCount / 2);
   const totalTimeOptions = Array.from({ length: 12 }, (_, i) => (i + 1) * 15);
@@ -52,6 +59,36 @@ export const GameSetup = ({ playerCount = 4, onComplete, onBack }: GameSetupProp
     onComplete({ gameDuration, totalTime, courts, courtConfigs });
   };
 
+  const handleCopy = () => {
+    if (!gameUrl) return;
+    navigator.clipboard.writeText(gameUrl);
+    setCopied(true);
+    toast.success("Link copied to clipboard!");
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleShare = async () => {
+    if (!gameCode || !gameUrl) return;
+    const shareText = `Join my game with code: ${gameCode}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "Join Racket Match",
+          text: shareText,
+          url: gameUrl,
+        });
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") {
+          handleCopy();
+        }
+      }
+    } else {
+      navigator.clipboard.writeText(shareText);
+      toast.success("Link copied to clipboard!");
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex items-center gap-3 mb-6">
@@ -63,6 +100,58 @@ export const GameSetup = ({ playerCount = 4, onComplete, onBack }: GameSetupProp
           <p className="text-muted-foreground text-sm">Configure your session</p>
         </div>
       </div>
+
+      {/* Game Code and QR Code Section */}
+      {gameCode && (
+        <Card className="p-6 bg-primary/5 border-primary/20">
+          <div className="flex flex-col items-center gap-4">
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground mb-1">Game Code</p>
+              <p className="text-3xl font-bold font-mono tracking-wider text-primary">{gameCode}</p>
+              <p className="text-xs text-muted-foreground mt-1">Share this code with other players</p>
+            </div>
+
+            <div className="bg-white p-4 rounded-lg shadow-inner">
+              <QRCodeSVG
+                value={gameUrl}
+                size={180}
+                level="H"
+                includeMargin={true}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={handleShare}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <Share2 className="w-4 h-4" />
+                Share Game
+              </Button>
+              <Button
+                onClick={handleCopy}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    Copy Link
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <div className="space-y-6">
         <div className="space-y-4">

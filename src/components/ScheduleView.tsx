@@ -70,7 +70,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     if (currentMatch && !matchStartTimes.has(currentMatch)) {
       setMatchStartTimes(prev => new Map(prev).set(currentMatch, Date.now()));
     }
-  }, [currentMatch]);
+  }, [currentMatch, matchStartTimes]);
 
   // Stopwatch hook for current match
   const { formattedTime, reset: resetStopwatch } = useStopwatch(!!currentMatch);
@@ -625,7 +625,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
       </div>
 
       {/* Courts Grid - Responsive layout to fit both courts on screen */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 px-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 px-2 sm:px-4">
         {courtConfigs.map((courtConfig) => {
           const courtMatches = matches.filter(m => m.court === courtConfig.courtNumber);
           const currentMatchIndex = courtMatches.findIndex(m => !matchScores.has(m.id));
@@ -670,10 +670,10 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                 </div>
               </div>
 
-              {/* Carousel */}
+              {/* Carousel - Compact height for better fit */}
               <Carousel
                 opts={{ align: "start", loop: false }}
-                className="w-full"
+                className="w-full max-h-[calc(100vh-280px)]"
                 setApi={(api) => {
                   if (api) {
                     setCarouselApis(prev => new Map(prev).set(courtConfig.courtNumber, api));
