@@ -21,6 +21,7 @@ const Index = () => {
   const [gameCode, setGameCode] = useState<string>("");
   const [showGameCodeDialog, setShowGameCodeDialog] = useState(true);
   const [setupComplete, setSetupComplete] = useState(false);
+  const [matchScores, setMatchScores] = useState<Map<string, { team1: number; team2: number }>>(new Map());
 
   useEffect(() => {
     if (!gameId) return;
@@ -260,6 +261,8 @@ const Index = () => {
               gameCode={gameCode}
               players={players}
               onPlayersUpdate={handlePlayersUpdate}
+              matches={matches}
+              matchScores={matchScores}
             />
           )}
 

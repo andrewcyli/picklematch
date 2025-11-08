@@ -1,37 +1,20 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Match, regenerateScheduleFromSlot, CourtConfig } from "@/lib/scheduler";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, Trophy, Clock, Users, Share2, Medal, UserPlus, X, Play, Edit } from "lucide-react";
+import { ArrowLeft, Clock, Users, Trophy, ChevronLeft, ChevronRight, Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Label } from "@/components/ui/label";
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+  type CarouselApi,
+} from "@/components/ui/carousel";
 
 interface ScheduleViewProps {
   matches: Match[];
@@ -52,23 +35,13 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
   const [matchScores, setMatchScores] = useState<Map<string, { team1: number | string; team2: number | string }>>(
     new Map()
   );
-  const [newPlayerName, setNewPlayerName] = useState("");
-  const [isAddPlayerOpen, setIsAddPlayerOpen] = useState(false);
-  const [playerToDelete, setPlayerToDelete] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [pendingScores, setPendingScores] = useState<Map<string, { team1: number | string; team2: number | string }>>(new Map());
   const [showAllMatches, setShowAllMatches] = useState(false);
-  const [editingMatch, setEditingMatch] = useState<string | null>(null);
-  const [editPlayers, setEditPlayers] = useState<{ team1: string[]; team2: string[] }>({ team1: [], team2: [] });
   const [courtConfigs, setCourtConfigs] = useState<CourtConfig[]>(
     gameConfig.courtConfigs || Array.from({ length: gameConfig.courts }, (_, i) => ({ courtNumber: i + 1, type: 'doubles' as const }))
   );
-
-  // Track elapsed time from when schedule was generated (using relative minutes)
-  useEffect(() => {
-    // currentTime will be managed by match completion rather than real clock time
-    // This is now a relative time tracker
-  }, []);
+  const [carouselApis, setCarouselApis] = useState<Map<number, CarouselApi>>(new Map());
 
   // Helper to normalize scores to numbers
   const normalizeScore = (score: { team1: number | string; team2: number | string } | undefined) => {
@@ -79,9 +52,8 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     };
   };
 
-  // Find current match based on time and scores
+  // Find current match based on scores
   const currentMatch = useMemo(() => {
-    // First, find the first unscored match
     const unscoredMatch = matches.find(m => !matchScores.has(m.id));
     if (unscoredMatch) {
       return unscoredMatch.id;
@@ -111,12 +83,10 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     newScores.set(matchId, { team1: team1Score, team2: team2Score });
     setMatchScores(newScores);
     
-    // Remove from pending
     const newPending = new Map(pendingScores);
     newPending.delete(matchId);
     setPendingScores(newPending);
 
-    // Calculate actual end time and check for schedule adjustment
     const actualEndTime = currentTime;
     checkScheduleAdjustment(matchId, actualEndTime);
     
@@ -143,7 +113,6 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     const scheduledEndTime = completedMatch.endTime;
     const timeDifference = actualEndTime - scheduledEndTime;
 
-    // If more than 5 minutes difference, adjust schedule
     if (Math.abs(timeDifference) > 5) {
       const matchIndex = matches.findIndex(m => m.id === completedMatchId);
       const playedMatches = matches.slice(0, matchIndex + 1).map(m => ({
@@ -152,13 +121,11 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
         actualEndTime: m.id === completedMatchId ? actualEndTime : m.endTime,
       }));
 
-      // Determine if we need more or fewer matches
       const remainingTime = gameConfig.totalTime - actualEndTime;
       const potentialNewMatches = Math.floor(remainingTime / gameConfig.gameDuration) * gameConfig.courts;
       const currentFutureMatches = matches.length - (matchIndex + 1);
 
       if (potentialNewMatches !== currentFutureMatches) {
-        // Regenerate schedule
         const newMatches = regenerateScheduleFromSlot(
           allPlayers,
           playedMatches,
@@ -190,240 +157,6 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     return acc;
   }, {} as Record<string, Match[]>);
 
-  const leaderboard = useMemo(() => {
-    const playerScores = new Map<string, { wins: number; losses: number; points: number }>();
-    
-    matches.forEach((match) => {
-      const scores = matchScores.get(match.id);
-      if (!scores) return;
-      
-      const team1Score = typeof scores.team1 === 'number' ? scores.team1 : 0;
-      const team2Score = typeof scores.team2 === 'number' ? scores.team2 : 0;
-      
-      const allMatchPlayers = [...match.team1, ...match.team2];
-      allMatchPlayers.forEach((player) => {
-        if (!playerScores.has(player)) {
-          playerScores.set(player, { wins: 0, losses: 0, points: 0 });
-        }
-      });
-      
-      const [p1, p2] = match.team1;
-      const [p3, p4] = match.team2;
-      
-      if (team1Score > team2Score) {
-        playerScores.get(p1)!.wins++;
-        playerScores.get(p2)!.wins++;
-        playerScores.get(p3)!.losses++;
-        playerScores.get(p4)!.losses++;
-      } else if (team2Score > team1Score) {
-        playerScores.get(p3)!.wins++;
-        playerScores.get(p4)!.wins++;
-        playerScores.get(p1)!.losses++;
-        playerScores.get(p2)!.losses++;
-      }
-      
-      playerScores.get(p1)!.points += team1Score;
-      playerScores.get(p2)!.points += team1Score;
-      playerScores.get(p3)!.points += team2Score;
-      playerScores.get(p4)!.points += team2Score;
-    });
-    
-    return Array.from(playerScores.entries())
-      .map(([player, stats]) => ({ player, ...stats }))
-      .sort((a, b) => b.wins - a.wins || b.points - a.points);
-  }, [matches, matchScores]);
-
-  const handleShare = async () => {
-    const shareText = `🏆 Match Results 🏆\n\n` +
-      `Leaderboard:\n` +
-      leaderboard.map((entry, idx) => 
-        `${idx + 1}. ${entry.player} - ${entry.wins}W/${entry.losses}L (${entry.points} pts)`
-      ).join('\n') +
-      `\n\n` +
-      `Total Matches: ${matches.length}`;
-    
-    if (navigator.share) {
-      try {
-        await navigator.share({ text: shareText });
-        toast({ title: "Shared successfully!" });
-      } catch (err) {
-        if ((err as Error).name !== 'AbortError') {
-          copyToClipboard(shareText);
-        }
-      }
-    } else {
-      copyToClipboard(shareText);
-    }
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast({ title: "Copied to clipboard!" });
-  };
-
-  const handleAddPlayer = () => {
-    const trimmedName = newPlayerName.trim();
-    if (!trimmedName) {
-      toast({ title: "Please enter a player name", variant: "destructive" });
-      return;
-    }
-    
-    if (allPlayers.some(p => p.toLowerCase() === trimmedName.toLowerCase())) {
-      toast({ title: "Player already exists", variant: "destructive" });
-      return;
-    }
-
-    const firstUnplayedMatchIndex = matches.findIndex(m => !matchScores.has(m.id));
-    
-    if (firstUnplayedMatchIndex === -1) {
-      toast({ title: "All matches completed", description: "Cannot add players after tournament ends", variant: "destructive" });
-      return;
-    }
-
-    const firstUnplayedMatch = matches[firstUnplayedMatchIndex];
-    const playedMatches = matches.slice(0, firstUnplayedMatchIndex);
-    
-    const matchesWithScores = playedMatches.map(m => ({
-      ...m,
-      score: normalizeScore(matchScores.get(m.id))
-    }));
-
-    const updatedPlayers = [...allPlayers, trimmedName];
-    const newMatches = regenerateScheduleFromSlot(
-      updatedPlayers,
-      matchesWithScores,
-      firstUnplayedMatch.startTime,
-      gameConfig.gameDuration,
-          gameConfig.totalTime,
-          gameConfig.courts,
-          undefined,
-          gameConfig.teammatePairs,
-          courtConfigs
-    );
-
-    onScheduleUpdate(newMatches, updatedPlayers);
-    setNewPlayerName("");
-    setIsAddPlayerOpen(false);
-    toast({ title: "Player added!", description: "Schedule updated from next slot onwards" });
-  };
-
-  const handleDeletePlayer = (playerName: string) => {
-    const firstUnplayedMatchIndex = matches.findIndex(m => !matchScores.has(m.id));
-    
-    if (firstUnplayedMatchIndex === -1) {
-      toast({ title: "Cannot remove player", description: "All matches completed", variant: "destructive" });
-      return;
-    }
-
-    const firstUnplayedMatch = matches[firstUnplayedMatchIndex];
-    const playedMatches = matches.slice(0, firstUnplayedMatchIndex);
-    
-    const matchesWithScores = playedMatches.map(m => ({
-      ...m,
-      score: normalizeScore(matchScores.get(m.id))
-    }));
-
-    const updatedPlayers = allPlayers.filter(p => p !== playerName);
-    
-    if (updatedPlayers.length < 4) {
-      toast({ title: "Cannot remove player", description: "Need at least 4 players", variant: "destructive" });
-      return;
-    }
-
-    // Remove player from teammate pairs if they're in one
-    const updatedPairs = (gameConfig.teammatePairs || []).filter(
-      pair => pair.player1 !== playerName && pair.player2 !== playerName
-    );
-
-    const newMatches = regenerateScheduleFromSlot(
-      updatedPlayers,
-      matchesWithScores,
-      firstUnplayedMatch.startTime,
-      gameConfig.gameDuration,
-          gameConfig.totalTime,
-          gameConfig.courts,
-          undefined,
-          updatedPairs,
-          courtConfigs
-    );
-
-    onScheduleUpdate(newMatches, updatedPlayers);
-    setPlayerToDelete(null);
-    toast({ title: "Player removed", description: "Schedule updated from next slot onwards" });
-  };
-
-  const startEditMatch = (match: Match) => {
-    setEditingMatch(match.id);
-    setEditPlayers({
-      team1: [...match.team1],
-      team2: [...match.team2]
-    });
-  };
-
-  const handlePlayerChange = (team: 'team1' | 'team2', index: number, newPlayer: string) => {
-    setEditPlayers(prev => ({
-      ...prev,
-      [team]: prev[team].map((p, i) => i === index ? newPlayer : p)
-    }));
-  };
-
-  const confirmEditMatch = (matchId: string) => {
-    const match = matches.find(m => m.id === matchId);
-    if (!match) return;
-
-    // Validate all players are selected and unique
-    const allSelectedPlayers = [...editPlayers.team1, ...editPlayers.team2];
-    const uniquePlayers = new Set(allSelectedPlayers);
-    
-    if (uniquePlayers.size !== allSelectedPlayers.length) {
-      toast({ title: "Error", description: "Each player can only be selected once", variant: "destructive" });
-      return;
-    }
-
-    if (allSelectedPlayers.some(p => !p)) {
-      toast({ title: "Error", description: "Please select all players", variant: "destructive" });
-      return;
-    }
-
-    // Update the match
-    const updatedMatches = matches.map(m => 
-      m.id === matchId 
-        ? { ...m, team1: editPlayers.team1 as any, team2: editPlayers.team2 as any }
-        : m
-    );
-
-    // Find next unplayed match to regenerate from
-    const matchIndex = matches.findIndex(m => m.id === matchId);
-    const nextMatchIndex = matchIndex + 1;
-    
-    if (nextMatchIndex < matches.length) {
-      const nextMatch = matches[nextMatchIndex];
-      const playedMatches = updatedMatches.slice(0, nextMatchIndex).map(m => ({
-        ...m,
-        score: normalizeScore(matchScores.get(m.id))
-      }));
-
-      const newMatches = regenerateScheduleFromSlot(
-        allPlayers,
-        playedMatches,
-        nextMatch.startTime,
-        gameConfig.gameDuration,
-          gameConfig.totalTime,
-          gameConfig.courts,
-          undefined,
-          gameConfig.teammatePairs,
-          courtConfigs
-      );
-
-      onScheduleUpdate(newMatches, allPlayers);
-    } else {
-      onScheduleUpdate(updatedMatches, allPlayers);
-    }
-
-    setEditingMatch(null);
-    toast({ title: "Match updated", description: "Schedule adjusted to minimize changes" });
-  };
-
   const toggleCourtType = (courtNumber: number) => {
     const updatedConfigs = courtConfigs.map(config => 
       config.courtNumber === courtNumber 
@@ -432,7 +165,6 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     );
     setCourtConfigs(updatedConfigs);
 
-    // Regenerate schedule from next unplayed match
     const firstUnplayedMatchIndex = matches.findIndex(m => !matchScores.has(m.id));
     if (firstUnplayedMatchIndex === -1) return;
 
@@ -447,19 +179,31 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
       playedMatches,
       firstUnplayedMatch.startTime,
       gameConfig.gameDuration,
-          gameConfig.totalTime,
-          gameConfig.courts,
-          undefined,
-          gameConfig.teammatePairs,
-          updatedConfigs
+      gameConfig.totalTime,
+      gameConfig.courts,
+      undefined,
+      gameConfig.teammatePairs,
+      updatedConfigs
     );
 
     onScheduleUpdate(newMatches, allPlayers);
     toast({ title: "Court type updated", description: "Schedule regenerated" });
   };
 
+  const scrollToCurrentMatch = (courtNumber: number) => {
+    const api = carouselApis.get(courtNumber);
+    if (!api) return;
+
+    const courtMatches = matches.filter(m => m.court === courtNumber);
+    const currentMatchIndex = courtMatches.findIndex(m => !matchScores.has(m.id));
+    
+    if (currentMatchIndex >= 0) {
+      api.scrollTo(currentMatchIndex);
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-4">
           <Button variant="ghost" onClick={onBack} size="sm" className="gap-2">
@@ -476,391 +220,194 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
             </div>
           </div>
         </div>
-
-        <Dialog open={isAddPlayerOpen} onOpenChange={setIsAddPlayerOpen}>
-          <DialogTrigger asChild>
-            <Button variant="outline" className="gap-2">
-              <UserPlus className="w-4 h-4" />
-              Add Player
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Player</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <Label htmlFor="new-player">Player Name</Label>
-                <Input
-                  id="new-player"
-                  value={newPlayerName}
-                  onChange={(e) => setNewPlayerName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddPlayer()}
-                  placeholder="Enter player name"
-                  className="h-12 text-lg"
-                />
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Schedule will be regenerated from the next unplayed match onwards.
-              </p>
-              <Button onClick={handleAddPlayer} className="w-full h-12">
-                Add Player & Update Schedule
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
-
-      {/* Player List with Delete Option */}
-      <Card className="p-4">
-        <h3 className="text-sm font-semibold text-foreground mb-3">Active Players</h3>
-        <div className="flex flex-wrap gap-2">
-          {allPlayers.map((player) => (
-            <Badge key={player} variant="secondary" className="px-3 py-1 text-sm">
-              {player}
-              <button
-                onClick={() => setPlayerToDelete(player)}
-                className="ml-2 hover:text-destructive"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          ))}
-        </div>
-      </Card>
-
-      {/* Court Configuration */}
-      <Card className="p-4">
-        <h3 className="text-sm font-semibold text-foreground mb-3">Court Configuration</h3>
-        <div className="flex flex-wrap gap-3">
-          {courtConfigs.map((config) => (
-            <div key={config.courtNumber} className="flex items-center gap-2 p-2 rounded-lg border bg-card">
-              <span className="text-sm font-medium">Court {config.courtNumber}:</span>
-              <div className="flex items-center gap-2">
-                <span className={`text-xs ${config.type === 'singles' ? 'text-muted-foreground' : 'text-foreground font-medium'}`}>
-                  Doubles
-                </span>
-                <Switch
-                  checked={config.type === 'singles'}
-                  onCheckedChange={() => toggleCourtType(config.courtNumber)}
-                  disabled={matchScores.size > 0}
-                />
-                <span className={`text-xs ${config.type === 'singles' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
-                  Singles
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-        {matchScores.size > 0 && (
-          <p className="text-xs text-muted-foreground mt-2">
-            Court configuration can only be changed before any matches are scored
-          </p>
-        )}
-      </Card>
-
-      <AlertDialog open={!!playerToDelete} onOpenChange={(open) => !open && setPlayerToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove Player</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to remove {playerToDelete} from the game? The schedule will be regenerated from the next unplayed match.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => playerToDelete && handleDeletePlayer(playerToDelete)}>
-              Remove
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Carousel-based Match View */}
       <div className="space-y-8">
         {courtConfigs.map((courtConfig) => {
-          // Get all matches for this court
           const courtMatches = matches.filter(m => m.court === courtConfig.courtNumber);
-          
-          // Find current, previous, and next matches for this court
           const currentMatchIndex = courtMatches.findIndex(m => !matchScores.has(m.id));
-          const currentMatchForCourt = currentMatchIndex >= 0 ? courtMatches[currentMatchIndex] : null;
-          const previousMatchForCourt = currentMatchIndex > 0 ? courtMatches[currentMatchIndex - 1] : null;
-          const nextMatchForCourt = currentMatchIndex >= 0 && currentMatchIndex < courtMatches.length - 1 
-            ? courtMatches[currentMatchIndex + 1] 
-            : null;
 
           return (
             <div key={courtConfig.courtNumber} className="space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-3">
                 <div className="flex items-center gap-2">
                   <Badge className="bg-primary/20 text-primary text-base px-3 py-1">
                     Court {courtConfig.courtNumber}
                   </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    {courtConfig.type === 'singles' ? 'Singles' : 'Doubles'}
-                  </Badge>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 p-2 rounded-lg border bg-card">
+                    <span className={`text-xs ${courtConfig.type === 'singles' ? 'text-muted-foreground' : 'text-foreground font-medium'}`}>
+                      Doubles
+                    </span>
+                    <Switch
+                      checked={courtConfig.type === 'singles'}
+                      onCheckedChange={() => toggleCourtType(courtConfig.courtNumber)}
+                      disabled={matchScores.size > 0}
+                    />
+                    <span className={`text-xs ${courtConfig.type === 'singles' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                      Singles
+                    </span>
+                  </div>
+                  
+                  {currentMatchIndex >= 0 && (
+                    <Button
+                      onClick={() => scrollToCurrentMatch(courtConfig.courtNumber)}
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                    >
+                      <Target className="w-4 h-4" />
+                      Current Match
+                    </Button>
+                  )}
                 </div>
               </div>
 
-              {/* Carousel Container */}
-              <div className="relative overflow-hidden">
-                <div className="flex items-center gap-3 px-2">
-                  {/* Previous Match - Dimmed */}
-                  <div className="flex-1 opacity-40 scale-90 transition-all">
-                    {previousMatchForCourt ? (
-                      <Card className="p-4 bg-muted/50 border-muted">
-                        <div className="space-y-2">
-                          <div className="text-center mb-2">
-                            <Badge variant="secondary" className="text-xs">Previous</Badge>
-                          </div>
-                          <div className="text-sm space-y-1">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-1 flex-1">
-                                <span className="font-medium truncate">{previousMatchForCourt.team1[0]}</span>
-                                {!previousMatchForCourt.isSingles && previousMatchForCourt.team1[1] && (
-                                  <span className="text-xs text-muted-foreground truncate">& {previousMatchForCourt.team1[1]}</span>
-                                )}
-                              </div>
-                              <span className="font-bold ml-2">{matchScores.get(previousMatchForCourt.id)?.team1}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-1 flex-1">
-                                <span className="font-medium truncate">{previousMatchForCourt.team2[0]}</span>
-                                {!previousMatchForCourt.isSingles && previousMatchForCourt.team2[1] && (
-                                  <span className="text-xs text-muted-foreground truncate">& {previousMatchForCourt.team2[1]}</span>
-                                )}
-                              </div>
-                              <span className="font-bold ml-2">{matchScores.get(previousMatchForCourt.id)?.team2}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-                    ) : (
-                      <div className="h-full flex items-center justify-center p-8">
-                        <span className="text-xs text-muted-foreground">No previous match</span>
-                      </div>
-                    )}
-                  </div>
+              {matchScores.size > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Court configuration can only be changed before any matches are scored
+                </p>
+              )}
 
-                  {/* Current Match - Centered & Featured */}
-                  <div className="flex-[2] scale-100 transition-all">
-                    {currentMatchForCourt ? (
-                      <Card className="p-5 border-2 border-accent bg-accent/5 shadow-lg">
-                        <div className="space-y-4">
-                          <div className="flex items-center justify-between">
-                            <Badge className="bg-accent text-accent-foreground">
-                              Current Match
-                            </Badge>
-                            <Badge variant="outline">
-                              <Clock className="w-3 h-3 mr-1" />
-                              {currentMatchForCourt.clockStartTime || `${currentMatchForCourt.startTime} min`}
-                            </Badge>
-                          </div>
+              <Carousel
+                opts={{ align: "center", loop: false }}
+                className="w-full"
+                setApi={(api) => {
+                  if (api) {
+                    setCarouselApis(prev => new Map(prev).set(courtConfig.courtNumber, api));
+                  }
+                }}
+              >
+                <CarouselContent>
+                  {courtMatches.map((match, idx) => {
+                    const isCurrentMatch = idx === currentMatchIndex;
+                    const isPreviousMatch = idx < currentMatchIndex;
+                    const isNextMatch = idx > currentMatchIndex;
+                    const confirmedScores = matchScores.get(match.id);
+                    const pendingForMatch = pendingScores.get(match.id);
+                    const scores = pendingForMatch || confirmedScores || { team1: '', team2: '' };
+                    const isCompleted = matchScores.has(match.id);
+                    const hasPending = pendingScores.has(match.id);
 
-                          {editingMatch === currentMatchForCourt.id ? (
-                            /* Edit Mode */
-                            <div className="space-y-3">
-                              <div className="p-3 rounded-lg bg-secondary/50 space-y-2">
-                                <Label className="text-xs text-muted-foreground">Team 1</Label>
-                                {currentMatchForCourt.isSingles ? (
-                                  <Select value={editPlayers.team1[0]} onValueChange={(v) => handlePlayerChange('team1', 0, v)}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                      {allPlayers.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                                    </SelectContent>
-                                  </Select>
-                                ) : (
-                                  <>
-                                    <Select value={editPlayers.team1[0]} onValueChange={(v) => handlePlayerChange('team1', 0, v)}>
-                                      <SelectTrigger><SelectValue /></SelectTrigger>
-                                      <SelectContent>
-                                        {allPlayers.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                                      </SelectContent>
-                                    </Select>
-                                    <Select value={editPlayers.team1[1]} onValueChange={(v) => handlePlayerChange('team1', 1, v)}>
-                                      <SelectTrigger><SelectValue /></SelectTrigger>
-                                      <SelectContent>
-                                        {allPlayers.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                                      </SelectContent>
-                                    </Select>
-                                  </>
-                                )}
+                    return (
+                      <CarouselItem key={match.id}>
+                        <div className="p-1">
+                          <Card className={`p-5 transition-all ${
+                            isCurrentMatch 
+                              ? 'border-2 border-accent bg-accent/5 shadow-lg scale-100' 
+                              : isPreviousMatch
+                              ? 'bg-muted/50 border-muted opacity-60'
+                              : 'bg-muted/30 border-dashed opacity-70'
+                          }`}>
+                            <div className="space-y-4">
+                              <div className="flex items-center justify-between">
+                                <Badge className={
+                                  isCurrentMatch 
+                                    ? 'bg-accent text-accent-foreground'
+                                    : isPreviousMatch
+                                    ? 'bg-secondary text-secondary-foreground'
+                                    : 'bg-muted text-muted-foreground'
+                                }>
+                                  {isCurrentMatch ? 'Current Match' : isPreviousMatch ? 'Previous' : 'Up Next'}
+                                </Badge>
+                                <Badge variant="outline">
+                                  <Clock className="w-3 h-3 mr-1" />
+                                  {match.clockStartTime || `${match.startTime} min`}
+                                </Badge>
                               </div>
-                              <div className="text-center text-sm font-semibold">VS</div>
-                              <div className="p-3 rounded-lg bg-secondary/50 space-y-2">
-                                <Label className="text-xs text-muted-foreground">Team 2</Label>
-                                {currentMatchForCourt.isSingles ? (
-                                  <Select value={editPlayers.team2[0]} onValueChange={(v) => handlePlayerChange('team2', 0, v)}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                      {allPlayers.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                                    </SelectContent>
-                                  </Select>
-                                ) : (
-                                  <>
-                                    <Select value={editPlayers.team2[0]} onValueChange={(v) => handlePlayerChange('team2', 0, v)}>
-                                      <SelectTrigger><SelectValue /></SelectTrigger>
-                                      <SelectContent>
-                                        {allPlayers.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                                      </SelectContent>
-                                    </Select>
-                                    <Select value={editPlayers.team2[1]} onValueChange={(v) => handlePlayerChange('team2', 1, v)}>
-                                      <SelectTrigger><SelectValue /></SelectTrigger>
-                                      <SelectContent>
-                                        {allPlayers.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                                      </SelectContent>
-                                    </Select>
-                                  </>
-                                )}
-                              </div>
-                              <div className="flex gap-2">
-                                <Button onClick={() => confirmEditMatch(currentMatchForCourt.id)} className="flex-1">
-                                  Confirm
-                                </Button>
-                                <Button onClick={() => setEditingMatch(null)} variant="outline" className="flex-1">
-                                  Cancel
-                                </Button>
-                              </div>
-                            </div>
-                          ) : (
-                            /* View Mode */
-                            <>
+
                               <div className="space-y-3">
-                                {(() => {
-                                  const confirmedScores = matchScores.get(currentMatchForCourt.id);
-                                  const pendingForMatch = pendingScores.get(currentMatchForCourt.id);
-                                  const scores = pendingForMatch || confirmedScores || { team1: '', team2: '' };
-                                  const isCompleted = matchScores.has(currentMatchForCourt.id);
-                                  const hasPending = pendingScores.has(currentMatchForCourt.id);
-
-                                  return (
-                                    <>
-                                      {/* Team 1 */}
-                                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50">
-                                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                                          <Users className="w-5 h-5 text-primary flex-shrink-0" />
-                                          <div className="font-semibold text-sm min-w-0">
-                                            <div className="truncate">{currentMatchForCourt.team1[0]}</div>
-                                            {!currentMatchForCourt.isSingles && currentMatchForCourt.team1[1] && (
-                                              <div className="text-muted-foreground text-xs truncate">{currentMatchForCourt.team1[1]}</div>
-                                            )}
-                                          </div>
-                                        </div>
-                                        <Input
-                                          type="number"
-                                          min="0"
-                                          value={scores.team1}
-                                          onChange={(e) => updatePendingScore(currentMatchForCourt.id, "team1", e.target.value)}
-                                          placeholder="0"
-                                          className="w-16 h-12 text-center text-xl font-bold flex-shrink-0"
-                                          disabled={isCompleted && !hasPending}
-                                        />
-                                      </div>
-
-                                      <div className="text-center text-sm font-bold text-muted-foreground">VS</div>
-
-                                      {/* Team 2 */}
-                                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50">
-                                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                                          <Users className="w-5 h-5 text-accent flex-shrink-0" />
-                                          <div className="font-semibold text-sm min-w-0">
-                                            <div className="truncate">{currentMatchForCourt.team2[0]}</div>
-                                            {!currentMatchForCourt.isSingles && currentMatchForCourt.team2[1] && (
-                                              <div className="text-muted-foreground text-xs truncate">{currentMatchForCourt.team2[1]}</div>
-                                            )}
-                                          </div>
-                                        </div>
-                                        <Input
-                                          type="number"
-                                          min="0"
-                                          value={scores.team2}
-                                          onChange={(e) => updatePendingScore(currentMatchForCourt.id, "team2", e.target.value)}
-                                          placeholder="0"
-                                          className="w-16 h-12 text-center text-xl font-bold flex-shrink-0"
-                                          disabled={isCompleted && !hasPending}
-                                        />
-                                      </div>
-
-                                      {!isCompleted && (
-                                        <>
-                                          <Button 
-                                            onClick={() => startEditMatch(currentMatchForCourt)}
-                                            variant="outline"
-                                            size="sm"
-                                            className="w-full gap-2"
-                                          >
-                                            <Edit className="w-4 h-4" />
-                                            Override Players
-                                          </Button>
-                                          <Button 
-                                            onClick={() => confirmScore(currentMatchForCourt.id)}
-                                            className="w-full h-11"
-                                            disabled={!hasPending}
-                                          >
-                                            Confirm Score & Next
-                                          </Button>
-                                        </>
+                                {/* Team 1 */}
+                                <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50">
+                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <Users className="w-5 h-5 text-primary flex-shrink-0" />
+                                    <div className="font-semibold text-sm min-w-0">
+                                      <div className="truncate">{match.team1[0]}</div>
+                                      {!match.isSingles && match.team1[1] && (
+                                        <div className="text-muted-foreground text-xs truncate">{match.team1[1]}</div>
                                       )}
-                                      
-                                      {isCompleted && !hasPending && (
-                                        <Button 
-                                          onClick={() => editScore(currentMatchForCourt.id)}
-                                          variant="outline"
-                                          className="w-full"
-                                        >
-                                          Edit Score
-                                        </Button>
+                                    </div>
+                                  </div>
+                                  {isCurrentMatch ? (
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      value={scores.team1}
+                                      onChange={(e) => updatePendingScore(match.id, "team1", e.target.value)}
+                                      placeholder="0"
+                                      className="w-16 h-12 text-center text-xl font-bold flex-shrink-0"
+                                      disabled={isCompleted && !hasPending}
+                                    />
+                                  ) : (
+                                    <span className="w-16 h-12 flex items-center justify-center text-xl font-bold">
+                                      {confirmedScores ? confirmedScores.team1 : '-'}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="text-center text-sm font-bold text-muted-foreground">VS</div>
+
+                                {/* Team 2 */}
+                                <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50">
+                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <Users className="w-5 h-5 text-accent flex-shrink-0" />
+                                    <div className="font-semibold text-sm min-w-0">
+                                      <div className="truncate">{match.team2[0]}</div>
+                                      {!match.isSingles && match.team2[1] && (
+                                        <div className="text-muted-foreground text-xs truncate">{match.team2[1]}</div>
                                       )}
-                                    </>
-                                  );
-                                })()}
+                                    </div>
+                                  </div>
+                                  {isCurrentMatch ? (
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      value={scores.team2}
+                                      onChange={(e) => updatePendingScore(match.id, "team2", e.target.value)}
+                                      placeholder="0"
+                                      className="w-16 h-12 text-center text-xl font-bold flex-shrink-0"
+                                      disabled={isCompleted && !hasPending}
+                                    />
+                                  ) : (
+                                    <span className="w-16 h-12 flex items-center justify-center text-xl font-bold">
+                                      {confirmedScores ? confirmedScores.team2 : '-'}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {isCurrentMatch && !isCompleted && (
+                                  <Button 
+                                    onClick={() => confirmScore(match.id)}
+                                    className="w-full h-11"
+                                    disabled={!hasPending}
+                                  >
+                                    Confirm Score & Next
+                                  </Button>
+                                )}
+                                
+                                {isCurrentMatch && isCompleted && !hasPending && (
+                                  <Button 
+                                    onClick={() => editScore(match.id)}
+                                    variant="outline"
+                                    className="w-full"
+                                  >
+                                    Edit Score
+                                  </Button>
+                                )}
                               </div>
-                            </>
-                          )}
-                        </div>
-                      </Card>
-                    ) : (
-                      <Card className="p-8 text-center bg-muted/30">
-                        <Trophy className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">All matches completed</p>
-                      </Card>
-                    )}
-                  </div>
-
-                  {/* Next Match - Preview */}
-                  <div className="flex-1 opacity-60 scale-90 transition-all">
-                    {nextMatchForCourt ? (
-                      <Card className="p-4 bg-muted/30 border-dashed">
-                        <div className="space-y-2">
-                          <div className="text-center mb-2">
-                            <Badge variant="outline" className="text-xs">Up Next</Badge>
-                          </div>
-                          <div className="text-xs space-y-1">
-                            <div className="flex items-center gap-1">
-                              <span className="font-medium truncate">{nextMatchForCourt.team1[0]}</span>
-                              {!nextMatchForCourt.isSingles && nextMatchForCourt.team1[1] && (
-                                <span className="text-muted-foreground truncate">& {nextMatchForCourt.team1[1]}</span>
-                              )}
                             </div>
-                            <div className="text-center text-muted-foreground">vs</div>
-                            <div className="flex items-center gap-1">
-                              <span className="font-medium truncate">{nextMatchForCourt.team2[0]}</span>
-                              {!nextMatchForCourt.isSingles && nextMatchForCourt.team2[1] && (
-                                <span className="text-muted-foreground truncate">& {nextMatchForCourt.team2[1]}</span>
-                              )}
-                            </div>
-                          </div>
+                          </Card>
                         </div>
-                      </Card>
-                    ) : (
-                      <div className="h-full flex items-center justify-center p-8">
-                        <span className="text-xs text-muted-foreground">No more matches</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+                      </CarouselItem>
+                    );
+                  })}
+                </CarouselContent>
+                <CarouselPrevious className="left-2" />
+                <CarouselNext className="right-2" />
+              </Carousel>
             </div>
           );
         })}
@@ -939,54 +486,6 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
             Show All Matches ({matches.length})
           </Button>
         </div>
-      )}
-
-      {leaderboard.length > 0 && (
-        <Card className="p-6 mt-8 bg-gradient-to-br from-primary/5 to-accent/5">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <Medal className="w-6 h-6 text-primary-foreground" />
-              </div>
-              <h2 className="text-2xl font-bold text-foreground">Leaderboard</h2>
-            </div>
-            <Button onClick={handleShare} className="gap-2">
-              <Share2 className="w-4 h-4" />
-              Share Results
-            </Button>
-          </div>
-          
-          <div className="space-y-3">
-            {leaderboard.map((entry, idx) => (
-              <div
-                key={entry.player}
-                className={`flex items-center justify-between p-4 rounded-lg ${
-                  idx === 0
-                    ? "bg-gradient-to-r from-primary/20 to-accent/20 border-2 border-primary"
-                    : "bg-secondary/50"
-                }`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                    idx === 0 ? "bg-primary text-primary-foreground text-lg" :
-                    idx === 1 ? "bg-accent text-accent-foreground" :
-                    idx === 2 ? "bg-muted text-muted-foreground" :
-                    "bg-secondary text-secondary-foreground"
-                  }`}>
-                    {idx + 1}
-                  </div>
-                  <div>
-                    <div className="font-semibold text-lg">{entry.player}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {entry.wins}W / {entry.losses}L • {entry.points} pts
-                    </div>
-                  </div>
-                </div>
-                {idx === 0 && <Trophy className="w-8 h-8 text-primary" />}
-              </div>
-            ))}
-          </div>
-        </Card>
       )}
     </div>
   );

@@ -62,7 +62,7 @@ export const BottomNav = ({ activeSection, onSectionChange, disabled }: BottomNa
             )}
           >
             <Users className="w-6 h-6" />
-            <span className="text-xs font-medium">Check In</span>
+            <span className="text-xs font-medium">Players</span>
           </button>
         </div>
       </div>
