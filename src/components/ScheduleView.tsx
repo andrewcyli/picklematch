@@ -40,6 +40,8 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     gameConfig.courtConfigs || Array.from({ length: gameConfig.courts }, (_, i) => ({ courtNumber: i + 1, type: 'doubles' as const }))
   );
   const [carouselApis, setCarouselApis] = useState<Map<number, CarouselApi>>(new Map());
+  const [editingMatch, setEditingMatch] = useState<string | null>(null);
+  const [editedTeams, setEditedTeams] = useState<{ team1: string[]; team2: string[] }>({ team1: [], team2: [] });
 
   // Helper to normalize scores to numbers
   const normalizeScore = (score: { team1: number | string; team2: number | string } | undefined) => {
@@ -67,6 +69,64 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     setPendingScores(newPending);
   };
 
+  const startEditingPlayers = (matchId: string) => {
+    const match = matches.find(m => m.id === matchId);
+    if (match) {
+      setEditingMatch(matchId);
+      setEditedTeams({ team1: [...match.team1], team2: [...match.team2] });
+    }
+  };
+
+  const updateEditedPlayer = (team: 'team1' | 'team2', index: number, value: string) => {
+    setEditedTeams(prev => ({
+      ...prev,
+      [team]: prev[team].map((p, i) => i === index ? value : p)
+    }));
+  };
+
+  const saveEditedPlayers = () => {
+    if (!editingMatch) return;
+
+    const match = matches.find(m => m.id === editingMatch);
+    if (!match) return;
+
+    const allEditedPlayers = [...editedTeams.team1, ...editedTeams.team2].filter(p => p.trim());
+    const updatedPlayers = [...new Set([...allEditedPlayers, ...allPlayers])];
+
+    const matchIndex = matches.findIndex(m => m.id === editingMatch);
+    const playedMatches = matches.slice(0, matchIndex).map(m => ({
+      ...m,
+      score: normalizeScore(matchScores.get(m.id))
+    }));
+
+    const updatedMatch = {
+      ...match,
+      team1: match.isSingles ? [editedTeams.team1[0]] as [string] : editedTeams.team1 as [string, string],
+      team2: match.isSingles ? [editedTeams.team2[0]] as [string] : editedTeams.team2 as [string, string],
+    };
+
+    const newMatches = regenerateScheduleFromSlot(
+      updatedPlayers,
+      [...playedMatches, updatedMatch],
+      match.endTime,
+      gameConfig.gameDuration,
+      gameConfig.totalTime,
+      gameConfig.courts,
+      undefined,
+      gameConfig.teammatePairs,
+      courtConfigs
+    );
+
+    onScheduleUpdate(newMatches, updatedPlayers);
+    setEditingMatch(null);
+    toast({ title: "Players updated", description: "Schedule regenerated" });
+  };
+
+  const cancelEditingPlayers = () => {
+    setEditingMatch(null);
+    setEditedTeams({ team1: [], team2: [] });
+  };
+
   const confirmScore = (matchId: string) => {
     const pending = pendingScores.get(matchId);
     if (!pending || pending.team1 === '' || pending.team2 === '' || pending.team1 === undefined || pending.team2 === undefined) {
@@ -87,6 +147,9 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
 
     const actualEndTime = currentTime;
     checkScheduleAdjustment(matchId, actualEndTime);
+    
+    // Check for player conflicts in current matches
+    checkPlayerConflicts(newScores);
     
     // Auto-scroll to next match on the same court
     const match = matches.find(m => m.id === matchId);
@@ -115,6 +178,61 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
       const newScores = new Map(matchScores);
       newScores.delete(matchId);
       onMatchScoresUpdate(newScores);
+    }
+  };
+
+  const checkPlayerConflicts = (scores: Map<string, { team1: number; team2: number }>) => {
+    const currentMatches = matches.filter(m => !scores.has(m.id));
+    const currentMatchesByCourt = new Map<number, Match>();
+    
+    currentMatches.forEach(match => {
+      if (!currentMatchesByCourt.has(match.court)) {
+        currentMatchesByCourt.set(match.court, match);
+      }
+    });
+
+    if (currentMatchesByCourt.size <= 1) return;
+
+    const allCurrentPlayers = new Map<string, number[]>();
+    
+    currentMatchesByCourt.forEach((match, court) => {
+      [...match.team1, ...match.team2].forEach(player => {
+        if (!allCurrentPlayers.has(player)) {
+          allCurrentPlayers.set(player, []);
+        }
+        allCurrentPlayers.get(player)!.push(court);
+      });
+    });
+
+    const conflictingPlayers = Array.from(allCurrentPlayers.entries())
+      .filter(([_, courts]) => courts.length > 1)
+      .map(([player]) => player);
+
+    if (conflictingPlayers.length > 0) {
+      const firstConflictMatch = Array.from(currentMatchesByCourt.values())[0];
+      const matchIndex = matches.findIndex(m => m.id === firstConflictMatch.id);
+      const playedMatches = matches.slice(0, matchIndex).map(m => ({
+        ...m,
+        score: normalizeScore(scores.get(m.id))
+      }));
+
+      const newMatches = regenerateScheduleFromSlot(
+        allPlayers,
+        playedMatches,
+        firstConflictMatch.startTime,
+        gameConfig.gameDuration,
+        gameConfig.totalTime,
+        gameConfig.courts,
+        undefined,
+        gameConfig.teammatePairs,
+        courtConfigs
+      );
+
+      onScheduleUpdate(newMatches, allPlayers);
+      toast({ 
+        title: "Schedule adjusted", 
+        description: `Resolved conflicts for: ${conflictingPlayers.join(', ')}` 
+      });
     }
   };
 
@@ -337,12 +455,31 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                             <div className="flex items-center gap-2 p-2 rounded-lg bg-secondary/50">
                               <div className="flex items-center gap-1.5 flex-1 min-w-0">
                                 <Users className="w-4 h-4 text-primary flex-shrink-0" />
-                                <div className="font-semibold text-sm min-w-0">
-                                  <div className="truncate">{match.team1[0]}</div>
-                                  {!match.isSingles && match.team1[1] && (
-                                    <div className="text-muted-foreground text-xs truncate">{match.team1[1]}</div>
-                                  )}
-                                </div>
+                                {editingMatch === match.id ? (
+                                  <div className="flex-1 min-w-0 space-y-1">
+                                    <Input
+                                      value={editedTeams.team1[0] || ''}
+                                      onChange={(e) => updateEditedPlayer('team1', 0, e.target.value)}
+                                      className="h-7 text-sm"
+                                      placeholder="Player 1"
+                                    />
+                                    {!match.isSingles && (
+                                      <Input
+                                        value={editedTeams.team1[1] || ''}
+                                        onChange={(e) => updateEditedPlayer('team1', 1, e.target.value)}
+                                        className="h-7 text-sm"
+                                        placeholder="Player 2"
+                                      />
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="font-semibold text-sm min-w-0">
+                                    <div className="truncate">{match.team1[0]}</div>
+                                    {!match.isSingles && match.team1[1] && (
+                                      <div className="text-muted-foreground text-xs truncate">{match.team1[1]}</div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                               {isCurrentMatch ? (
                                 <Input
@@ -371,12 +508,31 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                             <div className="flex items-center gap-2 p-2 rounded-lg bg-secondary/50">
                               <div className="flex items-center gap-1.5 flex-1 min-w-0">
                                 <Users className="w-4 h-4 text-accent flex-shrink-0" />
-                                <div className="font-semibold text-sm min-w-0">
-                                  <div className="truncate">{match.team2[0]}</div>
-                                  {!match.isSingles && match.team2[1] && (
-                                    <div className="text-muted-foreground text-xs truncate">{match.team2[1]}</div>
-                                  )}
-                                </div>
+                                {editingMatch === match.id ? (
+                                  <div className="flex-1 min-w-0 space-y-1">
+                                    <Input
+                                      value={editedTeams.team2[0] || ''}
+                                      onChange={(e) => updateEditedPlayer('team2', 0, e.target.value)}
+                                      className="h-7 text-sm"
+                                      placeholder="Player 1"
+                                    />
+                                    {!match.isSingles && (
+                                      <Input
+                                        value={editedTeams.team2[1] || ''}
+                                        onChange={(e) => updateEditedPlayer('team2', 1, e.target.value)}
+                                        className="h-7 text-sm"
+                                        placeholder="Player 2"
+                                      />
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="font-semibold text-sm min-w-0">
+                                    <div className="truncate">{match.team2[0]}</div>
+                                    {!match.isSingles && match.team2[1] && (
+                                      <div className="text-muted-foreground text-xs truncate">{match.team2[1]}</div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                               {isCurrentMatch ? (
                                 <Input
@@ -400,24 +556,52 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                             </div>
 
                             {/* Action Buttons for Current Match */}
-                            {isCurrentMatch && !isCompleted && (
-                              <Button 
-                                onClick={() => confirmScore(match.id)}
-                                className="w-full"
-                                disabled={!hasPending}
-                              >
-                                Confirm Score & Next
-                              </Button>
+                            {isCurrentMatch && editingMatch === match.id && (
+                              <div className="flex gap-2">
+                                <Button 
+                                  onClick={saveEditedPlayers}
+                                  className="flex-1"
+                                >
+                                  Save Players
+                                </Button>
+                                <Button 
+                                  onClick={cancelEditingPlayers}
+                                  variant="outline"
+                                  className="flex-1"
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
                             )}
                             
-                            {isCurrentMatch && isCompleted && !hasPending && (
-                              <Button 
-                                onClick={() => editScore(match.id)}
-                                variant="outline"
-                                className="w-full"
-                              >
-                                Edit Score
-                              </Button>
+                            {isCurrentMatch && !editingMatch && (
+                              <>
+                                <Button 
+                                  onClick={() => startEditingPlayers(match.id)}
+                                  variant="outline"
+                                  className="w-full"
+                                >
+                                  Change Players
+                                </Button>
+                                {!isCompleted && (
+                                  <Button 
+                                    onClick={() => confirmScore(match.id)}
+                                    className="w-full"
+                                    disabled={!hasPending}
+                                  >
+                                    Confirm Score & Next
+                                  </Button>
+                                )}
+                                {isCompleted && !hasPending && (
+                                  <Button 
+                                    onClick={() => editScore(match.id)}
+                                    variant="outline"
+                                    className="w-full"
+                                  >
+                                    Edit Score
+                                  </Button>
+                                )}
+                              </>
                             )}
                           </div>
                         </Card>
