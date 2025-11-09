@@ -149,3 +149,9 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .pb-safe {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 88px);
+  }
+}

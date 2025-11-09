@@ -103,62 +103,58 @@ export const PlayerSetup = ({
       addPlayer();
     }
   };
-  return <div className="space-y-6">
-      <div className="flex items-center gap-3 mb-6">
-        
-        <div>
-          
-          
+  return <div className="flex flex-col h-full">
+      <div className="flex-shrink-0 space-y-4">
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <Input placeholder="Enter player name" value={currentName} onChange={e => setCurrentName(e.target.value)} onKeyPress={handleKeyPress} className="h-12 text-lg" maxLength={50} />
+          </div>
+          <Button onClick={addPlayer} disabled={!currentName.trim()} size="lg" className="h-12 px-6">
+            <Plus className="w-5 h-5" />
+          </Button>
         </div>
-      </div>
 
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <Input placeholder="Enter player name" value={currentName} onChange={e => setCurrentName(e.target.value)} onKeyPress={handleKeyPress} className="h-12 text-lg" maxLength={50} />
-        </div>
-        <Button onClick={addPlayer} disabled={!currentName.trim()} size="lg" className="h-12 px-6">
-          <Plus className="w-5 h-5" />
+        <Button onClick={() => onComplete(players, teammatePairs)} disabled={players.length < 2} size="lg" className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-accent text-white shadow-sport">
+          {hasStartedMatches ? "Update Matches" : "Continue to Matches"} ({players.length} players)
         </Button>
+
+        <div className="text-sm text-muted-foreground">
+          {players.length} players added
+        </div>
       </div>
 
-      <Button onClick={() => onComplete(players, teammatePairs)} disabled={players.length < 2} size="lg" className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-accent text-white shadow-sport">
-        {hasStartedMatches ? "Update Matches" : "Continue to Matches"} ({players.length} players)
-      </Button>
+      <div className="flex-1 min-h-0 overflow-y-auto pb-safe mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {players.map((player, index) => <Card key={index} className={`p-4 flex items-center justify-between hover:shadow-md transition-all ${selectedForPairing === player ? "border-2 border-primary bg-primary/5" : isPaired(player) ? "border border-accent/50 bg-accent/5" : ""}`}>
+              <span className="font-medium text-foreground">{player}</span>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={() => togglePairSelection(player)} className="h-8 w-8 p-0 text-muted-foreground hover:text-primary" title="Link as teammates">
+                  <Link2 className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => removePlayer(index)} className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive">
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </Card>)}
+        </div>
 
-      <div className="text-sm text-muted-foreground">
-        {players.length} players added
+        {selectedForPairing && <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 mt-4">
+            <p className="text-sm text-foreground">
+              Select another player to pair with <strong>{selectedForPairing}</strong>
+            </p>
+          </div>}
+
+        {teammatePairs.length > 0 && <div className="pt-4 border-t space-y-2 mt-4">
+            <h4 className="text-sm font-semibold text-foreground">Teammate Pairs</h4>
+            {teammatePairs.map((pair, idx) => <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-accent/10 border border-accent/20">
+                <span className="text-sm font-medium">
+                  {pair.player1} & {pair.player2}
+                </span>
+                <Button variant="ghost" size="sm" onClick={() => removePair(pair)} className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive">
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>)}
+          </div>}
       </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto">
-        {players.map((player, index) => <Card key={index} className={`p-4 flex items-center justify-between hover:shadow-md transition-all ${selectedForPairing === player ? "border-2 border-primary bg-primary/5" : isPaired(player) ? "border border-accent/50 bg-accent/5" : ""}`}>
-            <span className="font-medium text-foreground">{player}</span>
-            <div className="flex gap-2">
-              <Button variant="ghost" size="sm" onClick={() => togglePairSelection(player)} className="h-8 w-8 p-0 text-muted-foreground hover:text-primary" title="Link as teammates">
-                <Link2 className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => removePlayer(index)} className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive">
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-          </Card>)}
-      </div>
-
-      {selectedForPairing && <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
-          <p className="text-sm text-foreground">
-            Select another player to pair with <strong>{selectedForPairing}</strong>
-          </p>
-        </div>}
-
-      {teammatePairs.length > 0 && <div className="pt-4 border-t space-y-2">
-          <h4 className="text-sm font-semibold text-foreground">Teammate Pairs</h4>
-          {teammatePairs.map((pair, idx) => <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-accent/10 border border-accent/20">
-              <span className="text-sm font-medium">
-                {pair.player1} & {pair.player2}
-              </span>
-              <Button variant="ghost" size="sm" onClick={() => removePair(pair)} className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive">
-                <X className="w-4 h-4" />
-              </Button>
-            </div>)}
-        </div>}
     </div>;
 };

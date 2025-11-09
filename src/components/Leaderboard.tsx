@@ -72,60 +72,64 @@ export const Leaderboard = ({ players, matches, matchScores }: LeaderboardProps)
   if (matchScores.size === 0) return null;
 
   return (
-    <div className="space-y-2 pt-3 border-t">
-      <div className="flex items-center gap-2">
-        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-accent to-accent/80 flex items-center justify-center">
-          <Trophy className="w-4 h-4 text-accent-foreground" />
-        </div>
-        <div>
-          <h3 className="text-base font-bold text-foreground">Leaderboard</h3>
-          <p className="text-[10px] text-muted-foreground">Player rankings</p>
+    <div className="flex flex-col h-full">
+      <div className="flex-shrink-0 mb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-accent to-accent/80 flex items-center justify-center">
+            <Trophy className="w-4 h-4 text-accent-foreground" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-foreground">Leaderboard</h3>
+            <p className="text-[10px] text-muted-foreground">Player rankings</p>
+          </div>
         </div>
       </div>
 
-      <div className="space-y-1.5">
-        {sortedStats.map((stat, index) => (
-          <Card
-            key={stat.player}
-            className={`p-2 flex items-center justify-between transition-all ${
-              index === 0 && stat.matchesPlayed > 0
-                ? "border-2 border-accent bg-accent/10"
-                : "bg-card"
-            }`}
-          >
-            <div className="flex items-center gap-2 flex-1">
-              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-xs">
-                {index + 1}
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-semibold text-sm text-foreground">{stat.player}</span>
-                  {index === 0 && stat.matchesPlayed > 0 && (
-                    <Trophy className="w-3 h-3 text-accent" />
-                  )}
+      <div className="flex-1 min-h-0 overflow-y-auto pb-safe">
+        <div className="space-y-1.5">
+          {sortedStats.map((stat, index) => (
+            <Card
+              key={stat.player}
+              className={`p-2 flex items-center justify-between transition-all ${
+                index === 0 && stat.matchesPlayed > 0
+                  ? "border-2 border-accent bg-accent/10"
+                  : "bg-card"
+              }`}
+            >
+              <div className="flex items-center gap-2 flex-1">
+                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-xs">
+                  {index + 1}
                 </div>
-                <div className="text-[10px] text-muted-foreground">
-                  {stat.matchesPlayed} match{stat.matchesPlayed !== 1 ? 'es' : ''}
+                <div className="flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-semibold text-sm text-foreground">{stat.player}</span>
+                    {index === 0 && stat.matchesPlayed > 0 && (
+                      <Trophy className="w-3 h-3 text-accent" />
+                    )}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {stat.matchesPlayed} match{stat.matchesPlayed !== 1 ? 'es' : ''}
+                  </div>
                 </div>
               </div>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <div className="text-center">
-                <div className="text-xs font-bold text-accent">{stat.points}</div>
-                <div className="text-[9px] text-muted-foreground">Pts</div>
+              
+              <div className="flex items-center gap-3">
+                <div className="text-center">
+                  <div className="text-xs font-bold text-accent">{stat.points}</div>
+                  <div className="text-[9px] text-muted-foreground">Pts</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-xs font-bold text-primary">{stat.wins}</div>
+                  <div className="text-[9px] text-muted-foreground">Wins</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-xs font-bold text-muted-foreground">{stat.totalScored}</div>
+                  <div className="text-[9px] text-muted-foreground">Scored</div>
+                </div>
               </div>
-              <div className="text-center">
-                <div className="text-xs font-bold text-primary">{stat.wins}</div>
-                <div className="text-[9px] text-muted-foreground">Wins</div>
-              </div>
-              <div className="text-center">
-                <div className="text-xs font-bold text-muted-foreground">{stat.totalScored}</div>
-                <div className="text-[9px] text-muted-foreground">Scored</div>
-              </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          ))}
+        </div>
       </div>
     </div>
   );

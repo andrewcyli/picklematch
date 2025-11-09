@@ -500,22 +500,28 @@ const Index = () => {
               <p className="text-muted-foreground">Please complete game setup and add players first</p>
             </div>}
 
-          {activeSection === "players" && gameCode && <CheckInOut gameCode={gameCode} players={players} onPlayersUpdate={handlePlayersUpdate} matches={matches} matchScores={matchScores} teammatePairs={gameConfig?.teammatePairs} onNavigateToMatches={() => setActiveSection("matches")} hasStartedMatches={matches.length > 0} />}
+          {activeSection === "players" && gameCode && <div className="flex-1 min-h-0">
+              <CheckInOut gameCode={gameCode} players={players} onPlayersUpdate={handlePlayersUpdate} matches={matches} matchScores={matchScores} teammatePairs={gameConfig?.teammatePairs} onNavigateToMatches={() => setActiveSection("matches")} hasStartedMatches={matches.length > 0} />
+            </div>}
 
           {activeSection === "players" && !gameCode && <div className="text-center py-12">
               <p className="text-muted-foreground">Please complete game setup first</p>
             </div>}
 
-          {activeSection === "history" && <MatchHistory matches={matches} matchScores={matchScores} />}
+          {activeSection === "history" && <div className="flex-1 min-h-0">
+              <MatchHistory matches={matches} matchScores={matchScores} />
+            </div>}
 
-          {activeSection === "leaderboard" && <div className="space-y-6">
-              <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold text-foreground mb-2">Leaderboard</h2>
-                <p className="text-muted-foreground">Player rankings and stats</p>
+          {activeSection === "leaderboard" && <div className="flex-1 min-h-0">
+              <div className="flex flex-col h-full">
+                <div className="text-center mb-3 flex-shrink-0">
+                  <h2 className="text-2xl font-bold text-foreground mb-2">Leaderboard</h2>
+                  <p className="text-muted-foreground">Player rankings and stats</p>
+                </div>
+                {matchScores.size > 0 ? <Leaderboard players={players} matches={matches} matchScores={matchScores} /> : <div className="text-center py-12">
+                    <p className="text-muted-foreground">No completed matches yet</p>
+                  </div>}
               </div>
-              {matchScores.size > 0 ? <Leaderboard players={players} matches={matches} matchScores={matchScores} /> : <div className="text-center py-12">
-                  <p className="text-muted-foreground">No completed matches yet</p>
-                </div>}
             </div>}
         </Card>
       </div>
