@@ -656,22 +656,22 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
 // }, []);
 
   return (
-    <div className="pb-20 max-h-[calc(100vh-5rem)] overflow-y-auto">
+    <div className="pb-20 max-h-[calc(100vh-3rem)] overflow-y-auto">
       {/* Header */}
-      <div className="sticky top-0 bg-background/95 backdrop-blur-sm z-10 pb-3 border-b mb-4">
-        <div className="flex items-center gap-3 px-4 pt-4">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
-            <Trophy className="w-5 h-5 text-primary-foreground" />
+      <div className="sticky top-0 bg-background/95 backdrop-blur-sm z-10 pb-2 border-b mb-3">
+        <div className="flex items-center gap-2 px-2 pt-2">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
+            <Trophy className="w-4 h-4 text-primary-foreground" />
           </div>
           <div>
-            <h2 className="text-lg sm:text-xl font-bold text-foreground">Match Schedule</h2>
-            <p className="text-xs sm:text-sm text-muted-foreground">{matches.length} matches • {allPlayers.length} players</p>
+            <h2 className="text-base sm:text-lg font-bold text-foreground">Match Schedule</h2>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">{matches.length} matches • {allPlayers.length} players</p>
           </div>
         </div>
       </div>
 
       {/* Courts Grid - Responsive layout to fit both courts on screen */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 px-2 sm:px-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 px-2">
         {courtConfigs.map((courtConfig) => {
           const courtMatches = matches.filter(m => m.court === courtConfig.courtNumber);
           const currentMatchIndex = courtMatches.findIndex(m => !matchScores.has(m.id));
@@ -719,14 +719,14 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
               {/* Carousel - Compact height for better fit */}
               <Carousel
                 opts={{ align: "start", loop: false }}
-                className="w-full max-h-[calc(100vh-240px)]"
+                className="w-full max-h-[calc(100vh-200px)]"
                 setApi={(api) => {
                   if (api) {
                     setCarouselApis(prev => new Map(prev).set(courtConfig.courtNumber, api));
                   }
                 }}
               >
-                <CarouselContent className="-ml-2">
+                <CarouselContent className="-ml-2 max-w-full">
                   {courtMatches.map((match, idx) => {
                     const isCurrentMatch = idx === currentMatchIndex;
                     const isNextMatch = idx === currentMatchIndex + 1;
@@ -738,8 +738,8 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                     const hasPending = pendingScores.has(match.id);
 
                     return (
-                      <CarouselItem key={match.id} className="pl-2 basis-[75%] sm:basis-[70%] lg:basis-1/3">
-                        <Card className={`p-2 transition-all ${
+                      <CarouselItem key={match.id} className="pl-2 basis-[90%] sm:basis-[85%] md:basis-[95%]">
+                        <Card className={`p-2 transition-all max-w-full ${
                           isCurrentMatch 
                             ? 'border-2 border-primary bg-primary/5 shadow-lg' 
                             : isNextMatch 
@@ -748,7 +748,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                             ? 'bg-muted/40 opacity-60' 
                             : 'bg-card opacity-80'
                         }`}>
-                          <div className="space-y-1">
+                          <div className="space-y-1 max-w-full overflow-hidden">
                             {/* Match Status Header */}
                             <div className="flex items-center justify-between">
                               <Badge className={`text-xs py-0 ${
@@ -770,14 +770,6 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                                 }
                               </Badge>
                             </div>
-
-                            {/* Stopwatch for Current Match */}
-                            {isCurrentMatch && (
-                              <div className="flex items-center justify-center gap-1.5 py-1 px-2 rounded-lg bg-primary/10 border border-primary/20">
-                                <Timer className="w-3 h-3 text-primary animate-pulse" />
-                                <span className="text-sm font-bold text-primary">{formattedTime}</span>
-                              </div>
-                            )}
 
                             {/* Team 1 */}
                             <div className="flex items-center gap-2 p-1.5 rounded-lg bg-secondary/50">
@@ -848,7 +840,20 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                               )}
                             </div>
 
-                            <div className="text-center text-[10px] font-bold text-muted-foreground">VS</div>
+                            {/* VS with Change Players Button */}
+                            <div className="flex items-center justify-center gap-2">
+                              <div className="text-[10px] font-bold text-muted-foreground">VS</div>
+                              {isCurrentMatch && !editingMatch && (
+                                <Button 
+                                  onClick={() => startEditingPlayers(match.id)}
+                                  variant="ghost"
+                                  className="h-5 px-2 text-[10px]"
+                                  size="sm"
+                                >
+                                  Change
+                                </Button>
+                              )}
+                            </div>
 
                             {/* Team 2 */}
                             <div className="flex items-center gap-2 p-1.5 rounded-lg bg-secondary/50">
@@ -919,58 +924,58 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                               )}
                             </div>
 
-                            {/* Action Buttons for Current Match */}
-                            {isCurrentMatch && editingMatch === match.id && (
-                              <div className="flex gap-1.5 pt-0.5">
-                                <Button 
-                                  onClick={saveEditedPlayers}
-                                  className="flex-1 h-8 text-xs"
-                                  size="sm"
-                                >
-                                  Save
-                                </Button>
-                                <Button 
-                                  onClick={cancelEditingPlayers}
-                                  variant="outline"
-                                  className="flex-1 h-8 text-xs"
-                                  size="sm"
-                                >
-                                  Cancel
-                                </Button>
+                            {/* Timer and Action Buttons for Current Match */}
+                            {isCurrentMatch && (
+                              <div className="space-y-1">
+                                {/* Stopwatch */}
+                                <div className="flex items-center justify-center gap-1.5 py-0.5 px-2 rounded-lg bg-primary/10 border border-primary/20">
+                                  <Timer className="w-3 h-3 text-primary animate-pulse" />
+                                  <span className="text-xs font-bold text-primary">{formattedTime}</span>
+                                </div>
+                                
+                                {editingMatch === match.id ? (
+                                  <div className="flex gap-1.5">
+                                    <Button 
+                                      onClick={saveEditedPlayers}
+                                      className="flex-1 h-7 text-xs"
+                                      size="sm"
+                                    >
+                                      Save
+                                    </Button>
+                                    <Button 
+                                      onClick={cancelEditingPlayers}
+                                      variant="outline"
+                                      className="flex-1 h-7 text-xs"
+                                      size="sm"
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    {!isCompleted && (
+                                      <Button 
+                                        onClick={() => confirmScore(match.id)}
+                                        className="w-full h-7 text-xs"
+                                        size="sm"
+                                        disabled={!hasPending}
+                                      >
+                                        Confirm & Next
+                                      </Button>
+                                    )}
+                                    {isCompleted && !hasPending && (
+                                      <Button 
+                                        onClick={() => editScore(match.id)}
+                                        variant="outline"
+                                        className="w-full h-7 text-xs"
+                                        size="sm"
+                                      >
+                                        Edit Score
+                                      </Button>
+                                    )}
+                                  </>
+                                )}
                               </div>
-                            )}
-                            
-                            {isCurrentMatch && !editingMatch && (
-                              <>
-                                <Button 
-                                  onClick={() => startEditingPlayers(match.id)}
-                                  variant="outline"
-                                  className="w-full h-8 text-xs"
-                                  size="sm"
-                                >
-                                  Change Players
-                                </Button>
-                                {!isCompleted && (
-                                  <Button 
-                                    onClick={() => confirmScore(match.id)}
-                                    className="w-full h-8 text-xs"
-                                    size="sm"
-                                    disabled={!hasPending}
-                                  >
-                                    Confirm & Next
-                                  </Button>
-                                )}
-                                {isCompleted && !hasPending && (
-                                  <Button 
-                                    onClick={() => editScore(match.id)}
-                                    variant="outline"
-                                    className="w-full h-8 text-xs"
-                                    size="sm"
-                                  >
-                                    Edit Score
-                                  </Button>
-                                )}
-                              </>
                             )}
                           </div>
                         </Card>
