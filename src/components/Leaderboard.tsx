@@ -72,7 +72,7 @@ export const Leaderboard = ({ players, matches, matchScores }: LeaderboardProps)
   if (matchScores.size === 0) return null;
 
   return (
-    <div className="space-y-2 pt-3 border-t">
+    <div className="flex flex-col min-h-0 space-y-2 pt-3 border-t">
       <div className="flex items-center gap-2">
         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-accent to-accent/80 flex items-center justify-center">
           <Trophy className="w-4 h-4 text-accent-foreground" />
@@ -83,7 +83,7 @@ export const Leaderboard = ({ players, matches, matchScores }: LeaderboardProps)
         </div>
       </div>
 
-      <div className="space-y-1.5 max-h-[calc(100vh-240px)] overflow-y-auto pb-20">
+      <div className="flex-1 min-h-0 space-y-1.5 overflow-y-auto pb-28">
         {sortedStats.map((stat, index) => (
           <Card
             key={stat.player}

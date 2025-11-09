@@ -26,13 +26,13 @@ export const MatchHistory = ({ matches, matchScores }: MatchHistoryProps) => {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col min-h-0 space-y-3">
       <div className="text-center mb-3">
         <h2 className="text-lg font-bold text-foreground mb-1">Match History</h2>
         <p className="text-xs text-muted-foreground">{completedMatches.length} completed match{completedMatches.length !== 1 ? 'es' : ''}</p>
       </div>
 
-      <div className="space-y-2 max-h-[calc(100vh-240px)] overflow-y-auto pb-20">
+      <div className="flex-1 min-h-0 space-y-2 overflow-y-auto pb-28">
         {completedMatches.map((match) => {
           const score = matchScores.get(match.id);
           if (!score) return null;

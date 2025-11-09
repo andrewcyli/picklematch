@@ -103,7 +103,7 @@ export const PlayerSetup = ({
       addPlayer();
     }
   };
-  return <div className="space-y-6">
+  return <div className="flex flex-col min-h-0 gap-6">
       <div className="flex items-center gap-3 mb-6">
         
         <div>
@@ -129,7 +129,7 @@ export const PlayerSetup = ({
         {players.length} players added
       </div>
 
-      <div className="max-h-[calc(100vh-380px)] overflow-y-auto pb-20 space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto pb-28 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {players.map((player, index) => <Card key={index} className={`p-4 flex items-center justify-between hover:shadow-md transition-all ${selectedForPairing === player ? "border-2 border-primary bg-primary/5" : isPaired(player) ? "border border-accent/50 bg-accent/5" : ""}`}>
               <span className="font-medium text-foreground">{player}</span>
