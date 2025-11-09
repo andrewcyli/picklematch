@@ -37,9 +37,14 @@ const Index = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   // Player identity and view management
-  const { playerName, isPlayerView, claimIdentity, releaseIdentity } = usePlayerIdentity(gameId);
+  const {
+    playerName,
+    isPlayerView,
+    claimIdentity,
+    releaseIdentity
+  } = usePlayerIdentity(gameId);
   const playerMatches = usePlayerMatches(matches, playerName, matchScores);
-  
+
   // Enable notifications when in player view
   usePlayerNotifications(matches, playerName, gameId, matchScores);
 
@@ -56,12 +61,15 @@ const Index = () => {
   // Ensure every match has a stable, unique id to prevent key collisions and score mismatches
   const sanitizeMatches = (arr: Match[]): Match[] => {
     const seen = new Map<string, number>();
-    return arr.map((m) => {
-      let baseId = (m.id && m.id.trim() !== "") ? m.id : `match-c${m.court}-t${m.startTime}`;
+    return arr.map(m => {
+      let baseId = m.id && m.id.trim() !== "" ? m.id : `match-c${m.court}-t${m.startTime}`;
       const count = seen.get(baseId) || 0;
       seen.set(baseId, count + 1);
       const id = count === 0 ? baseId : `${baseId}-v${count + 1}`;
-      return { ...m, id };
+      return {
+        ...m,
+        id
+      };
     });
   };
 
@@ -70,19 +78,15 @@ const Index = () => {
     const restoreSession = async () => {
       const savedGameId = localStorage.getItem('teamup_game_id');
       const savedGameCode = localStorage.getItem('teamup_game_code');
-      
       if (savedGameId && savedGameCode && userId) {
         try {
-          const { data, error } = await supabase
-            .from('games')
-            .select('*')
-            .eq('id', savedGameId)
-            .single();
-          
+          const {
+            data,
+            error
+          } = await supabase.from('games').select('*').eq('id', savedGameId).single();
           if (!error && data) {
             const loadedMatches = data.matches as unknown as Match[] || [];
             const sanitized = sanitizeMatches(loadedMatches);
-            
             setGameId(data.id);
             setGameCode(data.game_code);
             setPlayers(data.players || []);
@@ -90,11 +94,9 @@ const Index = () => {
             setMatches(sanitized);
             syncMatchScoresFromMatches(sanitized);
             setShowGameCodeDialog(false);
-            
             if (data.game_config) {
               setSetupComplete(true);
             }
-            
             if (loadedMatches.length > 0) {
               setActiveSection("matches");
             } else if (data.players && data.players.length > 0) {
@@ -102,7 +104,6 @@ const Index = () => {
             } else {
               setActiveSection("setup");
             }
-            
             toast.success(`Session restored: ${data.game_code}`);
           } else {
             // Session not found in DB, clear localStorage
@@ -115,10 +116,8 @@ const Index = () => {
           localStorage.removeItem('teamup_game_code');
         }
       }
-      
       setIsRestoringSession(false);
     };
-    
     if (userId) {
       restoreSession();
     }
@@ -127,14 +126,12 @@ const Index = () => {
   // Handle URL parameter for joining via shared link
   useEffect(() => {
     if (!userId) return;
-
     const urlParams = new URLSearchParams(window.location.search);
     const joinCode = urlParams.get('join');
-    
     if (joinCode) {
       // Remove the parameter from URL without reload
       window.history.replaceState({}, '', window.location.pathname);
-      
+
       // Join the game
       joinExistingGame(joinCode);
     }
@@ -175,7 +172,10 @@ const Index = () => {
   }, []);
   // Sync state from database matches
   const syncMatchScoresFromMatches = (matches: Match[]) => {
-    const scoresMap = new Map<string, { team1: number; team2: number }>();
+    const scoresMap = new Map<string, {
+      team1: number;
+      team2: number;
+    }>();
     matches.forEach(match => {
       if (match.score) {
         scoresMap.set(match.id, match.score);
@@ -183,7 +183,6 @@ const Index = () => {
     });
     setMatchScores(scoresMap);
   };
-
   useEffect(() => {
     if (!gameId) return;
     const channel = supabase.channel('game-updates').on('postgres_changes', {
@@ -197,9 +196,7 @@ const Index = () => {
         const newMatches = updatedGame.matches as unknown as Match[] || [];
         const newPlayers = updatedGame.players || [];
         const newConfig = updatedGame.game_config as unknown as GameConfig;
-        
         const sanitized = sanitizeMatches(newMatches);
-        
         setPlayers(newPlayers);
         setMatches(sanitized);
         setGameConfig(newConfig);
@@ -233,7 +230,6 @@ const Index = () => {
       }
       const loadedMatches = data.matches as unknown as Match[] || [];
       const sanitized = sanitizeMatches(loadedMatches);
-      
       setGameId(data.id);
       setGameCode(data.game_code);
       setPlayers(data.players || []);
@@ -241,7 +237,7 @@ const Index = () => {
       setMatches(sanitized);
       syncMatchScoresFromMatches(sanitized);
       setShowGameCodeDialog(false);
-      
+
       // Save session to localStorage
       localStorage.setItem('teamup_game_id', data.id);
       localStorage.setItem('teamup_game_code', data.game_code);
@@ -292,11 +288,10 @@ const Index = () => {
         if (error) throw error;
         setGameId(data.id);
         setGameCode(newGameCode);
-        
+
         // Save session to localStorage
         localStorage.setItem('teamup_game_id', data.id);
         localStorage.setItem('teamup_game_code', newGameCode);
-        
         toast.success(`Game created! Code: ${newGameCode}`);
       }
       setActiveSection("players");
@@ -316,51 +311,40 @@ const Index = () => {
       teammatePairs
     };
     setGameConfig(updatedConfig);
-    
+
     // Identify matches to preserve: completed (with scores) + current matches (first without score on each court)
     const preservedMatches: Match[] = [];
     const courts = Array.from(new Set(matches.map(m => m.court)));
-    
     for (const court of courts) {
       const courtMatches = matches.filter(m => m.court === court);
-      
+
       // Add all completed matches (with scores)
       const completedMatches = courtMatches.filter(m => matchScores.has(m.id));
       preservedMatches.push(...completedMatches);
-      
+
       // Add current match (first without score)
       const currentMatchIndex = courtMatches.findIndex(m => !matchScores.has(m.id));
       if (currentMatchIndex >= 0) {
         preservedMatches.push(courtMatches[currentMatchIndex]);
       }
     }
-    
+
     // Find the earliest time slot to start regeneration from
     let regenerateFromTime = 0;
     if (preservedMatches.length > 0) {
       const maxPreservedEndTime = Math.max(...preservedMatches.map(m => m.endTime));
       regenerateFromTime = maxPreservedEndTime;
     }
-    
+
     // Generate new schedule
-    const newSchedule = generateSchedule(
-      playerList, 
-      gameConfig.gameDuration, 
-      gameConfig.totalTime, 
-      gameConfig.courts, 
-      undefined, 
-      teammatePairs, 
-      gameConfig.courtConfigs
-    );
-    
+    const newSchedule = generateSchedule(playerList, gameConfig.gameDuration, gameConfig.totalTime, gameConfig.courts, undefined, teammatePairs, gameConfig.courtConfigs);
+
     // Filter new schedule to only include matches after regeneration point
     const futureMatches = newSchedule.filter(m => m.startTime >= regenerateFromTime);
-    
+
     // Combine preserved matches with future matches
     const finalSchedule = [...preservedMatches, ...futureMatches];
-    
     setMatches(finalSchedule);
-    
     try {
       if (gameId) {
         const {
@@ -371,11 +355,8 @@ const Index = () => {
           game_config: updatedConfig as any
         }).eq('id', gameId);
         if (error) throw error;
-        
         const preservedCount = preservedMatches.length;
-        const message = preservedCount > 0 
-          ? `Players updated! ${preservedCount} match(es) preserved, future matches regenerated.`
-          : "Schedule generated!";
+        const message = preservedCount > 0 ? `Players updated! ${preservedCount} match(es) preserved, future matches regenerated.` : "Schedule generated!";
         toast.success(message);
       }
     } catch (error) {
@@ -390,7 +371,9 @@ const Index = () => {
     setPlayers(newPlayers);
     if (gameId) {
       try {
-        const { error } = await supabase.from('games').update({
+        const {
+          error
+        } = await supabase.from('games').update({
           matches: sanitized as any,
           players: newPlayers
         }).eq('id', gameId);
@@ -401,19 +384,18 @@ const Index = () => {
       }
     }
   };
-  
   const handleCourtConfigUpdate = async (courtConfigs: any[]) => {
     if (!gameConfig) return;
-    
     const updatedConfig = {
       ...gameConfig,
       courtConfigs
     };
     setGameConfig(updatedConfig);
-    
     if (gameId) {
       try {
-        const { error } = await supabase.from('games').update({
+        const {
+          error
+        } = await supabase.from('games').update({
           game_config: updatedConfig as any
         }).eq('id', gameId);
         if (error) throw error;
@@ -423,7 +405,6 @@ const Index = () => {
       }
     }
   };
-  
   const resetApp = () => {
     setActiveSection("setup");
     setPlayers([]);
@@ -434,12 +415,11 @@ const Index = () => {
     setSetupComplete(false);
     setShowGameCodeDialog(true);
   };
-
   const startNewSession = () => {
     // Clear localStorage
     localStorage.removeItem('teamup_game_id');
     localStorage.removeItem('teamup_game_code');
-    
+
     // Reset all state
     setActiveSection("setup");
     setPlayers([]);
@@ -450,7 +430,6 @@ const Index = () => {
     setSetupComplete(false);
     setMatchScores(new Map());
     setShowGameCodeDialog(false);
-    
     toast.success("New session started");
   };
   // Show loading state while restoring session
@@ -464,7 +443,6 @@ const Index = () => {
       </div>
     </div>;
   }
-
   return <div className="h-screen bg-gradient-to-br from-background via-secondary/30 to-accent/5 relative flex flex-col">
       {/* Decorative background elements */}
       <div className="absolute inset-0 opacity-5 pointer-events-none">
@@ -491,115 +469,61 @@ const Index = () => {
 
         <Card className="p-3 shadow-sport border-2 border-primary/10 backdrop-blur-sm bg-card/80 flex-1 flex flex-col min-h-0 mb-14">
           {activeSection === "setup" && <div className="flex flex-col h-full">
-              {gameId && (
-                <div className="flex justify-end mb-2">
-                  <Button 
-                    onClick={startNewSession} 
-                    variant="outline"
-                    size="sm"
-                    className="gap-1 h-8 text-xs"
-                  >
+              {gameId && <div className="flex justify-end mb-2">
+                  <Button onClick={startNewSession} variant="outline" size="sm" className="gap-1 h-8 text-xs">
                     New Session
                   </Button>
-                </div>
-              )}
+                </div>}
               <div className="flex-1 overflow-y-auto">
                 <GameSetup onComplete={handleGameConfigComplete} gameCode={gameCode} />
               </div>
               <div className="pt-3 border-t mt-3 flex-shrink-0 bg-card/95 backdrop-blur-sm">
-                <Button 
-                  onClick={handleGameConfigComplete.bind(null, gameConfig || { gameDuration: 10, totalTime: 60, courts: 2 })} 
-                  size="default" 
-                  className="w-full h-11 text-sm font-semibold bg-gradient-to-r from-primary to-accent text-white shadow-sport"
-                  disabled={!gameConfig}
-                >
-                  Continue
-                </Button>
+                
               </div>
             </div>}
           
-          {activeSection === "matches" && gameConfig && matches.length > 0 && (
-            <div className="flex flex-col h-full min-h-0">
+          {activeSection === "matches" && gameConfig && matches.length > 0 && <div className="flex flex-col h-full min-h-0">
               {/* View Toggle Header */}
               <div className="flex items-center justify-between mb-3 flex-shrink-0">
                 <div className="flex items-center gap-2">
-                  {isPlayerView && playerName ? (
-                    <>
+                  {isPlayerView && playerName ? <>
                       <UserCircle className="h-5 w-5 text-primary" />
                       <span className="text-sm font-medium">Playing as: <span className="text-primary font-bold">{playerName}</span></span>
-                    </>
-                  ) : (
-                    <>
+                    </> : <>
                       <Users className="h-5 w-5 text-muted-foreground" />
                       <span className="text-sm font-medium text-muted-foreground">Organizer View</span>
-                    </>
-                  )}
+                    </>}
                 </div>
-                <Button
-                  variant={isPlayerView ? "outline" : "default"}
-                  size="sm"
-                  onClick={() => {
-                    if (isPlayerView) {
-                      releaseIdentity();
-                      toast.success("Switched to organizer view");
-                    } else {
-                      setShowPlayerIdentitySelector(true);
-                    }
-                  }}
-                  className="gap-2"
-                >
-                  {isPlayerView ? (
-                    <>
+                <Button variant={isPlayerView ? "outline" : "default"} size="sm" onClick={() => {
+              if (isPlayerView) {
+                releaseIdentity();
+                toast.success("Switched to organizer view");
+              } else {
+                setShowPlayerIdentitySelector(true);
+              }
+            }} className="gap-2">
+                  {isPlayerView ? <>
                       <Users className="h-4 w-4" />
                       Organizer View
-                    </>
-                  ) : (
-                    <>
+                    </> : <>
                       <UserCircle className="h-4 w-4" />
                       Player View
-                    </>
-                  )}
+                    </>}
                 </Button>
               </div>
 
               {/* Conditional View Rendering */}
               <div className="flex-1 min-h-0 overflow-y-auto">
-                {isPlayerView && playerName ? (
-                  <MyMatchesView
-                    playerName={playerName}
-                    matchGroups={playerMatches}
-                    matchScores={matchScores}
-                    currentTime={currentTime}
-                    allMatches={matches}
-                  />
-                ) : (
-                  <ScheduleView
-                    matches={matches}
-                    onBack={resetApp}
-                    gameConfig={gameConfig}
-                    allPlayers={players}
-                    onScheduleUpdate={handleScheduleUpdate}
-                    matchScores={matchScores}
-                    onMatchScoresUpdate={setMatchScores}
-                    onCourtConfigUpdate={handleCourtConfigUpdate}
-                  />
-                )}
+                {isPlayerView && playerName ? <MyMatchesView playerName={playerName} matchGroups={playerMatches} matchScores={matchScores} currentTime={currentTime} allMatches={matches} /> : <ScheduleView matches={matches} onBack={resetApp} gameConfig={gameConfig} allPlayers={players} onScheduleUpdate={handleScheduleUpdate} matchScores={matchScores} onMatchScoresUpdate={setMatchScores} onCourtConfigUpdate={handleCourtConfigUpdate} />}
               </div>
-            </div>
-          )}
+            </div>}
 
           {/* Player Identity Selector Dialog */}
-          {showPlayerIdentitySelector && (
-            <PlayerIdentitySelector
-              players={players}
-              onSelect={async (name) => {
-                await claimIdentity(name);
-                setShowPlayerIdentitySelector(false);
-                toast.success(`You're now playing as ${name}!`);
-              }}
-              onCancel={() => setShowPlayerIdentitySelector(false)}
-            />
-          )}
+          {showPlayerIdentitySelector && <PlayerIdentitySelector players={players} onSelect={async name => {
+          await claimIdentity(name);
+          setShowPlayerIdentitySelector(false);
+          toast.success(`You're now playing as ${name}!`);
+        }} onCancel={() => setShowPlayerIdentitySelector(false)} />}
 
           {activeSection === "matches" && (!gameConfig || matches.length === 0) && <div className="text-center py-12">
               <p className="text-muted-foreground">Please complete game setup and add players first</p>
