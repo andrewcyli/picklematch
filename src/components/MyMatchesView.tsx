@@ -23,12 +23,24 @@ export const MyMatchesView = ({
   const [showLater, setShowLater] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
 
-  const renderMatch = (match: Match, status: "current" | "upnext" | "later" | "completed") => {
+  const renderMatch = (match: Match, status: "current" | "upnext" | "later" | "completed", matchIndex: number) => {
     const team1HasPlayer = match.team1.includes(playerName);
     const score = matchScores.get(match.id);
     const isWinner = score && 
       ((team1HasPlayer && score.team1 > score.team2) || 
        (!team1HasPlayer && score.team2 > score.team1));
+
+    // Calculate estimated start time for upcoming matches
+    const getEstimatedTime = () => {
+      if (status === "current" || status === "completed") return null;
+      
+      // Estimate 15 minutes per match
+      const minutesPerMatch = 15;
+      const estimatedMinutes = matchIndex * minutesPerMatch;
+      const estimatedTime = new Date(currentTime.getTime() + estimatedMinutes * 60000);
+      
+      return estimatedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
 
     return (
       <Card
@@ -46,9 +58,14 @@ export const MyMatchesView = ({
         <div className="space-y-3">
           {/* Header */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-              <span className="font-semibold">Court {match.court}</span>
+            <div className="flex items-center gap-3">
+              <Badge variant="outline" className="font-mono">
+                #{matchIndex + 1}
+              </Badge>
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <span className="font-semibold">Court {match.court}</span>
+              </div>
             </div>
             {status === "current" && (
               <Badge className="bg-green-500">Playing Now</Badge>
@@ -91,16 +108,16 @@ export const MyMatchesView = ({
           </div>
 
           {/* Time Info */}
-          {match.clockStartTime && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Clock className="h-3 w-3" />
-              <span>
-                {status === "completed"
-                  ? `Duration: ${match.clockStartTime}`
-                  : `Started: ${match.clockStartTime}`}
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Clock className="h-3 w-3" />
+            {status === "completed" && match.clockStartTime ? (
+              <span>Duration: {match.clockStartTime}</span>
+            ) : status === "current" && match.clockStartTime ? (
+              <span>Started: {match.clockStartTime}</span>
+            ) : getEstimatedTime() ? (
+              <span>Estimated: ~{getEstimatedTime()}</span>
+            ) : null}
+          </div>
         </div>
       </Card>
     );
@@ -128,7 +145,7 @@ export const MyMatchesView = ({
             <Users className="h-5 w-5 text-green-500" />
             Playing Now
           </h3>
-          {renderMatch(matchGroups.current, "current")}
+          {renderMatch(matchGroups.current, "current", 0)}
         </div>
       )}
 
@@ -139,7 +156,7 @@ export const MyMatchesView = ({
             <Clock className="h-5 w-5 text-yellow-500" />
             Up Next
           </h3>
-          {matchGroups.upNext.map((match) => renderMatch(match, "upnext"))}
+          {matchGroups.upNext.map((match, idx) => renderMatch(match, "upnext", idx + 1))}
         </div>
       )}
 
@@ -158,7 +175,9 @@ export const MyMatchesView = ({
           </Button>
           {showLater && (
             <div className="space-y-2">
-              {matchGroups.later.map((match) => renderMatch(match, "later"))}
+              {matchGroups.later.map((match, idx) => 
+                renderMatch(match, "later", matchGroups.upNext.length + idx + 1)
+              )}
             </div>
           )}
         </div>
@@ -179,7 +198,9 @@ export const MyMatchesView = ({
           </Button>
           {showCompleted && (
             <div className="space-y-2">
-              {matchGroups.completed.map((match) => renderMatch(match, "completed"))}
+              {matchGroups.completed.map((match, idx) => 
+                renderMatch(match, "completed", totalMatches - matchGroups.completed.length + idx)
+              )}
             </div>
           )}
         </div>
