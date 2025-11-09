@@ -738,8 +738,8 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                     const hasPending = pendingScores.has(match.id);
 
                     return (
-                      <CarouselItem key={match.id} className="pl-2 basis-[80%] sm:basis-[75%] md:basis-[80%]">
-                        <Card className={`p-2 transition-all max-w-full ${
+                      <CarouselItem key={match.id} className="pl-2 basis-[80%] sm:basis-[60%] md:basis-[45%] lg:basis-[35%]">
+                        <Card className={`p-2 transition-all max-w-full md:aspect-[5/3] md:max-h-[280px] ${
                           isCurrentMatch 
                             ? 'border-2 border-primary bg-primary/5 shadow-lg' 
                             : isNextMatch 
