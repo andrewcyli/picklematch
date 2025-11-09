@@ -788,9 +788,9 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                             </div>
 
                             {/* Team 1 */}
-                            <div className="flex items-center gap-2 p-1.5 rounded-lg bg-secondary/50">
+                            <div className="flex items-center gap-2 p-1.5 rounded-lg bg-primary/50">
                               <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                <Users className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                                <Users className="w-3.5 h-3.5 text-primary-foreground flex-shrink-0" />
                                 {editingMatch === match.id ? (
                                   <div className="flex-1 min-w-0 space-y-1">
                                     <Select
@@ -835,7 +835,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                                   </div>
                                 )}
                               </div>
-                              {isCurrentMatch ? (
+                              {isCurrentMatch || hasPending ? (
                                 <Input
                                   type="number"
                                   min="0"
@@ -872,75 +872,75 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                             </div>
 
                             {/* Team 2 */}
-                            <div className="flex items-center gap-2 p-1.5 rounded-lg bg-secondary/50">
-                              <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                <Users className="w-3.5 h-3.5 text-accent flex-shrink-0" />
-                                {editingMatch === match.id ? (
-                                  <div className="flex-1 min-w-0 space-y-1">
-                                    <Select
-                                      value={editedTeams.team2[0] || ""}
-                                      onValueChange={(v) => updateEditedPlayer('team2', 0, v)}
-                                    >
-                                      <SelectTrigger className="h-6 text-xs">
-                                        <SelectValue placeholder="Player 1" />
-                                      </SelectTrigger>
-                                      <SelectContent className="z-50">
-                                        {allPlayers
-                                          .filter((p) => p !== editedTeams.team2[1])
-                                          .map((p) => (
-                                            <SelectItem key={p} value={p}>{p}</SelectItem>
-                                          ))}
-                                      </SelectContent>
-                                    </Select>
-                                    {!match.isSingles && (
+                              <div className="flex items-center gap-2 p-1.5 rounded-lg bg-secondary/50">
+                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                  <Users className="w-3.5 h-3.5 text-accent flex-shrink-0" />
+                                  {editingMatch === match.id ? (
+                                    <div className="flex-1 min-w-0 space-y-1">
                                       <Select
-                                        value={editedTeams.team2[1] || ""}
-                                        onValueChange={(v) => updateEditedPlayer('team2', 1, v)}
+                                        value={editedTeams.team2[0] || ""}
+                                        onValueChange={(v) => updateEditedPlayer('team2', 0, v)}
                                       >
                                         <SelectTrigger className="h-6 text-xs">
-                                          <SelectValue placeholder="Player 2" />
+                                          <SelectValue placeholder="Player 1" />
                                         </SelectTrigger>
                                         <SelectContent className="z-50">
                                           {allPlayers
-                                            .filter((p) => p !== editedTeams.team2[0])
+                                            .filter((p) => p !== editedTeams.team2[1])
                                             .map((p) => (
                                               <SelectItem key={p} value={p}>{p}</SelectItem>
                                             ))}
                                         </SelectContent>
                                       </Select>
-                                    )}
+                                      {!match.isSingles && (
+                                        <Select
+                                          value={editedTeams.team2[1] || ""}
+                                          onValueChange={(v) => updateEditedPlayer('team2', 1, v)}
+                                        >
+                                          <SelectTrigger className="h-6 text-xs">
+                                            <SelectValue placeholder="Player 2" />
+                                          </SelectTrigger>
+                                          <SelectContent className="z-50">
+                                            {allPlayers
+                                              .filter((p) => p !== editedTeams.team2[0])
+                                              .map((p) => (
+                                                <SelectItem key={p} value={p}>{p}</SelectItem>
+                                              ))}
+                                          </SelectContent>
+                                        </Select>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div className="font-semibold text-xs min-w-0">
+                                      <div className="truncate">{match.team2[0]}</div>
+                                      {!match.isSingles && match.team2[1] && (
+                                        <div className="text-muted-foreground text-[10px] truncate">{match.team2[1]}</div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                                {isCurrentMatch || hasPending ? (
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    value={scores.team2}
+                                    onChange={(e) => updatePendingScore(match.id, "team2", e.target.value)}
+                                    placeholder="0"
+                                    className="w-12 h-8 text-center text-lg font-bold flex-shrink-0"
+                                    disabled={isCompleted && !hasPending}
+                                  />
+                                ) : confirmedScores ? (
+                                  <div className="w-12 h-8 flex items-center justify-center text-lg font-bold">
+                                    {confirmedScores.team2}
                                   </div>
                                 ) : (
-                                  <div className="font-semibold text-xs min-w-0">
-                                    <div className="truncate">{match.team2[0]}</div>
-                                    {!match.isSingles && match.team2[1] && (
-                                      <div className="text-muted-foreground text-[10px] truncate">{match.team2[1]}</div>
-                                    )}
+                                  <div className="w-12 h-8 flex items-center justify-center text-muted-foreground">
+                                    -
                                   </div>
                                 )}
                               </div>
-                              {isCurrentMatch ? (
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  value={scores.team2}
-                                  onChange={(e) => updatePendingScore(match.id, "team2", e.target.value)}
-                                  placeholder="0"
-                                  className="w-12 h-8 text-center text-lg font-bold flex-shrink-0"
-                                  disabled={isCompleted && !hasPending}
-                                />
-                              ) : confirmedScores ? (
-                                <div className="w-12 h-8 flex items-center justify-center text-lg font-bold">
-                                  {confirmedScores.team2}
-                                </div>
-                              ) : (
-                                <div className="w-12 h-8 flex items-center justify-center text-muted-foreground">
-                                  -
-                                </div>
-                              )}
-                            </div>
 
-                            {/* Timer and Action Buttons for Current Match */}
+                            {/* Timer and Action Buttons */}
                             {isCurrentMatch && (
                               <div className="space-y-1">
                                 {/* Stopwatch */}
@@ -992,6 +992,29 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                                   </>
                                 )}
                               </div>
+                            )}
+                            
+                            {/* Edit Score Button for Completed Matches */}
+                            {!isCurrentMatch && isCompleted && !hasPending && (
+                              <Button 
+                                onClick={() => editScore(match.id)}
+                                variant="outline"
+                                className="w-full h-7 text-xs mt-2"
+                                size="sm"
+                              >
+                                Edit Score
+                              </Button>
+                            )}
+                            
+                            {/* Save Score Button for Past Matches Being Edited */}
+                            {!isCurrentMatch && hasPending && (
+                              <Button 
+                                onClick={() => confirmScore(match.id)}
+                                className="w-full h-7 text-xs mt-2"
+                                size="sm"
+                              >
+                                Save Score
+                              </Button>
                             )}
                           </div>
                         </Card>
