@@ -441,40 +441,41 @@ const Index = () => {
     </div>;
   }
 
-  return <div className="min-h-screen bg-gradient-to-br from-background via-secondary/30 to-accent/5 pb-24 relative overflow-hidden">
+  return <div className="h-screen bg-gradient-to-br from-background via-secondary/30 to-accent/5 relative overflow-hidden flex flex-col">
       {/* Decorative background elements */}
       <div className="absolute inset-0 opacity-5 pointer-events-none">
         <div className="absolute top-20 right-10 w-64 h-64 bg-primary rounded-full blur-3xl"></div>
         <div className="absolute bottom-20 left-10 w-96 h-96 bg-accent rounded-full blur-3xl"></div>
       </div>
       
-      <div className="max-w-5xl mx-auto p-2 sm:p-4 relative z-10">
-        <header className="text-center mb-4 sm:mb-6">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary via-primary to-accent flex items-center justify-center shadow-sport">
-              <Trophy className="w-6 h-6 text-white drop-shadow-lg" />
+      <div className="max-w-5xl mx-auto p-2 w-full relative z-10 flex flex-col h-full">
+        <header className="text-center py-2 flex-shrink-0">
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary via-primary to-accent flex items-center justify-center shadow-sport">
+              <Trophy className="w-5 h-5 text-white drop-shadow-lg" />
             </div>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold mb-1 bg-clip-text text-transparent bg-gradient-to-r from-primary via-accent to-primary bg-[length:200%_auto] animate-[gradient_6s_linear_infinite]">
+          <h1 className="text-xl sm:text-2xl font-bold mb-0.5 bg-clip-text text-transparent bg-gradient-to-r from-primary via-accent to-primary bg-[length:200%_auto] animate-[gradient_6s_linear_infinite]">
             TeamUp! Social Play
           </h1>
-          <p className="text-muted-foreground text-sm sm:text-base font-medium">
+          <p className="text-muted-foreground text-xs sm:text-sm font-medium">
             🎾 Smart team assignment & scoring 🏓
           </p>
         </header>
 
         <GameCodeDialog open={showGameCodeDialog} onOpenChange={setShowGameCodeDialog} onJoinGame={joinExistingGame} onCreateGame={createNewGame} />
 
-        <Card className="p-3 sm:p-4 shadow-sport border-2 border-primary/10 min-h-[60vh] backdrop-blur-sm bg-card/80">
-          {activeSection === "setup" && <div className="space-y-6">
-              <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold text-foreground mb-2">Game Setup</h2>
-                <p className="text-muted-foreground">Configure your game settings</p>
+        <Card className="p-2 sm:p-3 shadow-sport border-2 border-primary/10 backdrop-blur-sm bg-card/80 flex-1 overflow-y-auto mb-12">
+          {activeSection === "setup" && <div className="space-y-3">
+              <div className="text-center mb-3">
+                <h2 className="text-lg font-bold text-foreground mb-1">Game Setup</h2>
+                <p className="text-xs text-muted-foreground">Configure your game settings</p>
                 {gameId && (
-                  <div className="mt-4">
+                  <div className="mt-2">
                     <Button 
                       onClick={startNewSession} 
                       variant="outline"
+                      size="sm"
                       className="gap-2"
                     >
                       Start New Session

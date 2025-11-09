@@ -656,37 +656,45 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
 // }, []);
 
   return (
-    <div className="pb-20 max-h-[calc(100vh-3rem)] overflow-y-auto">
+    <div className="h-full overflow-y-auto">
       {/* Header */}
-      <div className="sticky top-0 bg-background/95 backdrop-blur-sm z-10 pb-2 border-b mb-3">
-        <div className="flex items-center gap-2 px-2 pt-2">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
-            <Trophy className="w-4 h-4 text-primary-foreground" />
+      <div className="sticky top-0 bg-background/95 backdrop-blur-sm z-10 pb-1 border-b mb-2">
+        <div className="flex items-center gap-2 px-2 pt-1">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
+            <Trophy className="w-3.5 h-3.5 text-primary-foreground" />
           </div>
           <div>
-            <h2 className="text-base sm:text-lg font-bold text-foreground">Match Schedule</h2>
-            <p className="text-[10px] sm:text-xs text-muted-foreground">{matches.length} matches • {allPlayers.length} players</p>
+            <h2 className="text-sm sm:text-base font-bold text-foreground">Match Schedule</h2>
+            <p className="text-[9px] sm:text-[10px] text-muted-foreground">{matches.length} matches • {allPlayers.length} players</p>
           </div>
         </div>
       </div>
 
       {/* Courts Grid - Vertical layout with Court A above Court B */}
-      <div className="grid grid-cols-1 gap-4 px-2">
+      <div className="grid grid-cols-1 gap-2 px-2 pb-2">
         {courtConfigs.map((courtConfig) => {
           const courtMatches = matches.filter(m => m.court === courtConfig.courtNumber);
           const currentMatchIndex = courtMatches.findIndex(m => !matchScores.has(m.id));
 
           return (
             <div key={courtConfig.courtNumber} className="space-y-2">
-              {/* Court Header */}
-              <div className="flex items-center justify-between gap-2">
-                <Badge className="bg-primary/20 text-primary text-sm px-2 py-1">
-                  Court {String.fromCharCode(64 + courtConfig.courtNumber)}
-                </Badge>
+              {/* Court Header - Compact */}
+              <div className="flex items-center justify-between gap-2 bg-gradient-to-r from-primary/10 to-accent/10 rounded-lg p-2 border border-primary/20">
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-primary/20 text-primary text-xs px-1.5 py-0.5">
+                    Court {String.fromCharCode(64 + courtConfig.courtNumber)}
+                  </Badge>
+                  <span className="text-[10px] text-muted-foreground">
+                    {currentMatchIndex >= 0 
+                      ? `${currentMatchIndex + 1}/${courtMatches.length}`
+                      : `${courtMatches.length} matches`
+                    }
+                  </span>
+                </div>
                 
                 <div className="flex items-center gap-2">
                   {/* Singles/Doubles Toggle */}
-                  <div className="flex items-center gap-1.5 p-1.5 rounded-lg border bg-card text-xs">
+                  <div className="flex items-center gap-1 p-1 rounded-lg border bg-card text-[10px]">
                     <span className={courtConfig.type === 'doubles' ? 'text-foreground font-medium' : 'text-muted-foreground'}>
                       Doubles
                     </span>
@@ -707,19 +715,19 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                       onClick={() => scrollToCurrentMatch(courtConfig.courtNumber)}
                       variant="outline"
                       size="sm"
-                      className="gap-1 h-8 text-xs"
+                      className="gap-1 h-6 text-[10px] px-2"
                     >
-                      <Target className="w-3 h-3" />
+                      <Target className="w-2.5 h-2.5" />
                       Current
                     </Button>
                   )}
                 </div>
               </div>
 
-              {/* Carousel - Compact height for better fit */}
+              {/* Carousel - Optimized for viewport */}
               <Carousel
                 opts={{ align: "start", loop: false }}
-                className="w-full max-h-[calc(100vh-200px)]"
+                className="w-full"
                 setApi={(api) => {
                   if (api) {
                     setCarouselApis(prev => new Map(prev).set(courtConfig.courtNumber, api));
@@ -739,7 +747,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
 
                     return (
                       <CarouselItem key={match.id} className="pl-2 basis-[80%] sm:basis-[60%] md:basis-[45%] lg:basis-[35%]">
-                        <Card className={`p-2 transition-all max-w-full md:aspect-[5/3] md:max-h-[280px] ${
+                        <Card className={`p-1.5 transition-all max-w-full md:aspect-[5/3] md:max-h-[220px] ${
                           isCurrentMatch 
                             ? 'border-2 border-primary bg-primary/5 shadow-lg' 
                             : isNextMatch 
