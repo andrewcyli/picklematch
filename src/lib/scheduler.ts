@@ -15,6 +15,8 @@ export interface Match {
   actualEndTime?: number;
   isSingles?: boolean;
   isLocked?: boolean;
+  timerStartTime?: number;
+  elapsedTime?: string;
 }
 
 export interface CourtConfig {

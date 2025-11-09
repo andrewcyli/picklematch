@@ -47,6 +47,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
   const [editingMatch, setEditingMatch] = useState<string | null>(null);
   const [editedTeams, setEditedTeams] = useState<{ team1: string[]; team2: string[] }>({ team1: [], team2: [] });
   const [matchStartTimes, setMatchStartTimes] = useState<Map<string, number>>(new Map());
+  const [courtTimers, setCourtTimers] = useState<Map<number, { startTime: number; matchId: string }>>(new Map());
 
   // Helper to normalize scores to numbers
   const normalizeScore = (score: { team1: number | string; team2: number | string } | undefined) => {
@@ -66,15 +67,66 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     return null;
   }, [matches, matchScores]);
 
-  // Track when matches become current and start stopwatches
-  useEffect(() => {
-    if (currentMatch && !matchStartTimes.has(currentMatch)) {
-      setMatchStartTimes(prev => new Map(prev).set(currentMatch, Date.now()));
-    }
-  }, [currentMatch, matchStartTimes]);
+  // Get current matches per court (first unscored match on each court)
+  const currentMatchesPerCourt = useMemo(() => {
+    const matchMap = new Map<number, Match>();
+    matches.forEach(match => {
+      if (!matchScores.has(match.id) && !matchMap.has(match.court)) {
+        matchMap.set(match.court, match);
+      }
+    });
+    return matchMap;
+  }, [matches, matchScores]);
 
-  // Stopwatch hook for current match
-  const { formattedTime, reset: resetStopwatch } = useStopwatch(!!currentMatch);
+  // Initialize or restore timers from database when matches change
+  useEffect(() => {
+    currentMatchesPerCourt.forEach((match, court) => {
+      // Check if this match already has a timer in the database
+      if (match.timerStartTime && !courtTimers.has(court)) {
+        // Restore timer from database
+        setCourtTimers(prev => new Map(prev).set(court, {
+          startTime: match.timerStartTime,
+          matchId: match.id
+        }));
+      } else if (!match.timerStartTime && !courtTimers.has(court)) {
+        // Start new timer and save to database
+        const startTime = Date.now();
+        setCourtTimers(prev => new Map(prev).set(court, {
+          startTime,
+          matchId: match.id
+        }));
+        
+        // Save timer start to database
+        const updatedMatches = matches.map(m => 
+          m.id === match.id ? { ...m, timerStartTime: startTime } : m
+        );
+        onScheduleUpdate(updatedMatches, allPlayers);
+      }
+    });
+  }, [currentMatchesPerCourt, matches]);
+
+  // Calculate elapsed time for each court
+  const [courtElapsedTimes, setCourtElapsedTimes] = useState<Map<number, number>>(new Map());
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const newElapsedTimes = new Map<number, number>();
+      courtTimers.forEach((timer, court) => {
+        const elapsed = Math.floor((Date.now() - timer.startTime) / 1000);
+        newElapsedTimes.set(court, elapsed);
+      });
+      setCourtElapsedTimes(newElapsedTimes);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [courtTimers]);
+
+  // Format time helper
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const updatePendingScore = (matchId: string, team: "team1" | "team2", value: string) => {
     // Allow empty string for partial input
@@ -217,15 +269,22 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     const team1Score = typeof pending.team1 === 'number' ? pending.team1 : Number(pending.team1);
     const team2Score = typeof pending.team2 === 'number' ? pending.team2 : Number(pending.team2);
 
+    const match = matches.find(m => m.id === matchId);
+    const wasAlreadyScored = matchScores.has(matchId);
+
     // Update scores state
     const newScores = new Map(matchScores);
     newScores.set(matchId, { team1: team1Score, team2: team2Score });
     onMatchScoresUpdate(newScores);
     
+    // Get elapsed time for this court
+    const elapsedTime = match ? courtElapsedTimes.get(match.court) || 0 : 0;
+    const formattedElapsedTime = formatTime(elapsedTime);
+    
     // Update ALL matches to include ALL scores (both new and existing)
     const updatedMatches = matches.map(m => {
       if (m.id === matchId) {
-        return { ...m, score: { team1: team1Score, team2: team2Score }, clockStartTime: formattedTime };
+        return { ...m, score: { team1: team1Score, team2: team2Score }, elapsedTime: formattedElapsedTime };
       }
       // Preserve existing scores using the latest scores map
       const existingScore = newScores.get(m.id);
@@ -242,58 +301,55 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     newPending.delete(matchId);
     setPendingScores(newPending);
 
-    // Reset stopwatch when score is confirmed
-    resetStopwatch();
-
-    const completedMatchRef = matches.find(m => m.id === matchId);
-    const actualEndTime = completedMatchRef ? completedMatchRef.endTime : 0;
-    checkScheduleAdjustment(matchId, actualEndTime, newScores);
-    // Check for player conflicts in current matches
-    checkPlayerConflicts(newScores);
-    
-    // Auto-scroll to next match on the same court
-    const match = matches.find(m => m.id === matchId);
-    if (match) {
-      setTimeout(() => {
-        const courtMatches = matches.filter(m => m.court === match.court);
-        const nextMatchIndex = courtMatches.findIndex(m => !newScores.has(m.id));
-        const api = carouselApis.get(match.court);
-        
-        if (api && nextMatchIndex >= 0) {
-          api.scrollTo(nextMatchIndex, true);
+    // Reset court timer when score is confirmed for current match (not when editing past scores)
+    if (match && !wasAlreadyScored) {
+      const newCourtTimers = new Map(courtTimers);
+      newCourtTimers.delete(match.court);
+      setCourtTimers(newCourtTimers);
+      
+      // Clear timerStartTime from the completed match
+      const clearedMatches = updatedMatches.map(m => {
+        if (m.id === matchId) {
+          const { timerStartTime, ...rest } = m;
+          return rest as Match;
         }
-      }, 100);
+        return m;
+      });
+      onScheduleUpdate(clearedMatches, allPlayers);
+    }
+
+    // Only check conflicts and schedule adjustments for newly completed matches, not edited ones
+    if (!wasAlreadyScored) {
+      const completedMatchRef = matches.find(m => m.id === matchId);
+      const actualEndTime = completedMatchRef ? completedMatchRef.endTime : 0;
+      checkScheduleAdjustment(matchId, actualEndTime, newScores);
+      checkPlayerConflicts(newScores);
+      
+      // Auto-scroll to next match on the same court
+      if (match) {
+        setTimeout(() => {
+          const courtMatches = matches.filter(m => m.court === match.court);
+          const nextMatchIndex = courtMatches.findIndex(m => !newScores.has(m.id));
+          const api = carouselApis.get(match.court);
+          
+          if (api && nextMatchIndex >= 0) {
+            api.scrollTo(nextMatchIndex, true);
+          }
+        }, 100);
+      }
     }
     
-    toast({ title: "Score confirmed" });
+    toast({ title: wasAlreadyScored ? "Score updated" : "Score confirmed" });
   };
 
   const editScore = (matchId: string) => {
     const current = matchScores.get(matchId);
     if (current) {
+      // Just move score to pending without removing it from matchScores
+      // This keeps the match as "completed" and doesn't trigger conflict checks
       const newPending = new Map(pendingScores);
       newPending.set(matchId, current);
       setPendingScores(newPending);
-      
-      const newScores = new Map(matchScores);
-      newScores.delete(matchId);
-      onMatchScoresUpdate(newScores);
-      
-      // Update matches to remove the score
-      const updatedMatches = matches.map(m => {
-        if (m.id === matchId) {
-          const { score, ...rest } = m;
-          return rest as Match;
-        }
-        // Preserve other scores
-        const existingScore = matchScores.get(m.id);
-        if (existingScore && m.id !== matchId) {
-          return { ...m, score: existingScore };
-        }
-        return m;
-      });
-      
-      onScheduleUpdate(updatedMatches, allPlayers);
     }
   };
 
@@ -780,10 +836,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                               </Badge>
                               <Badge variant="outline" className="text-[10px] py-0">
                                 <Clock className="w-2.5 h-2.5 mr-0.5" />
-                                {isCurrentMatch 
-                                  ? `${match.clockStartTime || new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
-                                  : `${match.clockStartTime || new Date(Date.now() + match.startTime * 60000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
-                                }
+                                {match.elapsedTime || `${new Date(Date.now() + match.startTime * 60000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`}
                               </Badge>
                             </div>
 
@@ -946,7 +999,9 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
                                 {/* Stopwatch */}
                                 <div className="flex items-center justify-center gap-1.5 py-0.5 px-2 rounded-lg bg-primary/10 border border-primary/20">
                                   <Timer className="w-3 h-3 text-primary animate-pulse" />
-                                  <span className="text-xs font-bold text-primary">{formattedTime}</span>
+                                  <span className="text-xs font-bold text-primary">
+                                    {formatTime(courtElapsedTimes.get(match.court) || 0)}
+                                  </span>
                                 </div>
                                 
                                 {editingMatch === match.id ? (
