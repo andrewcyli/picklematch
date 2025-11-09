@@ -121,6 +121,10 @@ export const PlayerSetup = ({
         </Button>
       </div>
 
+      <Button onClick={() => onComplete(players, teammatePairs)} disabled={players.length < 2} size="lg" className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-accent text-white shadow-sport">
+        {hasStartedMatches ? "Update Matches" : "Continue to Matches"} ({players.length} players)
+      </Button>
+
       <div className="text-sm text-muted-foreground">
         {players.length} players added
       </div>
@@ -156,9 +160,5 @@ export const PlayerSetup = ({
               </Button>
             </div>)}
         </div>}
-
-      <Button onClick={() => onComplete(players, teammatePairs)} disabled={players.length < 2} size="lg" className="w-full h-14 text-lg font-semibold">
-        {hasStartedMatches ? "Update Matches" : "Continue to Matches"} ({players.length} players)
-      </Button>
     </div>;
 };
