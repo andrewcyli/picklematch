@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Match, regenerateScheduleFromSlot, CourtConfig } from "@/lib/scheduler";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -12,6 +12,7 @@ import { CompletedMatchCard } from "./match-cards/CompletedMatchCard";
 import { FutureMatchCard } from "./match-cards/FutureMatchCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 
 interface ScheduleViewProps {
   matches: Match[];
@@ -41,6 +42,7 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
   const [editedTeams, setEditedTeams] = useState<{ team1: string[]; team2: string[] }>({ team1: [], team2: [] });
   const [matchStartTimes, setMatchStartTimes] = useState<Map<string, number>>(new Map());
   const [expandedCourts, setExpandedCourts] = useState<Map<number, { completed: boolean; future: boolean }>>(new Map());
+  const carouselApiRef = useRef<any>(null);
 
   // Helper to normalize scores to numbers
   const normalizeScore = (score: { team1: number | string; team2: number | string } | undefined) => {
@@ -244,6 +246,21 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
     checkScheduleAdjustment(matchId, actualEndTime, newScores);
     // Check for player conflicts in current matches
     checkPlayerConflicts(newScores);
+    
+    // Scroll to next unplayed match
+    setTimeout(() => {
+      if (carouselApiRef.current) {
+        const unplayedMatches = matches.filter(m => !newScores.has(m.id));
+        if (unplayedMatches.length > 0) {
+          const nextCourtNumber = unplayedMatches[0].court;
+          const courtsWithMatches = courtConfigs.filter(cc => matches.filter(m => m.court === cc.courtNumber).length > 0);
+          const slideIndex = courtsWithMatches.findIndex(cc => cc.courtNumber === nextCourtNumber);
+          if (slideIndex >= 0) {
+            carouselApiRef.current.scrollTo(slideIndex);
+          }
+        }
+      }
+    }, 100);
     
     toast({ title: "Score confirmed" });
   };
@@ -634,122 +651,166 @@ export const ScheduleView = ({ matches, onBack, gameConfig, allPlayers, onSchedu
         </div>
       </div>
 
-      {/* Courts Grid - Optimized for no scrolling */}
-      <div className={`flex-1 overflow-y-auto px-2 sm:px-4 pt-4 grid gap-4 ${gameConfig.courts === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
-        {courtConfigs.map((courtConfig) => {
-          const courtMatches = matches.filter(m => m.court === courtConfig.courtNumber);
-          const currentMatchIndex = courtMatches.findIndex(m => !matchScores.has(m.id));
-          const currentMatch = currentMatchIndex >= 0 ? courtMatches[currentMatchIndex] : null;
-          const nextMatch = currentMatchIndex >= 0 && currentMatchIndex + 1 < courtMatches.length ? courtMatches[currentMatchIndex + 1] : null;
-          const completedMatches = courtMatches.filter((m, idx) => idx < currentMatchIndex);
-          const futureMatches = courtMatches.filter((m, idx) => idx > currentMatchIndex + 1);
-          const expanded = expandedCourts.get(courtConfig.courtNumber) || { completed: false, future: false };
+      {/* Carousel for Current/Next Matches */}
+      <div className="flex-shrink-0 px-2 sm:px-4 pt-4">
+        <Carousel
+          opts={{
+            align: "start",
+            loop: false,
+          }}
+          className="w-full"
+          setApi={(api) => { carouselApiRef.current = api; }}
+        >
+          <CarouselContent className="-ml-2 md:-ml-4">
+            {courtConfigs.filter(courtConfig => {
+              const courtMatches = matches.filter(m => m.court === courtConfig.courtNumber);
+              return courtMatches.length > 0;
+            }).map((courtConfig) => {
+              const courtMatches = matches.filter(m => m.court === courtConfig.courtNumber);
+              const currentMatchIndex = courtMatches.findIndex(m => !matchScores.has(m.id));
+              const currentMatch = currentMatchIndex >= 0 ? courtMatches[currentMatchIndex] : null;
+              const nextMatch = currentMatchIndex >= 0 && currentMatchIndex + 1 < courtMatches.length ? courtMatches[currentMatchIndex + 1] : null;
 
-          return (
-            <div key={courtConfig.courtNumber} className="space-y-3">
-              {/* Court Header */}
-              <div className="flex items-center justify-between gap-2">
-                <Badge className="bg-primary/20 text-primary text-sm px-3 py-1">
-                  Court {String.fromCharCode(64 + courtConfig.courtNumber)}
+              return (
+                <CarouselItem key={courtConfig.courtNumber} className={`pl-2 md:pl-4 ${gameConfig.courts === 1 ? 'basis-full' : 'basis-full md:basis-1/2'}`}>
+                  <div className="space-y-3">
+                    {/* Court Header */}
+                    <div className="flex items-center justify-between gap-2">
+                      <Badge className="bg-primary/20 text-primary text-sm px-3 py-1">
+                        Court {String.fromCharCode(64 + courtConfig.courtNumber)}
+                      </Badge>
+                      
+                      {/* Singles/Doubles Toggle */}
+                      <div className="flex items-center gap-1.5 p-1.5 rounded-lg border bg-card text-xs">
+                        <span className={courtConfig.type === 'doubles' ? 'text-foreground font-medium' : 'text-muted-foreground'}>
+                          Doubles
+                        </span>
+                        <Switch
+                          checked={courtConfig.type === 'singles'}
+                          onCheckedChange={() => toggleCourtType(courtConfig.courtNumber)}
+                          disabled={matchScores.size > 0}
+                          className="scale-75"
+                        />
+                        <span className={courtConfig.type === 'singles' ? 'text-foreground font-medium' : 'text-muted-foreground'}>
+                          Singles
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Current Match */}
+                    {currentMatch && (
+                      <CurrentMatchCard
+                        match={currentMatch}
+                        matchNumber={`${String.fromCharCode(64 + courtConfig.courtNumber)}${currentMatchIndex + 1}`}
+                        scores={pendingScores.get(currentMatch.id) || matchScores.get(currentMatch.id) || { team1: '', team2: '' }}
+                        formattedTime={formattedTime}
+                        isEditing={editingMatch === currentMatch.id}
+                        editedTeams={editedTeams}
+                        allPlayers={allPlayers}
+                        onUpdateScore={(team, value) => updatePendingScore(currentMatch.id, team, value)}
+                        onConfirmScore={() => confirmScore(currentMatch.id)}
+                        onStartEdit={() => startEditingPlayers(currentMatch.id)}
+                        onUpdatePlayer={updateEditedPlayer}
+                        onSaveEdit={saveEditedPlayers}
+                        onCancelEdit={cancelEditingPlayers}
+                        compact={gameConfig.courts > 1}
+                      />
+                    )}
+
+                    {/* Up Next Match */}
+                    {nextMatch && (
+                      <UpNextMatchCard
+                        match={nextMatch}
+                        matchNumber={`${String.fromCharCode(64 + courtConfig.courtNumber)}${currentMatchIndex + 2}`}
+                        compact={gameConfig.courts > 1}
+                      />
+                    )}
+
+                    {!currentMatch && !nextMatch && (
+                      <div className="text-center py-4 text-sm text-muted-foreground border border-dashed rounded-lg">
+                        All matches completed! 🎉
+                      </div>
+                    )}
+                  </div>
+                </CarouselItem>
+              );
+            })}
+          </CarouselContent>
+          {gameConfig.courts > 1 && (
+            <>
+              <CarouselPrevious className="hidden md:flex" />
+              <CarouselNext className="hidden md:flex" />
+            </>
+          )}
+        </Carousel>
+      </div>
+
+      {/* Completed and Future Matches - Collapsible Sections */}
+      <div className="flex-1 overflow-y-auto px-2 sm:px-4 pt-4 pb-4">
+        <div className={`grid gap-4 ${gameConfig.courts === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
+          {courtConfigs.filter(courtConfig => {
+            const courtMatches = matches.filter(m => m.court === courtConfig.courtNumber);
+            return courtMatches.length > 0;
+          }).map((courtConfig) => {
+            const courtMatches = matches.filter(m => m.court === courtConfig.courtNumber);
+            const currentMatchIndex = courtMatches.findIndex(m => !matchScores.has(m.id));
+            const completedMatches = courtMatches.filter((m, idx) => idx < currentMatchIndex);
+            const futureMatches = courtMatches.filter((m, idx) => idx > currentMatchIndex + 1);
+            const expanded = expandedCourts.get(courtConfig.courtNumber) || { completed: false, future: false };
+
+            return (
+              <div key={`history-${courtConfig.courtNumber}`} className="space-y-3">
+                <Badge variant="outline" className="text-xs">
+                  Court {String.fromCharCode(64 + courtConfig.courtNumber)} History
                 </Badge>
-                
-                {/* Singles/Doubles Toggle */}
-                <div className="flex items-center gap-1.5 p-1.5 rounded-lg border bg-card text-xs">
-                  <span className={courtConfig.type === 'doubles' ? 'text-foreground font-medium' : 'text-muted-foreground'}>
-                    Doubles
-                  </span>
-                  <Switch
-                    checked={courtConfig.type === 'singles'}
-                    onCheckedChange={() => toggleCourtType(courtConfig.courtNumber)}
-                    disabled={matchScores.size > 0}
-                    className="scale-75"
-                  />
-                  <span className={courtConfig.type === 'singles' ? 'text-foreground font-medium' : 'text-muted-foreground'}>
-                    Singles
-                  </span>
-                </div>
+
+                {/* Completed Matches */}
+                {completedMatches.length > 0 && (
+                  <Collapsible open={expanded.completed} onOpenChange={() => toggleCourtSection(courtConfig.courtNumber, 'completed')}>
+                    <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Completed ({completedMatches.length})
+                      </span>
+                      <ChevronDown className={`w-4 h-4 transition-transform ${expanded.completed ? 'rotate-180' : ''}`} />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-2 pt-2">
+                      {completedMatches.map((match, idx) => (
+                        <CompletedMatchCard
+                          key={match.id}
+                          match={match}
+                          matchNumber={`${String.fromCharCode(64 + courtConfig.courtNumber)}${idx + 1}`}
+                          scores={matchScores.get(match.id)!}
+                          onEditScore={() => editScore(match.id)}
+                        />
+                      ))}
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+
+                {/* Future Matches */}
+                {futureMatches.length > 0 && (
+                  <Collapsible open={expanded.future} onOpenChange={() => toggleCourtSection(courtConfig.courtNumber, 'future')}>
+                    <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Upcoming ({futureMatches.length})
+                      </span>
+                      <ChevronDown className={`w-4 h-4 transition-transform ${expanded.future ? 'rotate-180' : ''}`} />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-2 pt-2">
+                      {futureMatches.map((match, idx) => (
+                        <FutureMatchCard
+                          key={match.id}
+                          match={match}
+                          matchNumber={`${String.fromCharCode(64 + courtConfig.courtNumber)}${currentMatchIndex + idx + 3}`}
+                        />
+                      ))}
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
               </div>
-
-              {/* Current Match - Prominent Display */}
-              {currentMatch && (
-                <CurrentMatchCard
-                  match={currentMatch}
-                  matchNumber={`${String.fromCharCode(64 + courtConfig.courtNumber)}${currentMatchIndex + 1}`}
-                  scores={pendingScores.get(currentMatch.id) || matchScores.get(currentMatch.id) || { team1: '', team2: '' }}
-                  formattedTime={formattedTime}
-                  isEditing={editingMatch === currentMatch.id}
-                  editedTeams={editedTeams}
-                  allPlayers={allPlayers}
-                  onUpdateScore={(team, value) => updatePendingScore(currentMatch.id, team, value)}
-                  onConfirmScore={() => confirmScore(currentMatch.id)}
-                  onStartEdit={() => startEditingPlayers(currentMatch.id)}
-                  onUpdatePlayer={updateEditedPlayer}
-                  onSaveEdit={saveEditedPlayers}
-                  onCancelEdit={cancelEditingPlayers}
-                />
-              )}
-
-              {/* Up Next Match */}
-              {nextMatch && (
-                <UpNextMatchCard
-                  match={nextMatch}
-                  matchNumber={`${String.fromCharCode(64 + courtConfig.courtNumber)}${currentMatchIndex + 2}`}
-                />
-              )}
-
-              {/* Completed Matches - Collapsible */}
-              {completedMatches.length > 0 && (
-                <Collapsible open={expanded.completed} onOpenChange={() => toggleCourtSection(courtConfig.courtNumber, 'completed')}>
-                  <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                    <span className="text-sm font-medium text-muted-foreground">
-                      Completed ({completedMatches.length})
-                    </span>
-                    <ChevronDown className={`w-4 h-4 transition-transform ${expanded.completed ? 'rotate-180' : ''}`} />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-2 pt-2">
-                    {completedMatches.map((match, idx) => (
-                      <CompletedMatchCard
-                        key={match.id}
-                        match={match}
-                        matchNumber={`${String.fromCharCode(64 + courtConfig.courtNumber)}${idx + 1}`}
-                        scores={matchScores.get(match.id)!}
-                        onEditScore={() => editScore(match.id)}
-                      />
-                    ))}
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-
-              {/* Future Matches - Collapsible */}
-              {futureMatches.length > 0 && (
-                <Collapsible open={expanded.future} onOpenChange={() => toggleCourtSection(courtConfig.courtNumber, 'future')}>
-                  <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                    <span className="text-sm font-medium text-muted-foreground">
-                      Upcoming ({futureMatches.length})
-                    </span>
-                    <ChevronDown className={`w-4 h-4 transition-transform ${expanded.future ? 'rotate-180' : ''}`} />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-2 pt-2">
-                    {futureMatches.map((match, idx) => (
-                      <FutureMatchCard
-                        key={match.id}
-                        match={match}
-                        matchNumber={`${String.fromCharCode(64 + courtConfig.courtNumber)}${currentMatchIndex + idx + 3}`}
-                      />
-                    ))}
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-
-              {/* No matches message */}
-              {courtMatches.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground text-sm">
-                  No matches scheduled for this court
-                </div>
-              )}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );

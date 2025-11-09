@@ -465,7 +465,7 @@ const Index = () => {
 
         <GameCodeDialog open={showGameCodeDialog} onOpenChange={setShowGameCodeDialog} onJoinGame={joinExistingGame} onCreateGame={createNewGame} />
 
-        <Card className="p-6 sm:p-8 md:p-10 shadow-sport border-2 border-primary/10 backdrop-blur-sm bg-card/80 flex flex-col h-[calc(100vh-20rem)]">
+        <Card className="p-6 sm:p-8 md:p-10 shadow-sport border-2 border-primary/10 backdrop-blur-sm bg-card/80 flex flex-col h-[calc(100vh-20rem)] pb-20">
           {activeSection === "setup" && <div className="space-y-6 overflow-y-auto">
               <div className="text-center mb-6">
                 <h2 className="text-2xl font-bold text-foreground mb-2">Game Setup</h2>
