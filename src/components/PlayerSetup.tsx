@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { X, Plus, Users, Link2 } from "lucide-react";
+import { X, Plus, Users, Link2, Unlink } from "lucide-react";
 import { toast } from "sonner";
 import { Match } from "@/lib/scheduler";
 import { validatePlayerName } from "@/lib/validation";
@@ -98,6 +98,19 @@ export const PlayerSetup = ({
   const isPaired = (player: string) => {
     return teammatePairs.some(pair => pair.player1 === player || pair.player2 === player);
   };
+
+  const getPairPartner = (player: string) => {
+    const pair = teammatePairs.find(p => p.player1 === player || p.player2 === player);
+    if (!pair) return null;
+    return pair.player1 === player ? pair.player2 : pair.player1;
+  };
+
+  const unpairPlayer = (player: string) => {
+    const pair = teammatePairs.find(p => p.player1 === player || p.player2 === player);
+    if (pair) {
+      removePair(pair);
+    }
+  };
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       addPlayer();
@@ -125,17 +138,34 @@ export const PlayerSetup = ({
 
       <div className="flex-1 min-h-0 overflow-y-auto pb-safe mt-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {players.map((player, index) => <Card key={index} className={`p-4 flex items-center justify-between hover:shadow-md transition-all ${selectedForPairing === player ? "border-2 border-primary bg-primary/5" : isPaired(player) ? "border border-accent/50 bg-accent/5" : ""}`}>
-              <span className="font-medium text-foreground">{player}</span>
-              <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={() => togglePairSelection(player)} className="h-8 w-8 p-0 text-muted-foreground hover:text-primary" title="Link as teammates">
-                  <Link2 className="w-4 h-4" />
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => removePlayer(index)} className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive">
-                  <X className="w-4 h-4" />
-                </Button>
+          {players.map((player, index) => {
+            const partner = getPairPartner(player);
+            return <Card key={index} className={`p-4 flex flex-col gap-2 hover:shadow-md transition-all ${selectedForPairing === player ? "border-2 border-primary bg-primary/5" : isPaired(player) ? "border border-accent/50 bg-accent/5" : ""}`}>
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-foreground">{player}</span>
+                <div className="flex gap-2">
+                  {isPaired(player) ? (
+                    <Button variant="ghost" size="sm" onClick={() => unpairPlayer(player)} className="h-8 w-8 p-0 text-accent hover:text-destructive" title="Unpair teammates">
+                      <Unlink className="w-4 h-4" />
+                    </Button>
+                  ) : (
+                    <Button variant="ghost" size="sm" onClick={() => togglePairSelection(player)} className="h-8 w-8 p-0 text-muted-foreground hover:text-primary" title="Link as teammates">
+                      <Link2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="sm" onClick={() => removePlayer(index)} className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive">
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
-            </Card>)}
+              {partner && (
+                <div className="text-xs text-accent font-medium flex items-center gap-1">
+                  <Users className="w-3 h-3" />
+                  Paired with {partner}
+                </div>
+              )}
+            </Card>;
+          })}
         </div>
 
         {selectedForPairing && <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 mt-4">
