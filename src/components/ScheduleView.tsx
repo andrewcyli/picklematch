@@ -717,9 +717,8 @@ export const ScheduleView = ({
             <Trophy className="w-3.5 h-3.5 text-primary-foreground" />
           </div>
           <div className="flex-1">
-            <h2 className="text-sm sm:text-base font-bold text-foreground">Match Schedule</h2>
-            <p className="text-[9px] sm:text-[10px] text-muted-foreground mb-1">{matches.length} matches • {allPlayers.length} players</p>
-            
+            <h2 className="text-base font-bold text-foreground">Match Schedule</h2>
+            <p className="text-[10px] text-muted-foreground">{matches.length} matches • {allPlayers.length} players</p>
           </div>
         </div>
       </div>

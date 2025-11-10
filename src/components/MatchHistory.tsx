@@ -19,7 +19,7 @@ export const MatchHistory = ({ matches, matchScores }: MatchHistoryProps) => {
     return (
       <div className="text-center py-6">
         <Trophy className="w-12 h-12 mx-auto mb-2 text-muted-foreground/50" />
-        <h3 className="text-base font-semibold text-foreground mb-1">No Completed Matches</h3>
+        <p className="text-base font-semibold text-foreground mb-1">No Completed Matches</p>
         <p className="text-xs text-muted-foreground">Completed matches will appear here</p>
       </div>
     );
@@ -27,10 +27,17 @@ export const MatchHistory = ({ matches, matchScores }: MatchHistoryProps) => {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="text-center mb-3 flex-shrink-0">
-        <h2 className="text-lg font-bold text-foreground mb-1">Match History</h2>
-        <p className="text-xs text-muted-foreground mb-2">{completedMatches.length} completed match{completedMatches.length !== 1 ? 'es' : ''}</p>
-        <p className="text-xs text-muted-foreground leading-relaxed max-w-md mx-auto">
+      <div className="flex-shrink-0 mb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-accent to-accent/80 flex items-center justify-center">
+            <Trophy className="w-4 h-4 text-accent-foreground" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-foreground">Match History</h2>
+            <p className="text-[10px] text-muted-foreground">{completedMatches.length} completed match{completedMatches.length !== 1 ? 'es' : ''}</p>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
           Review all completed matches with final scores, winning teams, and match timing. 
           Perfect for tracking tournament progress, analyzing team performance, and maintaining 
           a complete record of your pickleball, tennis, or badminton games.

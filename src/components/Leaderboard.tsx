@@ -96,7 +96,7 @@ export const Leaderboard = ({ players, matches, matchScores }: LeaderboardProps)
             <Trophy className="w-4 h-4 text-accent-foreground" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-foreground">Leaderboard</h3>
+            <h2 className="text-base font-bold text-foreground">Leaderboard</h2>
             <p className="text-[10px] text-muted-foreground">Player rankings</p>
           </div>
         </div>

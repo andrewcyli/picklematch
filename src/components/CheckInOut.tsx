@@ -31,13 +31,17 @@ export const CheckInOut = ({
   hasStartedMatches = false
 }: CheckInOutProps) => {
   return <div className="flex flex-col min-h-0 flex-1 h-full">
-      <div className="text-center mb-3 flex-shrink-0">
-        <div className="inline-flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-accent mb-2 shadow-sport">
-          <Users className="w-5 h-5 text-white" />
+      <div className="flex-shrink-0 mb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+            <Users className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-foreground">Players Check in</h2>
+            <p className="text-[10px] text-muted-foreground">Dynamic roster management</p>
+          </div>
         </div>
-        <h2 className="text-lg font-bold text-foreground mb-1">Players Check in</h2>
-        <p className="text-xs text-muted-foreground mb-2">Add or remove players. Matches will auto-reschedule.</p>
-        <p className="text-xs text-muted-foreground leading-relaxed max-w-md mx-auto">
+        <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
           Manage your tournament roster dynamically. Players can check in or out anytime, and our intelligent 
           scheduling system automatically regenerates fair team assignments and match rotations to ensure 
           everyone gets balanced playing time.
