@@ -32,24 +32,40 @@ export const GameCodeDialog = ({ open, onOpenChange, onJoinGame, onCreateGame }:
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle className="text-2xl">Welcome to Court Rotations! 🎾</DialogTitle>
+          <DialogTitle className="text-2xl font-bold">TeamUp Social Play 🏸</DialogTitle>
           <DialogDescription className="text-base space-y-2 pt-2">
-            <p className="font-medium text-foreground">Organize pickleball, tennis & badminton games in 60 seconds.</p>
+            <p className="font-medium text-foreground">Free pickleball, tennis & badminton tournament organizer. Setup games instantly!</p>
             <div className="grid grid-cols-2 gap-2 pt-3 text-sm">
               <div className="flex items-start gap-2">
-                <span className="text-primary">✓</span>
-                <span>Auto player rotation</span>
+                <span>🔄</span>
+                <span>Smart player rotation</span>
               </div>
               <div className="flex items-start gap-2">
-                <span className="text-primary">✓</span>
+                <span>🏆</span>
                 <span>Live leaderboards</span>
               </div>
               <div className="flex items-start gap-2">
-                <span className="text-primary">✓</span>
-                <span>Match tracking</span>
+                <span>📊</span>
+                <span>Real-time scoring</span>
               </div>
               <div className="flex items-start gap-2">
-                <span className="text-primary">✓</span>
+                <span>⚡</span>
+                <span>60-second setup</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span>👥</span>
+                <span>Team balancing</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span>📱</span>
+                <span>Mobile-first design</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span>🎯</span>
+                <span>Match history tracking</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span>🔓</span>
                 <span>No login required</span>
               </div>
             </div>
