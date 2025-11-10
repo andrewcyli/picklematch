@@ -34,8 +34,8 @@ export const Leaderboard = ({ players, matches, matchScores }: LeaderboardProps)
       const score = matchScores.get(match.id);
       if (!score) return;
 
-      const isInTeam1 = match.team1.includes(player);
-      const isInTeam2 = match.team2.includes(player);
+      const isInTeam1 = match.team1.some(p => p === player);
+      const isInTeam2 = match.team2.some(p => p === player);
       
       if (!isInTeam1 && !isInTeam2) return;
 

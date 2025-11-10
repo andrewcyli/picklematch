@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
-import { Clock, Trophy, Share2, Copy, Check } from "lucide-react";
+import { Clock, Trophy, Share2, Copy, Check, Users, Target } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { CourtConfig } from "@/lib/scheduler";
@@ -26,6 +26,11 @@ export interface GameConfig {
     player2: string;
   }[];
   courtConfigs?: CourtConfig[];
+  schedulingType?: 'round-robin' | 'single-elimination' | 'double-elimination';
+  tournamentSettings?: {
+    seeding: 'random' | 'manual';
+    thirdPlaceMatch: boolean;
+  };
 }
 export const GameSetup = ({
   playerCount = 4,
@@ -43,6 +48,8 @@ export const GameSetup = ({
     courtNumber: i + 1,
     type: 'doubles' as const
   })));
+  const [schedulingType, setSchedulingType] = useState<'round-robin' | 'single-elimination' | 'double-elimination'>('round-robin');
+  const [thirdPlaceMatch, setThirdPlaceMatch] = useState(false);
   const [copied, setCopied] = useState(false);
   const gameUrl = gameCode ? `${window.location.origin}?join=${gameCode}` : '';
   const maxCourts = Math.floor(playerCount / 2);
@@ -71,7 +78,12 @@ export const GameSetup = ({
       gameDuration,
       totalTime,
       courts,
-      courtConfigs
+      courtConfigs,
+      schedulingType,
+      tournamentSettings: {
+        seeding: 'random',
+        thirdPlaceMatch
+      }
     });
   };
   const handleCopy = () => {
@@ -193,6 +205,59 @@ export const GameSetup = ({
                 </SelectItem>)}
             </SelectContent>
           </Select>
+        </div>
+
+        {/* Scheduling Type - Full Width */}
+        <div className="space-y-2 sm:col-span-2">
+          <Label className="text-sm font-semibold flex items-center gap-1.5">
+            <Target className="w-3.5 h-3.5" />
+            Tournament Style
+          </Label>
+          <RadioGroup value={schedulingType} onValueChange={(v: any) => setSchedulingType(v)}>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <label className={`relative flex flex-col items-start p-3 rounded-lg border-2 cursor-pointer transition-all ${schedulingType === 'round-robin' ? "border-primary bg-primary/5 shadow-md" : "border-border hover:border-primary/50"}`}>
+                <RadioGroupItem value="round-robin" className="sr-only" />
+                <div className="flex items-center gap-2 mb-1">
+                  <Users className="w-4 h-4" />
+                  <span className="text-sm font-bold">Round Robin</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground">Everyone plays multiple matches</p>
+              </label>
+              
+              <label className={`relative flex flex-col items-start p-3 rounded-lg border-2 cursor-pointer transition-all ${schedulingType === 'single-elimination' ? "border-primary bg-primary/5 shadow-md" : "border-border hover:border-primary/50"}`}>
+                <RadioGroupItem value="single-elimination" className="sr-only" />
+                <div className="flex items-center gap-2 mb-1">
+                  <Trophy className="w-4 h-4" />
+                  <span className="text-sm font-bold">Single Elim</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground">Win or go home bracket</p>
+              </label>
+              
+              <label className={`relative flex flex-col items-start p-3 rounded-lg border-2 cursor-pointer transition-all ${schedulingType === 'double-elimination' ? "border-primary bg-primary/5 shadow-md" : "border-border hover:border-primary/50"}`}>
+                <RadioGroupItem value="double-elimination" className="sr-only" />
+                <div className="flex items-center gap-2 mb-1">
+                  <Trophy className="w-4 h-4" />
+                  <span className="text-sm font-bold">Double Elim</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground">Two chances to advance</p>
+              </label>
+            </div>
+          </RadioGroup>
+          
+          {/* Tournament-specific options */}
+          {schedulingType === 'single-elimination' && (
+            <div className="flex items-center gap-2 p-2 rounded-md bg-muted/30 mt-2">
+              <Switch 
+                id="third-place" 
+                checked={thirdPlaceMatch} 
+                onCheckedChange={setThirdPlaceMatch}
+                className="scale-90"
+              />
+              <Label htmlFor="third-place" className="text-xs cursor-pointer">
+                Include 3rd place match
+              </Label>
+            </div>
+          )}
         </div>
 
         {/* Number of Courts */}

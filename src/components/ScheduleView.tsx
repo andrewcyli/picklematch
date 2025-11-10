@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Match, regenerateScheduleFromSlot, CourtConfig } from "@/lib/scheduler";
+import { TournamentBracket } from "@/components/TournamentBracket";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,11 @@ interface ScheduleViewProps {
       player2: string;
     }[];
     courtConfigs?: CourtConfig[];
+    schedulingType?: 'round-robin' | 'single-elimination' | 'double-elimination';
+    tournamentSettings?: {
+      seeding: 'random' | 'manual';
+      thirdPlaceMatch: boolean;
+    };
   };
   allPlayers: string[];
   onScheduleUpdate: (newMatches: Match[], newPlayers: string[]) => void;
@@ -758,8 +764,43 @@ export const ScheduleView = ({
         </div>
       </div>
 
-      {/* Courts Grid - Vertical layout with Court A above Court B */}
-      <div className="grid grid-cols-1 gap-2 px-2 pb-2">
+      {/* Tournament Bracket or Courts Grid */}
+      {gameConfig.schedulingType && gameConfig.schedulingType !== 'round-robin' ? (
+        <div className="px-2 pb-2">
+          <TournamentBracket
+            matches={matches}
+            matchScores={matchScores}
+            onScoreUpdate={(matchId, team1, team2) => {
+              const match = matches.find(m => m.id === matchId);
+              if (!match) return;
+
+              // Update scores
+              const newScores = new Map(matchScores);
+              newScores.set(matchId, { team1, team2 });
+              onMatchScoresUpdate(newScores);
+
+              // Determine winner and advance in tournament
+              const winner = team1 > team2 ? 'team1' : 'team2';
+              const { advanceWinnerToNextMatch } = require('@/lib/tournament-progression');
+              const updatedMatches = advanceWinnerToNextMatch(match, winner, matches);
+
+              // Save to database
+              const matchesWithScores = updatedMatches.map(m => {
+                const score = newScores.get(m.id);
+                return score ? { ...m, score } : m;
+              });
+              onScheduleUpdate(matchesWithScores, allPlayers);
+
+              toast({ title: "Score confirmed" });
+            }}
+            courtElapsedTimes={courtElapsedTimes}
+            isPlayerView={isPlayerView}
+            playerName={playerName}
+          />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-2 px-2 pb-2">
+          {/* Round Robin Courts Grid */}
         {courtConfigs.map(courtConfig => {
         const courtMatches = matches.filter(m => m.court === courtConfig.courtNumber);
         const currentMatchIndex = courtMatches.findIndex(m => !matchScores.has(m.id));
@@ -953,7 +994,8 @@ export const ScheduleView = ({
                 <CarouselNext className="-right-2 h-8 w-8" />
               </Carousel>
             </div>;
-      })}
-      </div>
+        })}
+        </div>
+      )}
     </div>;
 };
