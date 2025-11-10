@@ -455,11 +455,7 @@ const Index = () => {
       
       <div className="max-w-5xl mx-auto p-2 w-full relative z-10 flex flex-col h-full min-h-0">
         <header className="text-center py-2 flex-shrink-0">
-          <div className="flex items-center justify-center gap-2 mb-1">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary via-primary to-accent flex items-center justify-center shadow-sport">
-              <Trophy className="w-5 h-5 text-white drop-shadow-lg" />
-            </div>
-          </div>
+          
           <h1 className="text-xl sm:text-2xl font-bold mb-0.5 bg-clip-text text-transparent bg-gradient-to-r from-primary via-accent to-primary bg-[length:200%_auto] animate-[gradient_6s_linear_infinite]">
             TeamUp! Social Play
           </h1>
