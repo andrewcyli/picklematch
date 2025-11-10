@@ -170,7 +170,8 @@ function generateCompleteSchedule(
     restQueue.cleanup(slot);
 
     // Generate matches for ALL courts in this slot
-    for (const courtConfig of courtConfigs) {
+    const courtOrder = slot % 2 === 0 ? courtConfigs : [...courtConfigs].reverse();
+    for (const courtConfig of courtOrder) {
       // CRITICAL: Exclude all players already used in THIS slot (current matches across courts)
       const excludedPlayers = new Set([
         ...playersUsedThisSlot, // Players in current/next matches on ALL courts in this slot
@@ -832,7 +833,8 @@ export function regenerateScheduleFromSlot(
     
     restQueue.cleanup(slot);
     
-    for (const courtConfig of finalCourtConfigs) {
+    const courtOrder = slot % 2 === 0 ? finalCourtConfigs : [...finalCourtConfigs].reverse();
+    for (const courtConfig of courtOrder) {
       const excludedPlayers = new Set([
         ...playersUsedThisSlot,
         ...getPreviousSlotPlayersOnOtherCourts(schedule, slot, courtConfig.courtNumber),
