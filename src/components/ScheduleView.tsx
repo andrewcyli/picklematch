@@ -830,7 +830,12 @@ export const ScheduleView = ({
           {/* Round Robin Courts Grid */}
         {courtConfigs.map(courtConfig => {
         const courtMatches = matches.filter(m => m.court === courtConfig.courtNumber);
-        const currentMatchIndex = courtMatches.findIndex(m => !matchScores.has(m.id));
+        // In tournament mode, exclude matches with TBD players from being "current"
+        const currentMatchIndex = courtMatches.findIndex(m => {
+          if (matchScores.has(m.id)) return false;
+          if (isTournamentMode && (m.team1[0] === 'TBD' || m.team2[0] === 'TBD')) return false;
+          return true;
+        });
         return <div key={courtConfig.courtNumber} className="space-y-2">
               {/* Court Header - Compact */}
               <div className={`flex items-center justify-between gap-2 rounded-lg p-2 border ${courtConfig.courtNumber === 1 ? 'bg-greenery border-greenery/30' : 'bg-pantone-493c border-pantone-493c/30'}`}>
