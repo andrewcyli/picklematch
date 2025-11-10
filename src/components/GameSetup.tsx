@@ -10,57 +10,68 @@ import { Clock, Trophy, Share2, Copy, Check } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { CourtConfig } from "@/lib/scheduler";
-
 interface GameSetupProps {
   playerCount?: number;
   onComplete: (config: GameConfig) => void;
   onBack?: () => void;
   gameCode?: string;
 }
-
 export interface GameConfig {
   gameDuration: number;
   totalTime: number;
   courts: number;
-  teammatePairs?: { player1: string; player2: string }[];
+  teammatePairs?: {
+    player1: string;
+    player2: string;
+  }[];
   courtConfigs?: CourtConfig[];
 }
-
-export const GameSetup = ({ playerCount = 4, onComplete, onBack, gameCode }: GameSetupProps) => {
+export const GameSetup = ({
+  playerCount = 4,
+  onComplete,
+  onBack,
+  gameCode
+}: GameSetupProps) => {
   const [gameDuration, setGameDuration] = useState<number>(10);
   const [totalTime, setTotalTime] = useState<number>(60);
   const [courts, setCourts] = useState<number>(2);
-  const [courtConfigs, setCourtConfigs] = useState<CourtConfig[]>(
-    Array.from({ length: 2 }, (_, i) => ({ courtNumber: i + 1, type: 'doubles' as const }))
-  );
+  const [courtConfigs, setCourtConfigs] = useState<CourtConfig[]>(Array.from({
+    length: 2
+  }, (_, i) => ({
+    courtNumber: i + 1,
+    type: 'doubles' as const
+  })));
   const [copied, setCopied] = useState(false);
-
   const gameUrl = gameCode ? `${window.location.origin}?join=${gameCode}` : '';
-
   const maxCourts = Math.floor(playerCount / 2);
-  const totalTimeOptions = Array.from({ length: 12 }, (_, i) => (i + 1) * 15);
-
+  const totalTimeOptions = Array.from({
+    length: 12
+  }, (_, i) => (i + 1) * 15);
   const handleCourtsChange = (newCourts: number) => {
     setCourts(newCourts);
-    const newConfigs = Array.from({ length: newCourts }, (_, i) => 
-      courtConfigs[i] || { courtNumber: i + 1, type: 'doubles' as const }
-    );
+    const newConfigs = Array.from({
+      length: newCourts
+    }, (_, i) => courtConfigs[i] || {
+      courtNumber: i + 1,
+      type: 'doubles' as const
+    });
     setCourtConfigs(newConfigs);
   };
-
   const toggleCourtType = (courtNumber: number) => {
-    const newConfigs = courtConfigs.map(config => 
-      config.courtNumber === courtNumber 
-        ? { ...config, type: config.type === 'singles' ? 'doubles' as const : 'singles' as const }
-        : config
-    );
+    const newConfigs = courtConfigs.map(config => config.courtNumber === courtNumber ? {
+      ...config,
+      type: config.type === 'singles' ? 'doubles' as const : 'singles' as const
+    } : config);
     setCourtConfigs(newConfigs);
   };
-
   const handleContinue = () => {
-    onComplete({ gameDuration, totalTime, courts, courtConfigs });
+    onComplete({
+      gameDuration,
+      totalTime,
+      courts,
+      courtConfigs
+    });
   };
-
   const handleCopy = () => {
     if (!gameUrl) return;
     navigator.clipboard.writeText(gameUrl);
@@ -68,17 +79,15 @@ export const GameSetup = ({ playerCount = 4, onComplete, onBack, gameCode }: Gam
     toast.success("Link copied to clipboard!");
     setTimeout(() => setCopied(false), 2000);
   };
-
   const handleShare = async () => {
     if (!gameCode || !gameUrl) return;
     const shareText = `Join my game with code: ${gameCode}`;
-    
     if (navigator.share) {
       try {
         await navigator.share({
           title: "Join Racket Match",
           text: shareText,
-          url: gameUrl,
+          url: gameUrl
         });
       } catch (error) {
         if ((error as Error).name !== "AbortError") {
@@ -90,14 +99,10 @@ export const GameSetup = ({ playerCount = 4, onComplete, onBack, gameCode }: Gam
       toast.success("Link copied to clipboard!");
     }
   };
-
-  return (
-    <div className="space-y-4 pb-2">
+  return <div className="space-y-4 pb-2">
       {/* Header Section */}
       <div className="text-center mb-4">
-        <div className="inline-flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-accent mb-2 shadow-sport">
-          <Trophy className="w-5 h-5 text-white" />
-        </div>
+        
         <h2 className="text-lg font-bold text-foreground mb-1">Game Configuration</h2>
         <p className="text-xs text-muted-foreground leading-relaxed max-w-md mx-auto">
           Configure your tournament settings including match duration, total play time, and number of courts. 
@@ -107,53 +112,32 @@ export const GameSetup = ({ playerCount = 4, onComplete, onBack, gameCode }: Gam
       </div>
 
       {/* Game Code and QR Code Section */}
-      {gameCode && (
-        <Card className="p-3 bg-primary/5 border-primary/20">
+      {gameCode && <Card className="p-3 bg-primary/5 border-primary/20">
           <div className="flex items-center justify-between gap-3">
             <div className="flex-1">
               <p className="text-xs text-muted-foreground mb-0.5">Game Code</p>
               <p className="text-xl font-bold font-mono text-primary">{gameCode}</p>
             </div>
             <div className="bg-white p-2 rounded shadow-inner">
-              <QRCodeSVG
-                value={gameUrl}
-                size={80}
-                level="H"
-                includeMargin={false}
-              />
+              <QRCodeSVG value={gameUrl} size={80} level="H" includeMargin={false} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Button
-                onClick={handleShare}
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs px-2"
-              >
+              <Button onClick={handleShare} variant="outline" size="sm" className="h-7 text-xs px-2">
                 <Share2 className="w-3 h-3 mr-1" />
                 Share
               </Button>
-              <Button
-                onClick={handleCopy}
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs px-2"
-              >
-                {copied ? (
-                  <>
+              <Button onClick={handleCopy} variant="outline" size="sm" className="h-7 text-xs px-2">
+                {copied ? <>
                     <Check className="w-3 h-3 mr-1" />
                     Copied
-                  </>
-                ) : (
-                  <>
+                  </> : <>
                     <Copy className="w-3 h-3 mr-1" />
                     Copy
-                  </>
-                )}
+                  </>}
               </Button>
             </div>
           </div>
-        </Card>
-      )}
+        </Card>}
 
       {/* Form Layout */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -163,21 +147,12 @@ export const GameSetup = ({ playerCount = 4, onComplete, onBack, gameCode }: Gam
             <Clock className="w-3.5 h-3.5" />
             Game Duration
           </Label>
-          <RadioGroup value={gameDuration.toString()} onValueChange={(v) => setGameDuration(Number(v))}>
+          <RadioGroup value={gameDuration.toString()} onValueChange={v => setGameDuration(Number(v))}>
             <div className="grid grid-cols-3 gap-2">
-              {[5, 10, 15].map((duration) => (
-                <label
-                  key={duration}
-                  className={`relative flex items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                    gameDuration === duration
-                      ? "border-primary bg-primary/5 shadow-md"
-                      : "border-border hover:border-primary/50"
-                  }`}
-                >
+              {[5, 10, 15].map(duration => <label key={duration} className={`relative flex items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all ${gameDuration === duration ? "border-primary bg-primary/5 shadow-md" : "border-border hover:border-primary/50"}`}>
                   <RadioGroupItem value={duration.toString()} className="sr-only" />
                   <span className="text-sm font-bold">{duration} min</span>
-                </label>
-              ))}
+                </label>)}
             </div>
           </RadioGroup>
         </div>
@@ -187,16 +162,14 @@ export const GameSetup = ({ playerCount = 4, onComplete, onBack, gameCode }: Gam
           <Label htmlFor="total-time" className="text-sm font-semibold">
             Total Play Time
           </Label>
-          <Select value={totalTime.toString()} onValueChange={(v) => setTotalTime(Number(v))}>
+          <Select value={totalTime.toString()} onValueChange={v => setTotalTime(Number(v))}>
             <SelectTrigger id="total-time" className="h-10 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {totalTimeOptions.map((time) => (
-                <SelectItem key={time} value={time.toString()} className="text-sm">
+              {totalTimeOptions.map(time => <SelectItem key={time} value={time.toString()} className="text-sm">
                   {time} minutes
-                </SelectItem>
-              ))}
+                </SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -206,16 +179,16 @@ export const GameSetup = ({ playerCount = 4, onComplete, onBack, gameCode }: Gam
           <Label htmlFor="courts" className="text-sm font-semibold">
             Number of Courts
           </Label>
-          <Select value={courts.toString()} onValueChange={(v) => handleCourtsChange(Number(v))}>
+          <Select value={courts.toString()} onValueChange={v => handleCourtsChange(Number(v))}>
             <SelectTrigger id="courts" className="h-10 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Array.from({ length: Math.min(maxCourts, 10) }, (_, i) => i + 1).map((num) => (
-                <SelectItem key={num} value={num.toString()} className="text-sm">
+              {Array.from({
+              length: Math.min(maxCourts, 10)
+            }, (_, i) => i + 1).map(num => <SelectItem key={num} value={num.toString()} className="text-sm">
                   {num} {num === 1 ? "court" : "courts"}
-                </SelectItem>
-              ))}
+                </SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -226,8 +199,7 @@ export const GameSetup = ({ playerCount = 4, onComplete, onBack, gameCode }: Gam
             Court Configuration
           </Label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {courtConfigs.map((config) => (
-              <div key={config.courtNumber} className="flex items-center justify-between p-3 rounded-lg border bg-card">
+            {courtConfigs.map(config => <div key={config.courtNumber} className="flex items-center justify-between p-3 rounded-lg border bg-card">
                 <Label htmlFor={`court-${config.courtNumber}`} className="text-sm font-medium">
                   Court {config.courtNumber}
                 </Label>
@@ -235,30 +207,19 @@ export const GameSetup = ({ playerCount = 4, onComplete, onBack, gameCode }: Gam
                   <span className={`text-xs ${config.type === 'singles' ? 'text-muted-foreground' : 'text-foreground font-medium'}`}>
                     Doubles
                   </span>
-                  <Switch
-                    id={`court-${config.courtNumber}`}
-                    checked={config.type === 'singles'}
-                    onCheckedChange={() => toggleCourtType(config.courtNumber)}
-                    className="scale-90"
-                  />
+                  <Switch id={`court-${config.courtNumber}`} checked={config.type === 'singles'} onCheckedChange={() => toggleCourtType(config.courtNumber)} className="scale-90" />
                   <span className={`text-xs ${config.type === 'singles' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
                     Singles
                   </span>
                 </div>
-              </div>
-            ))}
+              </div>)}
           </div>
         </div>
       </div>
 
       {/* Continue Button */}
-      <Button 
-        onClick={handleContinue}
-        size="lg" 
-        className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-accent text-white shadow-sport"
-      >
+      <Button onClick={handleContinue} size="lg" className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-accent text-white shadow-sport">
         Continue to Players
       </Button>
-    </div>
-  );
+    </div>;
 };
