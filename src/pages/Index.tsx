@@ -78,7 +78,7 @@ const Index = () => {
     const restoreSession = async () => {
       const savedGameId = localStorage.getItem('teamup_game_id');
       const savedGameCode = localStorage.getItem('teamup_game_code');
-      if (savedGameId && savedGameCode && userId) {
+      if (savedGameId && savedGameCode) {
         try {
           const {
             data,
@@ -120,6 +120,9 @@ const Index = () => {
     };
     if (userId) {
       restoreSession();
+    } else if (userId === null) {
+      // No user yet, but we know auth check completed with no session
+      setIsRestoringSession(false);
     }
   }, [userId]);
 
