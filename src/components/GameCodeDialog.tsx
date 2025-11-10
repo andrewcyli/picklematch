@@ -6,31 +6,29 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { validateGameCode } from "@/lib/validation";
 import { Trophy, Users, Clock, BarChart3, Sparkles, Zap } from "lucide-react";
-
 interface GameCodeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onJoinGame: (gameCode: string) => void;
   onCreateGame: () => void;
 }
-
-export const GameCodeDialog = ({ open, onOpenChange, onJoinGame, onCreateGame }: GameCodeDialogProps) => {
+export const GameCodeDialog = ({
+  open,
+  onOpenChange,
+  onJoinGame,
+  onCreateGame
+}: GameCodeDialogProps) => {
   const [gameCode, setGameCode] = useState("");
-
   const handleJoin = () => {
     const code = gameCode.trim().toUpperCase();
-    
     const validation = validateGameCode(code);
     if (!validation.valid) {
       toast.error(validation.error || "Invalid game code");
       return;
     }
-    
     onJoinGame(code);
   };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+  return <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader className="space-y-3">
           <div className="flex items-center justify-center gap-2">
@@ -98,23 +96,14 @@ export const GameCodeDialog = ({ open, onOpenChange, onJoinGame, onCreateGame }:
         </div>
 
         {/* Sports Icons */}
-        <div className="text-center text-sm text-muted-foreground py-2 border-t border-b">
-          Perfect for 🏸 Pickleball • 🎾 Tennis • 🏓 Badminton • 🏐 Volleyball
-        </div>
+        <div className="text-center text-sm text-muted-foreground py-2 border-t border-b">Perfect for 🏓Pickleball • 🏸 Badminton • 🎾 Tennis</div>
 
         {/* Join/Create Section */}
         <div className="space-y-4 pt-4">
           <div className="space-y-2">
             <Label htmlFor="game-code" className="text-sm font-semibold">Join Existing Game</Label>
             <div className="flex gap-2">
-              <Input
-                id="game-code"
-                value={gameCode}
-                onChange={(e) => setGameCode(e.target.value.toUpperCase())}
-                placeholder="Enter 6-char code"
-                maxLength={6}
-                className="flex-1 uppercase font-mono text-lg tracking-wider"
-              />
+              <Input id="game-code" value={gameCode} onChange={e => setGameCode(e.target.value.toUpperCase())} placeholder="Enter 6-char code" maxLength={6} className="flex-1 uppercase font-mono text-lg tracking-wider" />
               <Button onClick={handleJoin} disabled={gameCode.length !== 6} size="lg">
                 Join
               </Button>
@@ -130,11 +119,8 @@ export const GameCodeDialog = ({ open, onOpenChange, onJoinGame, onCreateGame }:
             </div>
           </div>
 
-          <Button onClick={onCreateGame} className="w-full" variant="default" size="lg">
-            🎯 Create New Game
-          </Button>
+          <Button onClick={onCreateGame} className="w-full" variant="default" size="lg">🤝 Create New Game</Button>
         </div>
       </DialogContent>
-    </Dialog>
-  );
+    </Dialog>;
 };
