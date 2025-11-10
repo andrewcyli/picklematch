@@ -32,48 +32,14 @@ export const GameCodeDialog = ({ open, onOpenChange, onJoinGame, onCreateGame }:
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold">TeamUp Social Play 🏸</DialogTitle>
-          <DialogDescription className="text-base space-y-2 pt-2">
-            <p className="font-medium text-foreground">Free pickleball, tennis & badminton tournament organizer. Setup games instantly!</p>
-            <div className="grid grid-cols-2 gap-2 pt-3 text-sm">
-              <div className="flex items-start gap-2">
-                <span>🔄</span>
-                <span>Smart player rotation</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span>🏆</span>
-                <span>Live leaderboards</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span>📊</span>
-                <span>Real-time scoring</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span>⚡</span>
-                <span>60-second setup</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span>👥</span>
-                <span>Team balancing</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span>📱</span>
-                <span>Mobile-first design</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span>🎯</span>
-                <span>Match history tracking</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span>🔓</span>
-                <span>No login required</span>
-              </div>
-            </div>
+          <DialogTitle>Join or Create Game</DialogTitle>
+          <DialogDescription>
+            Enter a game code to join an existing game, or create a new one.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 py-4">
+        <div className="space-y-6 py-4">
           <div className="space-y-3">
-            <Label htmlFor="game-code" className="text-base">Have a game code?</Label>
+            <Label htmlFor="game-code">Game Code</Label>
             <div className="flex gap-2">
               <Input
                 id="game-code"
@@ -98,7 +64,7 @@ export const GameCodeDialog = ({ open, onOpenChange, onJoinGame, onCreateGame }:
             </div>
           </div>
 
-          <Button onClick={onCreateGame} className="w-full h-12" variant="default">
+          <Button onClick={onCreateGame} className="w-full" variant="default">
             Create New Game
           </Button>
         </div>
