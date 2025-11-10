@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, Clock, Users, Trophy, ChevronLeft, ChevronRight, Target, Timer } from "lucide-react";
+import { ArrowLeft, Clock, Users, Trophy, ChevronLeft, ChevronRight, Target, Timer, UserCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { validateMatchScore } from "@/lib/validation";
 import { useStopwatch } from "@/hooks/use-stopwatch";
@@ -35,6 +35,9 @@ interface ScheduleViewProps {
     team2: number;
   }>) => void;
   onCourtConfigUpdate?: (configs: CourtConfig[]) => void;
+  isPlayerView?: boolean;
+  onReleaseIdentity?: () => void;
+  onShowPlayerSelector?: () => void;
 }
 export const ScheduleView = ({
   matches,
@@ -44,7 +47,10 @@ export const ScheduleView = ({
   onScheduleUpdate,
   matchScores,
   onMatchScoresUpdate,
-  onCourtConfigUpdate
+  onCourtConfigUpdate,
+  isPlayerView = false,
+  onReleaseIdentity,
+  onShowPlayerSelector
 }: ScheduleViewProps) => {
   const {
     toast
@@ -802,13 +808,31 @@ export const ScheduleView = ({
           </div>
           
           <Button
-            variant="outline"
+            variant={isPlayerView ? "outline" : "default"}
             size="sm"
-            onClick={() => setCurrentView('player')}
+            onClick={() => {
+              if (isPlayerView) {
+                onReleaseIdentity?.();
+                toast({
+                  title: "Switched to organizer view"
+                });
+              } else {
+                onShowPlayerSelector?.();
+              }
+            }}
             className="h-8 text-xs px-3 gap-1.5"
           >
-            <Users className="w-3.5 h-3.5" />
-            Player View
+            {isPlayerView ? (
+              <>
+                <Users className="w-3.5 h-3.5" />
+                Organizer View
+              </>
+            ) : (
+              <>
+                <UserCircle className="w-3.5 h-3.5" />
+                Player View
+              </>
+            )}
           </Button>
         </div>
       </div>
