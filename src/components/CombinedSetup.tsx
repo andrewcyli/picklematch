@@ -95,15 +95,11 @@ export const CombinedSetup = ({ onComplete }: CombinedSetupProps) => {
   const totalTimeOptions = Array.from({ length: 16 }, (_, i) => (i + 1) * 15);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground mb-6">Setup Your Game</h2>
-      </div>
-
-      <div className="grid md:grid-cols-[1fr_2fr] gap-6">
+    <div className="space-y-4">
+      <div className="grid md:grid-cols-[1fr_2fr] gap-4 md:gap-6">
         {/* Player List and Add Player - Now First */}
         <div className="space-y-4 order-1">
-          <h3 className="text-lg font-semibold text-foreground">Players</h3>
+          <h2 className="text-base font-bold text-foreground">Players</h2>
           
           {/* Add Player Section at Top */}
           <div className="space-y-3">
@@ -213,9 +209,9 @@ export const CombinedSetup = ({ onComplete }: CombinedSetupProps) => {
         </div>
 
         {/* Game Configuration - Now Second */}
-        <div className="space-y-6 order-2">
+        <div className="space-y-4 order-2">
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-foreground">Game Settings</h3>
+            <h2 className="text-base font-bold text-foreground">Game Settings</h2>
             
             <div className="space-y-3">
               <Label htmlFor="game-duration" className="text-base">Game Duration</Label>
@@ -277,12 +273,12 @@ export const CombinedSetup = ({ onComplete }: CombinedSetupProps) => {
         </div>
       </div>
 
-      <div className="flex justify-end pt-4">
+      <div className="flex justify-end pt-4 mt-2">
         <Button
           onClick={handleSubmit}
           disabled={players.length < 2}
           size="lg"
-          className="min-w-[200px]"
+          className="min-w-[200px] w-full sm:w-auto"
         >
           Generate Schedule
           <ArrowRight className="ml-2 h-5 w-5" />

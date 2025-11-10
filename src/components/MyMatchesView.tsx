@@ -148,10 +148,10 @@ export const MyMatchesView = ({
       {/* Current Match */}
       {matchGroups.current && (
         <div className="space-y-2">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <Users className="h-5 w-5 text-green-500" />
+          <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+            <Users className="h-4 w-4 text-green-500" />
             Playing Now
-          </h3>
+          </h2>
           {renderMatch(matchGroups.current, "current", 0)}
         </div>
       )}
@@ -159,10 +159,10 @@ export const MyMatchesView = ({
       {/* Up Next */}
       {matchGroups.upNext.length > 0 && (
         <div className="space-y-2">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <Clock className="h-5 w-5 text-yellow-500" />
+          <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+            <Clock className="h-4 w-4 text-yellow-500" />
             Up Next
-          </h3>
+          </h2>
           {matchGroups.upNext.map((match, idx) => renderMatch(match, "upnext", idx + 1))}
         </div>
       )}
@@ -173,12 +173,12 @@ export const MyMatchesView = ({
           <Button
             variant="ghost"
             onClick={() => setShowLater(!showLater)}
-            className="w-full justify-between"
+            className="w-full justify-between p-2"
           >
-            <span className="text-lg font-semibold">
+            <span className="text-base font-bold text-foreground">
               Later ({matchGroups.later.length})
             </span>
-            {showLater ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+            {showLater ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </Button>
           {showLater && (
             <div className="space-y-2">
@@ -196,12 +196,12 @@ export const MyMatchesView = ({
           <Button
             variant="ghost"
             onClick={() => setShowCompleted(!showCompleted)}
-            className="w-full justify-between"
+            className="w-full justify-between p-2"
           >
-            <span className="text-lg font-semibold">
+            <span className="text-base font-bold text-foreground">
               Completed ({matchGroups.completed.length})
             </span>
-            {showCompleted ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+            {showCompleted ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </Button>
           {showCompleted && (
             <div className="space-y-2">
@@ -215,8 +215,8 @@ export const MyMatchesView = ({
 
       {/* No matches */}
       {!matchGroups.current && matchGroups.upNext.length === 0 && matchGroups.later.length === 0 && (
-        <Card className="p-8 text-center">
-          <p className="text-muted-foreground">No upcoming matches. Check back later!</p>
+        <Card className="p-6 sm:p-8 text-center">
+          <p className="text-sm text-muted-foreground">No upcoming matches. Check back later!</p>
         </Card>
       )}
     </div>

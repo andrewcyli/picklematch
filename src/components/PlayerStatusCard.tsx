@@ -42,41 +42,41 @@ export const PlayerStatusCard = ({
   };
 
   return (
-    <Card className="p-4 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-      <div className="space-y-3">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">Playing as</p>
-            <h3 className="text-lg font-bold">{playerName}</h3>
+    <Card className="p-3 sm:p-4 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+      <div className="space-y-2 sm:space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs sm:text-sm text-muted-foreground">Playing as</p>
+            <h3 className="text-base sm:text-lg font-bold truncate">{playerName}</h3>
           </div>
           {getStatusBadge()}
         </div>
 
-        <div className="grid grid-cols-3 gap-4 pt-2 border-t">
-          <div className="space-y-1">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-2 border-t">
+          <div className="space-y-0.5 sm:space-y-1">
             <div className="flex items-center gap-1 text-muted-foreground">
               <Users className="h-3 w-3" />
-              <span className="text-xs">Matches</span>
+              <span className="text-[10px] sm:text-xs">Matches</span>
             </div>
-            <p className="text-lg font-semibold">
+            <p className="text-sm sm:text-lg font-semibold">
               {matchesPlayed}/{totalMatches}
             </p>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-0.5 sm:space-y-1">
             <div className="flex items-center gap-1 text-muted-foreground">
               <Clock className="h-3 w-3" />
-              <span className="text-xs">Status</span>
+              <span className="text-[10px] sm:text-xs">Status</span>
             </div>
-            <p className="text-xs font-medium">{getWaitMessage()}</p>
+            <p className="text-[10px] sm:text-xs font-medium break-words">{getWaitMessage()}</p>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-0.5 sm:space-y-1">
             <div className="flex items-center gap-1 text-muted-foreground">
               <TrendingUp className="h-3 w-3" />
-              <span className="text-xs">Queue</span>
+              <span className="text-[10px] sm:text-xs">Queue</span>
             </div>
-            <p className="text-lg font-semibold">{upNextCount}</p>
+            <p className="text-sm sm:text-lg font-semibold">{upNextCount}</p>
           </div>
         </div>
       </div>

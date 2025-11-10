@@ -453,28 +453,27 @@ const Index = () => {
         <div className="absolute bottom-20 left-10 w-96 h-96 bg-accent rounded-full blur-3xl"></div>
       </div>
       
-      <div className="max-w-5xl mx-auto p-2 w-full relative z-10 flex flex-col h-full min-h-0">
-        <header className="text-center py-2 flex-shrink-0">
-          
-          <h1 className="text-xl sm:text-2xl font-bold mb-0.5 bg-clip-text text-transparent bg-gradient-to-r from-primary via-accent to-primary bg-[length:200%_auto] animate-[gradient_6s_linear_infinite]">
+      <div className="max-w-5xl mx-auto p-2 sm:p-3 w-full relative z-10 flex flex-col h-full min-h-0">
+        <header className="text-center py-2 sm:py-3 flex-shrink-0">
+          <h1 className="text-lg sm:text-xl md:text-2xl font-bold mb-1 bg-clip-text text-transparent bg-gradient-to-r from-primary via-accent to-primary bg-[length:200%_auto] animate-[gradient_6s_linear_infinite]">
             TeamUp! Social Play
           </h1>
-          <p className="text-muted-foreground text-xs sm:text-sm font-medium">🎾 Smart team assignment & scoring.  Live match scheduling with multi-court management, real-time scoring, and smart team rotation. 🏓  </p>
+          <p className="text-muted-foreground text-[10px] sm:text-xs md:text-sm font-medium leading-relaxed px-2 sm:px-0">🎾 Smart team assignment & scoring. Live match scheduling with multi-court management, real-time scoring, and smart team rotation. 🏓</p>
         </header>
 
         <GameCodeDialog open={showGameCodeDialog} onOpenChange={setShowGameCodeDialog} onJoinGame={joinExistingGame} onCreateGame={createNewGame} />
 
-        <Card className="p-3 shadow-sport border-2 border-primary/10 backdrop-blur-sm bg-card/80 flex-1 flex flex-col min-h-0 mb-14">
+        <Card className="p-2 sm:p-3 shadow-sport border-2 border-primary/10 backdrop-blur-sm bg-card/80 flex-1 flex flex-col min-h-0 mb-14">
           {activeSection === "setup" && <div className="flex flex-col h-full">
               {gameId && <div className="flex justify-end mb-2">
-                  <Button onClick={startNewSession} variant="outline" size="sm" className="gap-1 h-8 text-xs">
+                  <Button onClick={startNewSession} variant="outline" size="sm" className="gap-1 h-7 sm:h-8 text-[10px] sm:text-xs px-2 sm:px-3">
                     New Session
                   </Button>
                 </div>}
               <div className="flex-1 overflow-y-auto">
                 <GameSetup onComplete={handleGameConfigComplete} gameCode={gameCode} />
               </div>
-              <div className="pt-3 border-t mt-3 flex-shrink-0 bg-card/95 backdrop-blur-sm">
+              <div className="pt-2 sm:pt-3 border-t mt-2 sm:mt-3 flex-shrink-0 bg-card/95 backdrop-blur-sm">
                 
               </div>
             </div>}
