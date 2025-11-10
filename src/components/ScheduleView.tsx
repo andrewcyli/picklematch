@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, Clock, Users, Trophy, ChevronLeft, ChevronRight, Target, Timer, UserCircle } from "lucide-react";
+import { ArrowLeft, Clock, Users, Trophy, ChevronLeft, ChevronRight, Target, Timer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { validateMatchScore } from "@/lib/validation";
 import { useStopwatch } from "@/hooks/use-stopwatch";
@@ -35,9 +35,6 @@ interface ScheduleViewProps {
     team2: number;
   }>) => void;
   onCourtConfigUpdate?: (configs: CourtConfig[]) => void;
-  isPlayerView?: boolean;
-  onReleaseIdentity?: () => void;
-  onShowPlayerSelector?: () => void;
 }
 export const ScheduleView = ({
   matches,
@@ -47,10 +44,7 @@ export const ScheduleView = ({
   onScheduleUpdate,
   matchScores,
   onMatchScoresUpdate,
-  onCourtConfigUpdate,
-  isPlayerView = false,
-  onReleaseIdentity,
-  onShowPlayerSelector
+  onCourtConfigUpdate
 }: ScheduleViewProps) => {
   const {
     toast
@@ -80,7 +74,6 @@ export const ScheduleView = ({
     startTime: number;
     matchId: string;
   }>>(new Map());
-  const [currentView, setCurrentView] = useState<'organizer' | 'player'>('organizer');
 
   // Helper to normalize scores to numbers
   const normalizeScore = (score: {
@@ -716,124 +709,17 @@ export const ScheduleView = ({
   //   checkPlayerConflicts(matchScores);
   // }, []);
 
-  // Player View
-  if (currentView === 'player') {
-    return (
-      <div className="h-full overflow-y-auto">
-        <div className="sticky top-0 bg-background/95 backdrop-blur-sm z-10 pb-2 border-b mb-2">
-          <div className="flex items-center justify-between gap-2 px-2 pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentView('organizer')}
-              className="h-8 text-xs px-3 gap-1.5"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Back to Schedule
-            </Button>
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-primary" />
-              <h2 className="text-base font-bold text-foreground">Player View</h2>
-            </div>
-          </div>
-        </div>
-
-        <div className="px-2 pb-2 space-y-2">
-          {allPlayers.map(player => {
-            const playerMatches = matches.filter(m => 
-              m.team1.includes(player) || m.team2.includes(player)
-            );
-            const completedMatches = playerMatches.filter(m => matchScores.has(m.id));
-            const upcomingMatches = playerMatches.filter(m => !matchScores.has(m.id));
-            const nextMatch = upcomingMatches[0];
-
-            return (
-              <Card key={player} className="p-3">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-sm">{player}</h3>
-                    <div className="flex gap-2 text-xs text-muted-foreground">
-                      <span>{completedMatches.length} played</span>
-                      <span>•</span>
-                      <span>{upcomingMatches.length} upcoming</span>
-                    </div>
-                  </div>
-
-                  {nextMatch && (
-                    <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
-                      <div className="text-[10px] font-medium text-primary mb-1">NEXT MATCH</div>
-                      <div className="flex items-center justify-between">
-                        <div className="text-xs">
-                          <div className="font-semibold">
-                            Court {String.fromCharCode(64 + nextMatch.court)}
-                          </div>
-                          <div className="text-muted-foreground text-[10px]">
-                            {new Date(Date.now() + nextMatch.startTime * 60000).toLocaleTimeString('en-US', {
-                              hour: 'numeric',
-                              minute: '2-digit'
-                            })}
-                          </div>
-                        </div>
-                        <Badge variant="outline" className="text-[10px]">
-                          {nextMatch.team1.includes(player) ? 
-                            `vs ${nextMatch.team2.join(' & ')}` : 
-                            `vs ${nextMatch.team1.join(' & ')}`
-                          }
-                        </Badge>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  // Organizer View
   return <div className="h-full overflow-y-auto">
       {/* Header */}
       <div className="sticky top-0 bg-background/95 backdrop-blur-sm z-10 pb-1 border-b mb-2">
-        <div className="flex items-center justify-between gap-2 px-2 pt-1">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
-              <Trophy className="w-3.5 h-3.5 text-primary-foreground" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-foreground">Match Schedule</h2>
-              <p className="text-[10px] text-muted-foreground">{matches.length} matches • {allPlayers.length} players</p>
-            </div>
+        <div className="flex items-center gap-2 px-2 pt-1">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
+            <Trophy className="w-3.5 h-3.5 text-primary-foreground" />
           </div>
-          
-          <Button
-            variant={isPlayerView ? "outline" : "default"}
-            size="sm"
-            onClick={() => {
-              if (isPlayerView) {
-                onReleaseIdentity?.();
-                toast({
-                  title: "Switched to organizer view"
-                });
-              } else {
-                onShowPlayerSelector?.();
-              }
-            }}
-            className="h-8 text-xs px-3 gap-1.5"
-          >
-            {isPlayerView ? (
-              <>
-                <Users className="w-3.5 h-3.5" />
-                Organizer View
-              </>
-            ) : (
-              <>
-                <UserCircle className="w-3.5 h-3.5" />
-                Player View
-              </>
-            )}
-          </Button>
+          <div className="flex-1">
+            <h2 className="text-base font-bold text-foreground">Match Schedule</h2>
+            <p className="text-[10px] text-muted-foreground">{matches.length} matches • {allPlayers.length} players</p>
+          </div>
         </div>
       </div>
 
