@@ -74,6 +74,7 @@ export const ScheduleView = ({
     startTime: number;
     matchId: string;
   }>>(new Map());
+  const [currentView, setCurrentView] = useState<'organizer' | 'player'>('organizer');
 
   // Helper to normalize scores to numbers
   const normalizeScore = (score: {
@@ -712,14 +713,26 @@ export const ScheduleView = ({
   return <div className="h-full overflow-y-auto">
       {/* Header */}
       <div className="sticky top-0 bg-background/95 backdrop-blur-sm z-10 pb-1 border-b mb-2">
-        <div className="flex items-center gap-2 px-2 pt-1">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
-            <Trophy className="w-3.5 h-3.5 text-primary-foreground" />
+        <div className="flex items-center justify-between gap-2 px-2 pt-1">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
+              <Trophy className="w-3.5 h-3.5 text-primary-foreground" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-foreground">Match Schedule</h2>
+              <p className="text-[10px] text-muted-foreground">{matches.length} matches • {allPlayers.length} players</p>
+            </div>
           </div>
-          <div className="flex-1">
-            <h2 className="text-base font-bold text-foreground">Match Schedule</h2>
-            <p className="text-[10px] text-muted-foreground">{matches.length} matches • {allPlayers.length} players</p>
-          </div>
+          
+          <Button
+            variant={currentView === 'organizer' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setCurrentView(currentView === 'organizer' ? 'player' : 'organizer')}
+            className="h-8 text-xs px-3 gap-1.5"
+          >
+            <Users className="w-3.5 h-3.5" />
+            {currentView === 'organizer' ? 'Organizer View' : 'Player View'}
+          </Button>
         </div>
       </div>
 
