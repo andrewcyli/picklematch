@@ -17,11 +17,7 @@ import { usePlayerMatches } from "@/hooks/use-player-matches";
 import { usePlayerNotifications } from "@/hooks/use-player-notifications";
 import { PlayerIdentitySelector } from "@/components/PlayerIdentitySelector";
 import { MyMatchesView } from "@/components/MyMatchesView";
-import { WelcomeScreen } from "@/components/WelcomeScreen";
-import { CombinedSetup } from "@/components/CombinedSetup";
-
 type Section = "setup" | "players" | "matches" | "history" | "leaderboard";
-
 const Index = () => {
   const [activeSection, setActiveSection] = useState<Section>("setup");
   const [players, setPlayers] = useState<string[]>([]);
@@ -29,7 +25,7 @@ const Index = () => {
   const [gameConfig, setGameConfig] = useState<GameConfig | null>(null);
   const [gameId, setGameId] = useState<string | null>(null);
   const [gameCode, setGameCode] = useState<string>("");
-  const [showGameCodeDialog, setShowGameCodeDialog] = useState(false);
+  const [showGameCodeDialog, setShowGameCodeDialog] = useState(true);
   const [setupComplete, setSetupComplete] = useState(false);
   const [matchScores, setMatchScores] = useState<Map<string, {
     team1: number;
@@ -39,7 +35,6 @@ const Index = () => {
   const [isRestoringSession, setIsRestoringSession] = useState(true);
   const [showPlayerIdentitySelector, setShowPlayerIdentitySelector] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [showWelcome, setShowWelcome] = useState(false);
 
   // Player identity and view management
   const {
@@ -83,8 +78,6 @@ const Index = () => {
     const restoreSession = async () => {
       const savedGameId = localStorage.getItem('teamup_game_id');
       const savedGameCode = localStorage.getItem('teamup_game_code');
-      const hasSeenWelcome = localStorage.getItem('teamup_has_seen_welcome');
-      
       if (savedGameId && savedGameCode) {
         try {
           const {
@@ -100,28 +93,27 @@ const Index = () => {
             setGameConfig(data.game_config as unknown as GameConfig);
             setMatches(sanitized);
             syncMatchScoresFromMatches(sanitized);
+            setShowGameCodeDialog(false);
             if (data.game_config) {
               setSetupComplete(true);
             }
             if (loadedMatches.length > 0) {
               setActiveSection("matches");
+            } else if (data.players && data.players.length > 0) {
+              setActiveSection("players");
             } else {
               setActiveSection("setup");
             }
-            toast.success("Session restored");
+            toast.success(`Session restored: ${data.game_code}`);
           } else {
+            // Session not found in DB, clear localStorage
             localStorage.removeItem('teamup_game_id');
             localStorage.removeItem('teamup_game_code');
           }
         } catch (error) {
-          console.error('Session restore error:', error);
+          console.error('Failed to restore session:', error);
           localStorage.removeItem('teamup_game_id');
           localStorage.removeItem('teamup_game_code');
-        }
-      } else {
-        // No saved session, show welcome for first-time users
-        if (!hasSeenWelcome) {
-          setShowWelcome(true);
         }
       }
       setIsRestoringSession(false);
@@ -130,10 +122,6 @@ const Index = () => {
       restoreSession();
     } else if (userId === null) {
       // No user yet, but we know auth check completed with no session
-      const hasSeenWelcome = localStorage.getItem('teamup_has_seen_welcome');
-      if (!hasSeenWelcome) {
-        setShowWelcome(true);
-      }
       setIsRestoringSession(false);
     }
   }, [userId]);
@@ -222,34 +210,13 @@ const Index = () => {
       supabase.removeChannel(channel);
     };
   }, [gameId]);
-  
   const createNewGame = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke("create-game");
-      
-      if (error) throw error;
-      
-      const { game_id, game_code } = data;
-      setGameId(game_id);
-      setGameCode(game_code);
-      setShowGameCodeDialog(false);
-      
-      // Mark welcome as seen and hide it
-      localStorage.setItem('teamup_has_seen_welcome', 'true');
-      setShowWelcome(false);
-      
-      toast.success(`Game created! Code: ${game_code}`);
-    } catch (error) {
-      console.error("Error creating game:", error);
-      toast.error("Failed to create game");
-    }
+    // Clear any existing session
+    localStorage.removeItem('teamup_game_id');
+    localStorage.removeItem('teamup_game_code');
+    setShowGameCodeDialog(false);
+    setActiveSection("setup");
   };
-  
-  const handleWelcomeComplete = () => {
-    localStorage.setItem('teamup_has_seen_welcome', 'true');
-    setShowWelcome(false);
-  };
-  
   const joinExistingGame = async (code: string) => {
     if (!userId) {
       toast.error('Please wait for authentication to complete');
@@ -277,11 +244,6 @@ const Index = () => {
       // Save session to localStorage
       localStorage.setItem('teamup_game_id', data.id);
       localStorage.setItem('teamup_game_code', data.game_code);
-      
-      // Mark welcome as seen
-      localStorage.setItem('teamup_has_seen_welcome', 'true');
-      setShowWelcome(false);
-      
       if (data.game_config) {
         setSetupComplete(true);
       }
@@ -296,7 +258,6 @@ const Index = () => {
       console.error(error);
     }
   };
-  
   const handleGameConfigComplete = async (config: GameConfig) => {
     if (!userId) {
       toast.error('Please wait for authentication to complete');
@@ -342,47 +303,6 @@ const Index = () => {
       console.error(error);
     }
   };
-  
-  const handleCombinedSetupComplete = async (playerList: string[], config: GameConfig) => {
-    if (!userId) {
-      toast.error('Please wait for authentication to complete');
-      return;
-    }
-    
-    setPlayers(playerList);
-    setGameConfig(config);
-    setSetupComplete(true);
-    
-    // Generate schedule
-    const newSchedule = generateSchedule(
-      playerList, 
-      config.gameDuration, 
-      config.totalTime, 
-      config.courts, 
-      undefined, 
-      config.teammatePairs,
-      config.courtConfigs
-    );
-    const sanitized = sanitizeMatches(newSchedule);
-    setMatches(sanitized);
-    
-    try {
-      if (gameId) {
-        const { error } = await supabase.from('games').update({
-          players: playerList,
-          matches: sanitized as any,
-          game_config: config as any
-        }).eq('id', gameId);
-        if (error) throw error;
-        toast.success("Schedule generated!");
-        setActiveSection("matches");
-      }
-    } catch (error) {
-      toast.error("Failed to save game");
-      console.error(error);
-    }
-  };
-  
   const handlePlayersUpdate = async (playerList: string[], teammatePairs?: {
     player1: string;
     player2: string;
@@ -515,7 +435,6 @@ const Index = () => {
     setShowGameCodeDialog(false);
     toast.success("New session started");
   };
-  
   // Show loading state while restoring session
   if (isRestoringSession) {
     return <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20 flex items-center justify-center">
@@ -527,28 +446,6 @@ const Index = () => {
       </div>
     </div>;
   }
-  
-  // Show welcome screen for first-time users
-  if (showWelcome) {
-    return <WelcomeScreen onGetStarted={handleWelcomeComplete} />;
-  }
-  
-  // Show setup screen when no game is active
-  if (!gameId) {
-    return (
-      <div className="min-h-screen bg-background pb-20">
-        <div className="container mx-auto p-4 max-w-6xl">
-          <CombinedSetup 
-            onComplete={handleCombinedSetupComplete}
-            onJoinGame={joinExistingGame}
-            onCreateGame={createNewGame}
-            showGameOptions={true}
-          />
-        </div>
-      </div>
-    );
-  }
-  
   return <div className="h-screen bg-gradient-to-br from-background via-secondary/30 to-accent/5 relative flex flex-col">
       {/* Decorative background elements */}
       <div className="absolute inset-0 opacity-5 pointer-events-none">
@@ -600,38 +497,68 @@ const Index = () => {
                       <span className="text-sm font-medium text-muted-foreground">Organizer View</span>
                     </>}
                 </div>
-                <Button onClick={() => {
-                  if (isPlayerView) {
-                    releaseIdentity();
-                  } else {
-                    setShowPlayerIdentitySelector(true);
-                  }
-                }} variant="outline" size="sm" className="gap-1.5">
-                  {isPlayerView ? 'Exit Player View' : 'Player View'}
+                <Button variant={isPlayerView ? "outline" : "default"} size="sm" onClick={() => {
+              if (isPlayerView) {
+                releaseIdentity();
+                toast.success("Switched to organizer view");
+              } else {
+                setShowPlayerIdentitySelector(true);
+              }
+            }} className="gap-2">
+                  {isPlayerView ? <>
+                      <Users className="h-4 w-4" />
+                      Organizer View
+                    </> : <>
+                      <UserCircle className="h-4 w-4" />
+                      Player View
+                    </>}
                 </Button>
               </div>
 
-              {/* Render different views based on mode */}
-              <div className="flex-1 overflow-y-auto min-h-0">
-                {isPlayerView && playerName ? <MyMatchesView gameConfig={gameConfig} matches={playerMatches} currentTime={currentTime} /> : <ScheduleView gameConfig={gameConfig} matches={matches} players={players} matchScores={matchScores} onScheduleUpdate={handleScheduleUpdate} onCourtConfigUpdate={handleCourtConfigUpdate} gameId={gameId || ""} />}
+              {/* Conditional View Rendering */}
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                {isPlayerView && playerName ? <MyMatchesView playerName={playerName} matchGroups={playerMatches} matchScores={matchScores} currentTime={currentTime} allMatches={matches} /> : <ScheduleView matches={matches} onBack={resetApp} gameConfig={gameConfig} allPlayers={players} onScheduleUpdate={handleScheduleUpdate} matchScores={matchScores} onMatchScoresUpdate={setMatchScores} onCourtConfigUpdate={handleCourtConfigUpdate} />}
               </div>
             </div>}
-          
-          {activeSection === "players" && <CheckInOut players={players} onPlayersUpdate={handlePlayersUpdate} gameConfig={gameConfig} />}
-          
-          {activeSection === "leaderboard" && <Leaderboard matches={matches} players={players} matchScores={matchScores} />}
-          
-          {activeSection === "history" && <MatchHistory matches={matches} players={players} matchScores={matchScores} />}
+
+          {/* Player Identity Selector Dialog */}
+          {showPlayerIdentitySelector && <PlayerIdentitySelector players={players} onSelect={async name => {
+          await claimIdentity(name);
+          setShowPlayerIdentitySelector(false);
+          toast.success(`You're now playing as ${name}!`);
+        }} onCancel={() => setShowPlayerIdentitySelector(false)} />}
+
+          {activeSection === "matches" && (!gameConfig || matches.length === 0) && <div className="text-center py-12">
+              <p className="text-muted-foreground">Please complete game setup and add players first</p>
+            </div>}
+
+          {activeSection === "players" && gameCode && <div className="flex-1 min-h-0 h-full">
+              <CheckInOut gameCode={gameCode} players={players} onPlayersUpdate={handlePlayersUpdate} matches={matches} matchScores={matchScores} teammatePairs={gameConfig?.teammatePairs} onNavigateToMatches={() => setActiveSection("matches")} hasStartedMatches={matches.length > 0} />
+            </div>}
+
+          {activeSection === "players" && !gameCode && <div className="text-center py-12">
+              <p className="text-muted-foreground">Please complete game setup first</p>
+            </div>}
+
+          {activeSection === "history" && <div className="flex-1 min-h-0">
+              <MatchHistory matches={matches} matchScores={matchScores} />
+            </div>}
+
+          {activeSection === "leaderboard" && <div className="flex-1 min-h-0">
+              <div className="flex flex-col h-full">
+                <div className="text-center mb-3 flex-shrink-0">
+                  <h2 className="text-2xl font-bold text-foreground mb-2">Leaderboard</h2>
+                  <p className="text-muted-foreground">Player rankings and stats</p>
+                </div>
+                {matchScores.size > 0 ? <Leaderboard players={players} matches={matches} matchScores={matchScores} /> : <div className="text-center py-12">
+                    <p className="text-muted-foreground">No completed matches yet</p>
+                  </div>}
+              </div>
+            </div>}
         </Card>
-
-        {showPlayerIdentitySelector && players.length > 0 && <PlayerIdentitySelector players={players} onSelect={name => {
-            claimIdentity(name);
-            setShowPlayerIdentitySelector(false);
-            setActiveSection("matches");
-          }} onCancel={() => setShowPlayerIdentitySelector(false)} />}
-
-        <BottomNav activeSection={activeSection} onSectionChange={setActiveSection} hasMatches={matches.length > 0} setupComplete={setupComplete} />
       </div>
+
+      <BottomNav activeSection={activeSection} onSectionChange={setActiveSection} disabled={showGameCodeDialog} />
     </div>;
 };
 export default Index;
