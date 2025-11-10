@@ -102,7 +102,7 @@ export const GameSetup = ({
   return <div className="space-y-4 pb-2">
       {/* Header Section */}
       <div className="flex-shrink-0 mb-4">
-        <div className="flex items-center gap-2 justify-center">
+        <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
             <Clock className="w-4 h-4 text-white" />
           </div>
@@ -111,7 +111,7 @@ export const GameSetup = ({
             <p className="text-[10px] text-muted-foreground">Tournament settings</p>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground mt-2 leading-relaxed text-center max-w-md mx-auto">
+        <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
           Configure your tournament settings including match duration, total play time, and number of courts. 
           Choose between singles and doubles play for each court to optimize your racket sports tournament 
           scheduling for pickleball, badminton, or tennis games.
