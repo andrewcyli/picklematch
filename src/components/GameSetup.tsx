@@ -72,6 +72,12 @@ export const GameSetup = ({
     setCourtConfigs(newConfigs);
   };
   const handleContinue = () => {
+    // Validate even player count for doubles tournaments
+    if (schedulingType !== 'round-robin' && tournamentPlayStyle === 'doubles' && playerCount % 2 !== 0) {
+      toast.error("Doubles tournaments require an even number of players. Please add or remove one player.");
+      return;
+    }
+    
     onComplete({
       gameDuration,
       totalTime,
@@ -212,6 +218,14 @@ export const GameSetup = ({
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="text-xs">
               {schedulingType === 'single-elimination' ? 'Single' : 'Double'} elimination requires 4-16 {tournamentPlayStyle === 'singles' ? 'players' : 'teams (pairs)'}. Please adjust player count.
+            </AlertDescription>
+          </Alert>
+        )}
+        {schedulingType !== 'round-robin' && tournamentPlayStyle === 'doubles' && playerCount % 2 !== 0 && (
+          <Alert variant="destructive" className="mt-2">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="text-xs">
+              Doubles tournaments require an even number of players to form teams. Please add or remove one player.
             </AlertDescription>
           </Alert>
         )}

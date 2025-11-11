@@ -317,6 +317,11 @@ const Index = () => {
 
     // Check if tournament mode
     if (gameConfig.schedulingType && gameConfig.schedulingType !== 'round-robin') {
+      // Validate even player count for doubles tournaments
+      if (gameConfig.tournamentPlayStyle === 'doubles' && playerList.length % 2 !== 0) {
+        toast.error("Doubles tournaments require an even number of players. Please add or remove one player.");
+        return;
+      }
       // Tournament mode - generate complete bracket
       const isQualifierMode = gameConfig.schedulingType === 'qualifier-tournament';
       
