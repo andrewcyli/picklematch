@@ -315,6 +315,43 @@ const Index = () => {
     };
     setGameConfig(updatedConfig);
 
+    // Check if tournament mode
+    if (gameConfig.schedulingType && gameConfig.schedulingType !== 'round-robin') {
+      // Tournament mode - generate complete bracket
+      const { generateTournamentSchedule } = await import('@/lib/tournament-scheduler');
+      const { processByeMatches } = await import('@/lib/tournament-progression');
+      
+      try {
+        let newSchedule = generateTournamentSchedule(
+          playerList,
+          gameConfig.gameDuration,
+          gameConfig.courts,
+          gameConfig.schedulingType,
+          gameConfig.courtConfigs || []
+        );
+        
+        // Process bye matches
+        newSchedule = processByeMatches(newSchedule);
+        
+        setMatches(newSchedule);
+        
+        if (gameId) {
+          const { error } = await supabase.from('games').update({
+            players: playerList,
+            matches: newSchedule as any,
+            game_config: updatedConfig as any
+          }).eq('id', gameId);
+          if (error) throw error;
+          toast.success("Tournament bracket generated!");
+        }
+      } catch (error: any) {
+        toast.error(error.message || "Failed to generate tournament");
+        console.error(error);
+      }
+      return;
+    }
+
+    // Round-robin mode - preserve matches and regenerate
     // Identify matches to preserve: completed (with scores) + current matches (first without score on each court)
     const preservedMatches: Match[] = [];
     const courts = Array.from(new Set(matches.map(m => m.court)));

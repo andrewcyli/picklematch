@@ -1,3 +1,21 @@
+export type SchedulingType = 'round-robin' | 'single-elimination' | 'double-elimination';
+
+export interface TournamentMetadata {
+  bracketType: 'winners' | 'losers' | 'finals' | 'grand-finals' | 'third-place';
+  round: number;
+  roundName: string;
+  matchNumber: number;
+  bracketPosition?: string;
+  advancesTo?: string;
+  advancesToSlot?: 'team1' | 'team2';
+  loserAdvancesTo?: string;
+  loserAdvancesToSlot?: 'team1' | 'team2';
+  sourceMatch1?: string;
+  sourceMatch2?: string;
+  seed1?: number;
+  seed2?: number;
+}
+
 export interface Match {
   id: string;
   court: number;
@@ -11,12 +29,13 @@ export interface Match {
     team1: number;
     team2: number;
   };
-  status?: 'scheduled' | 'in-progress' | 'completed';
+  status?: 'scheduled' | 'in-progress' | 'completed' | 'waiting' | 'bye';
   actualEndTime?: number;
   isSingles?: boolean;
   isLocked?: boolean;
   timerStartTime?: number;
   elapsedTime?: string;
+  tournamentMetadata?: TournamentMetadata;
 }
 
 export interface CourtConfig {

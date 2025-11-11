@@ -6,7 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
-import { Clock, Trophy, Share2, Copy, Check } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Clock, Trophy, Share2, Copy, Check, AlertCircle } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { CourtConfig } from "@/lib/scheduler";
@@ -26,6 +27,7 @@ export interface GameConfig {
     player2: string;
   }[];
   courtConfigs?: CourtConfig[];
+  schedulingType?: 'round-robin' | 'single-elimination' | 'double-elimination';
 }
 export const GameSetup = ({
   playerCount = 4,
@@ -37,6 +39,7 @@ export const GameSetup = ({
   const [gameDuration, setGameDuration] = useState<number>(10);
   const [totalTime, setTotalTime] = useState<number>(60);
   const [courts, setCourts] = useState<number>(2);
+  const [schedulingType, setSchedulingType] = useState<'round-robin' | 'single-elimination' | 'double-elimination'>('round-robin');
   const [courtConfigs, setCourtConfigs] = useState<CourtConfig[]>(Array.from({
     length: 2
   }, (_, i) => ({
@@ -71,7 +74,8 @@ export const GameSetup = ({
       gameDuration,
       totalTime,
       courts,
-      courtConfigs
+      courtConfigs,
+      schedulingType
     });
   };
   const handleCopy = () => {
@@ -160,6 +164,43 @@ export const GameSetup = ({
         </Button>
       )}
 
+      {/* Scheduling Type Selection */}
+      <div className="space-y-2">
+        <Label className="text-sm font-semibold flex items-center gap-1.5">
+          <Trophy className="w-3.5 h-3.5" />
+          Scheduling Type
+        </Label>
+        <RadioGroup value={schedulingType} onValueChange={(v) => setSchedulingType(v as any)}>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <label className={`relative flex flex-col items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all ${schedulingType === 'round-robin' ? "border-primary bg-primary/5 shadow-md" : "border-border hover:border-primary/50"}`}>
+              <RadioGroupItem value="round-robin" className="sr-only" />
+              <span className="text-sm font-bold">Round Robin</span>
+              <p className="text-xs text-muted-foreground text-center mt-1">Everyone plays multiple games</p>
+            </label>
+            <label className={`relative flex flex-col items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all ${schedulingType === 'single-elimination' ? "border-primary bg-primary/5 shadow-md" : "border-border hover:border-primary/50"}`}>
+              <RadioGroupItem value="single-elimination" className="sr-only" />
+              <span className="text-sm font-bold">Single Elim</span>
+              <p className="text-xs text-muted-foreground text-center mt-1">Lose once, you're out</p>
+            </label>
+            <label className={`relative flex flex-col items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all ${schedulingType === 'double-elimination' ? "border-primary bg-primary/5 shadow-md" : "border-border hover:border-primary/50"}`}>
+              <RadioGroupItem value="double-elimination" className="sr-only" />
+              <span className="text-sm font-bold">Double Elim</span>
+              <p className="text-xs text-muted-foreground text-center mt-1">Two chances to stay in</p>
+            </label>
+          </div>
+        </RadioGroup>
+        
+        {/* Tournament player count validation */}
+        {schedulingType !== 'round-robin' && (playerCount < 4 || playerCount > 16) && (
+          <Alert variant="destructive" className="mt-2">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="text-xs">
+              Tournament mode requires 4-16 players. Please adjust player count.
+            </AlertDescription>
+          </Alert>
+        )}
+      </div>
+
       {/* Form Layout */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Game Duration */}
@@ -178,22 +219,24 @@ export const GameSetup = ({
           </RadioGroup>
         </div>
 
-        {/* Total Play Time */}
-        <div className="space-y-2">
-          <Label htmlFor="total-time" className="text-sm font-semibold">
-            Total Play Time
-          </Label>
-          <Select value={totalTime.toString()} onValueChange={v => setTotalTime(Number(v))}>
-            <SelectTrigger id="total-time" className="h-10 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {totalTimeOptions.map(time => <SelectItem key={time} value={time.toString()} className="text-sm">
-                  {time} minutes
-                </SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Total Play Time - Only show for round-robin */}
+        {schedulingType === 'round-robin' && (
+          <div className="space-y-2">
+            <Label htmlFor="total-time" className="text-sm font-semibold">
+              Total Play Time
+            </Label>
+            <Select value={totalTime.toString()} onValueChange={v => setTotalTime(Number(v))}>
+              <SelectTrigger id="total-time" className="h-10 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {totalTimeOptions.map(time => <SelectItem key={time} value={time.toString()} className="text-sm">
+                    {time} minutes
+                  </SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {/* Number of Courts */}
         <div className="space-y-2">

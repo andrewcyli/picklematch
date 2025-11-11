@@ -11,6 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { validateMatchScore } from "@/lib/validation";
 import { useStopwatch } from "@/hooks/use-stopwatch";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from "@/components/ui/carousel";
+import { TournamentBracketDialog } from "./TournamentBracketDialog";
+import { advanceWinnerToNextMatch } from "@/lib/tournament-progression";
 interface ScheduleViewProps {
   matches: Match[];
   onBack: () => void;
@@ -23,6 +25,7 @@ interface ScheduleViewProps {
       player2: string;
     }[];
     courtConfigs?: CourtConfig[];
+    schedulingType?: 'round-robin' | 'single-elimination' | 'double-elimination';
   };
   allPlayers: string[];
   onScheduleUpdate: (newMatches: Match[], newPlayers: string[]) => void;
@@ -82,6 +85,10 @@ export const ScheduleView = ({
     startTime: number;
     matchId: string;
   }>>(new Map());
+  const [showBracketDialog, setShowBracketDialog] = useState(false);
+
+  // Check if tournament mode
+  const isTournamentMode = gameConfig.schedulingType && gameConfig.schedulingType !== 'round-robin';
 
   // Helper to normalize scores to numbers
   const normalizeScore = (score: {
@@ -384,10 +391,21 @@ export const ScheduleView = ({
 
     // Only check conflicts and schedule adjustments for newly completed matches, not edited ones
     if (!wasAlreadyScored) {
+      // If tournament mode, advance winners
+      if (isTournamentMode && match) {
+        const winner: 'team1' | 'team2' = team1Score > team2Score ? 'team1' : 'team2';
+        const advancedMatches = advanceWinnerToNextMatch(match, winner, updatedMatches);
+        onScheduleUpdate(advancedMatches, allPlayers);
+      }
+
       const completedMatchRef = matches.find(m => m.id === matchId);
       const actualEndTime = completedMatchRef ? completedMatchRef.endTime : 0;
-      checkScheduleAdjustment(matchId, actualEndTime, newScores);
-      checkPlayerConflicts(newScores);
+      
+      // Only check conflicts for round-robin mode
+      if (!isTournamentMode) {
+        checkScheduleAdjustment(matchId, actualEndTime, newScores);
+        checkPlayerConflicts(newScores);
+      }
 
       // Auto-scroll to next match on the same court
       if (match) {
@@ -720,6 +738,34 @@ export const ScheduleView = ({
   return <div className="h-full overflow-y-auto">
       {/* Header */}
       <div className="sticky top-0 bg-background/95 backdrop-blur-sm z-10 pb-1 border-b mb-2">
+        {/* Tournament Mode Header */}
+        {isTournamentMode && (
+          <div className="px-2 pt-2 pb-1 border-b">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                  <Trophy className="w-4 h-4" />
+                  {gameConfig.schedulingType === 'single-elimination' 
+                    ? 'Single Elimination Tournament'
+                    : 'Double Elimination Tournament'}
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Score matches below or view full bracket
+                </p>
+              </div>
+              <Button
+                onClick={() => setShowBracketDialog(true)}
+                variant="outline"
+                size="sm"
+                className="gap-2 h-8"
+              >
+                <Trophy className="w-3.5 h-3.5" />
+                View Bracket
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between gap-2 px-2 pt-1">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
@@ -955,5 +1001,17 @@ export const ScheduleView = ({
             </div>;
       })}
       </div>
+
+      {/* Tournament Bracket Dialog */}
+      {isTournamentMode && gameConfig.schedulingType !== 'round-robin' && (
+        <TournamentBracketDialog
+          open={showBracketDialog}
+          onOpenChange={setShowBracketDialog}
+          matches={matches}
+          matchScores={matchScores}
+          allPlayers={allPlayers}
+          schedulingType={gameConfig.schedulingType}
+        />
+      )}
     </div>;
 };
