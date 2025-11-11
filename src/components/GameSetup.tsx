@@ -73,23 +73,7 @@ export const GameSetup = ({
     setCourtConfigs(newConfigs);
   };
   const handleContinue = () => {
-    // For single/double elimination, validate team count is 4, 8, or 16
-    if (schedulingType === 'single-elimination' || schedulingType === 'double-elimination') {
-      const teamCount = tournamentPlayStyle === 'doubles' ? playerCount / 2 : playerCount;
-      if (![4, 8, 16].includes(teamCount)) {
-        const requiredCounts = tournamentPlayStyle === 'doubles' ? '8, 16, or 32' : '4, 8, or 16';
-        toast.error(`${schedulingType === 'single-elimination' ? 'Single' : 'Double'} elimination requires exactly ${requiredCounts} ${tournamentPlayStyle === 'singles' ? 'players' : 'players (for 4, 8, or 16 teams)'}.`);
-        return;
-      }
-    }
-    
-    // Validate even player count for doubles tournaments
-    if (schedulingType !== 'round-robin' && tournamentPlayStyle === 'doubles' && playerCount % 2 !== 0) {
-      toast.error("Doubles tournaments require an even number of players. Please add or remove one player.");
-      return;
-    }
-    
-    // For tournament modes, set all courts to match the play style
+    // Do not block on team/player count here; validate on Players page when updating matches
     const finalCourtConfigs = schedulingType !== 'round-robin' 
       ? courtConfigs.map(config => ({ ...config, type: tournamentPlayStyle as 'singles' | 'doubles' }))
       : courtConfigs;
