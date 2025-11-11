@@ -27,7 +27,7 @@ export interface GameConfig {
     player2: string;
   }[];
   courtConfigs?: CourtConfig[];
-  schedulingType?: 'round-robin' | 'single-elimination' | 'double-elimination';
+  schedulingType?: 'round-robin' | 'single-elimination' | 'double-elimination' | 'qualifier-tournament';
   tournamentPlayStyle?: 'singles' | 'doubles';
 }
 export const GameSetup = ({
@@ -40,7 +40,7 @@ export const GameSetup = ({
   const [gameDuration, setGameDuration] = useState<number>(10);
   const [totalTime, setTotalTime] = useState<number>(60);
   const [courts, setCourts] = useState<number>(2);
-  const [schedulingType, setSchedulingType] = useState<'round-robin' | 'single-elimination' | 'double-elimination'>('round-robin');
+  const [schedulingType, setSchedulingType] = useState<'round-robin' | 'single-elimination' | 'double-elimination' | 'qualifier-tournament'>('round-robin');
   const [tournamentPlayStyle, setTournamentPlayStyle] = useState<'singles' | 'doubles'>('doubles');
   const [courtConfigs, setCourtConfigs] = useState<CourtConfig[]>(Array.from({
     length: 2
@@ -174,11 +174,16 @@ export const GameSetup = ({
           Scheduling Type
         </Label>
         <RadioGroup value={schedulingType} onValueChange={(v) => setSchedulingType(v as any)}>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <label className={`relative flex flex-col items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all ${schedulingType === 'round-robin' ? "border-primary bg-primary/5 shadow-md" : "border-border hover:border-primary/50"}`}>
               <RadioGroupItem value="round-robin" className="sr-only" />
               <span className="text-sm font-bold">Round Robin</span>
               <p className="text-xs text-muted-foreground text-center mt-1">Everyone plays multiple games</p>
+            </label>
+            <label className={`relative flex flex-col items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all ${schedulingType === 'qualifier-tournament' ? "border-primary bg-primary/5 shadow-md" : "border-border hover:border-primary/50"}`}>
+              <RadioGroupItem value="qualifier-tournament" className="sr-only" />
+              <span className="text-sm font-bold">Qualifier Stage</span>
+              <p className="text-xs text-muted-foreground text-center mt-1">Groups then knockout (4-24 teams)</p>
             </label>
             <label className={`relative flex flex-col items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all ${schedulingType === 'single-elimination' ? "border-primary bg-primary/5 shadow-md" : "border-border hover:border-primary/50"}`}>
               <RadioGroupItem value="single-elimination" className="sr-only" />
@@ -194,11 +199,19 @@ export const GameSetup = ({
         </RadioGroup>
         
         {/* Tournament player count validation */}
-        {schedulingType !== 'round-robin' && (playerCount < 4 || playerCount > 16) && (
+        {schedulingType === 'qualifier-tournament' && (playerCount < 4 || playerCount > 24) && (
           <Alert variant="destructive" className="mt-2">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="text-xs">
-              Tournament mode requires 4-16 {tournamentPlayStyle === 'singles' ? 'players' : 'teams (pairs)'}. Please adjust player count.
+              Qualifier tournament requires 4-24 {tournamentPlayStyle === 'singles' ? 'players' : 'teams (pairs)'}. Please adjust player count.
+            </AlertDescription>
+          </Alert>
+        )}
+        {(schedulingType === 'single-elimination' || schedulingType === 'double-elimination') && (playerCount < 4 || playerCount > 16) && (
+          <Alert variant="destructive" className="mt-2">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="text-xs">
+              {schedulingType === 'single-elimination' ? 'Single' : 'Double'} elimination requires 4-16 {tournamentPlayStyle === 'singles' ? 'players' : 'teams (pairs)'}. Please adjust player count.
             </AlertDescription>
           </Alert>
         )}

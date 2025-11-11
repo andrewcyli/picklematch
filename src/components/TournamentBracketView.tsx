@@ -1,23 +1,95 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Match } from "@/lib/scheduler";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Trophy, Clock } from "lucide-react";
+import { Trophy, Clock, Users } from "lucide-react";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface TournamentBracketViewProps {
   matches: Match[];
   matchScores: Map<string, { team1: number; team2: number }>;
   allPlayers: string[];
+  isQualifierMode?: boolean;
 }
 
 export function TournamentBracketView({
   matches,
   matchScores,
   allPlayers,
+  isQualifierMode = false,
 }: TournamentBracketViewProps) {
+  // Check if this is qualifier mode by checking for qualifier metadata
+  const hasQualifierStage = useMemo(() => 
+    matches.some(m => m.qualifierMetadata?.isGroupStage),
+    [matches]
+  );
+  
+  const actualIsQualifierMode = isQualifierMode || hasQualifierStage;
+  
+  // Separate qualifier and knockout matches
+  const qualifierMatches = useMemo(() => 
+    matches.filter(m => m.qualifierMetadata?.isGroupStage),
+    [matches]
+  );
+  
+  const knockoutMatches = useMemo(() => 
+    matches.filter(m => !m.qualifierMetadata?.isGroupStage),
+    [matches]
+  );
+  
+  // If qualifier mode, show tabs
+  if (actualIsQualifierMode) {
+    return (
+      <Tabs defaultValue="qualifier" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="qualifier">
+            <Users className="w-4 h-4 mr-2" />
+            Qualifier Stage
+          </TabsTrigger>
+          <TabsTrigger value="knockout">
+            <Trophy className="w-4 h-4 mr-2" />
+            Knockout Bracket
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="qualifier" className="mt-4">
+          <QualifierStageViewInternal matches={qualifierMatches} matchScores={matchScores} />
+        </TabsContent>
+        <TabsContent value="knockout" className="mt-4">
+          <BracketViewInternal matches={knockoutMatches} matchScores={matchScores} allPlayers={allPlayers} />
+        </TabsContent>
+      </Tabs>
+    );
+  }
+  
+  // Standard tournament bracket view
+  return <BracketViewInternal matches={matches} matchScores={matchScores} allPlayers={allPlayers} />;
+}
+
+// Internal component for qualifier stage view
+function QualifierStageViewInternal({
+  matches,
+  matchScores
+}: {
+  matches: Match[];
+  matchScores: Map<string, { team1: number; team2: number }>;
+}) {
+  const { QualifierStageView } = require('./QualifierStageView');
+  return <QualifierStageView matches={matches} matchScores={matchScores} />;
+}
+
+// Internal component for bracket view
+function BracketViewInternal({
+  matches,
+  matchScores,
+  allPlayers
+}: {
+  matches: Match[];
+  matchScores: Map<string, { team1: number; team2: number }>;
+  allPlayers: string[];
+}) {
   const isMobile = useIsMobile();
   
   // Group matches by bracket type and round
@@ -67,6 +139,11 @@ export function TournamentBracketView({
     const sourceMatchId = slot === 'team1' ? metadata.sourceMatch1 : metadata.sourceMatch2;
 
     if (sourceMatchId) {
+      // Check if source is a group (for qualifier tournaments)
+      if (sourceMatchId.startsWith('Group ')) {
+        return `Winner of ${sourceMatchId}`;
+      }
+      
       const sourceMatch = matches.find((m) => m.id === sourceMatchId);
       if (sourceMatch?.tournamentMetadata) {
         const pos = sourceMatch.tournamentMetadata.bracketPosition;

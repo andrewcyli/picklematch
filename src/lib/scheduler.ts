@@ -1,4 +1,4 @@
-export type SchedulingType = 'round-robin' | 'single-elimination' | 'double-elimination';
+export type SchedulingType = 'round-robin' | 'single-elimination' | 'double-elimination' | 'qualifier-tournament';
 
 export interface TournamentMetadata {
   bracketType: 'winners' | 'losers' | 'finals' | 'grand-finals' | 'third-place';
@@ -14,6 +14,23 @@ export interface TournamentMetadata {
   sourceMatch2?: string;
   seed1?: number;
   seed2?: number;
+}
+
+export interface QualifierMetadata {
+  groupId: string;
+  groupSize: 2 | 3 | 4;
+  groupMatchNum: number;
+  isGroupStage: boolean;
+  advancesToKnockout?: boolean;
+}
+
+export interface GroupStanding {
+  team: string[];
+  wins: number;
+  losses: number;
+  pointsFor: number;
+  pointsAgainst: number;
+  pointDifferential: number;
 }
 
 export interface Match {
@@ -36,6 +53,7 @@ export interface Match {
   timerStartTime?: number;
   elapsedTime?: string;
   tournamentMetadata?: TournamentMetadata;
+  qualifierMetadata?: QualifierMetadata;
 }
 
 export interface CourtConfig {

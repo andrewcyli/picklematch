@@ -14,7 +14,7 @@ interface TournamentBracketDialogProps {
   matches: Match[];
   matchScores: Map<string, { team1: number; team2: number }>;
   allPlayers: string[];
-  schedulingType: 'single-elimination' | 'double-elimination';
+  schedulingType: 'single-elimination' | 'double-elimination' | 'qualifier-tournament';
 }
 
 export function TournamentBracketDialog({
@@ -33,7 +33,9 @@ export function TournamentBracketDialog({
           <DialogDescription>
             {schedulingType === 'single-elimination'
               ? 'Single Elimination - One loss and you\'re out'
-              : 'Double Elimination - Two chances to stay in'}
+              : schedulingType === 'double-elimination'
+              ? 'Double Elimination - Two chances to stay in'
+              : 'Qualifier Tournament - Groups then knockout'}
           </DialogDescription>
         </DialogHeader>
 

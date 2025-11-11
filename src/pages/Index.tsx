@@ -318,6 +318,40 @@ const Index = () => {
     // Check if tournament mode
     if (gameConfig.schedulingType && gameConfig.schedulingType !== 'round-robin') {
       // Tournament mode - generate complete bracket
+      const isQualifierMode = gameConfig.schedulingType === 'qualifier-tournament';
+      
+      if (isQualifierMode) {
+        const { generateQualifierTournamentSchedule } = await import('@/lib/qualifier-tournament-scheduler');
+        const { advanceGroupWinnersToKnockout } = await import('@/lib/qualifier-progression');
+        
+        try {
+          let newSchedule = generateQualifierTournamentSchedule(
+            playerList,
+            gameConfig.gameDuration,
+            gameConfig.courts,
+            gameConfig.courtConfigs || [],
+            teammatePairs || [],
+            gameConfig.tournamentPlayStyle === 'singles'
+          );
+          
+          setMatches(newSchedule);
+          
+          if (gameId) {
+            const { error } = await supabase.from('games').update({
+              players: playerList,
+              matches: newSchedule as any,
+              game_config: updatedConfig as any
+            }).eq('id', gameId);
+            if (error) throw error;
+            toast.success("Qualifier tournament generated!");
+          }
+        } catch (error: any) {
+          toast.error(error.message || "Failed to generate qualifier tournament");
+          console.error(error);
+        }
+        return;
+      }
+      
       const { generateTournamentSchedule } = await import('@/lib/tournament-scheduler');
       const { processByeMatches } = await import('@/lib/tournament-progression');
       

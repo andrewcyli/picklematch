@@ -25,7 +25,8 @@ interface ScheduleViewProps {
       player2: string;
     }[];
     courtConfigs?: CourtConfig[];
-    schedulingType?: 'round-robin' | 'single-elimination' | 'double-elimination';
+    schedulingType?: 'round-robin' | 'single-elimination' | 'double-elimination' | 'qualifier-tournament';
+    tournamentPlayStyle?: 'singles' | 'doubles';
   };
   allPlayers: string[];
   onScheduleUpdate: (newMatches: Match[], newPlayers: string[]) => void;
@@ -405,8 +406,17 @@ export const ScheduleView = ({
       // If tournament mode, advance winners
       if (isTournamentMode && match) {
         const winner: 'team1' | 'team2' = team1Score > team2Score ? 'team1' : 'team2';
-        const advancedMatches = advanceWinnerToNextMatch(match, winner, updatedMatches);
-        onScheduleUpdate(advancedMatches, allPlayers);
+        
+        // For qualifier tournaments, handle group progression
+        if (match.qualifierMetadata?.isGroupStage) {
+          const { advanceGroupWinnersToKnockout } = require('@/lib/qualifier-progression');
+          const advancedMatches = advanceGroupWinnersToKnockout(updatedMatches, newScores);
+          onScheduleUpdate(advancedMatches, allPlayers);
+        } else {
+          // Standard tournament progression
+          const advancedMatches = advanceWinnerToNextMatch(match, winner, updatedMatches);
+          onScheduleUpdate(advancedMatches, allPlayers);
+        }
       }
 
       const completedMatchRef = matches.find(m => m.id === matchId);

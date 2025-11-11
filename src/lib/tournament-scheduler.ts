@@ -7,11 +7,23 @@ export function generateTournamentSchedule(
   players: string[],
   gameDuration: number,
   courts: number,
-  schedulingType: 'single-elimination' | 'double-elimination',
+  schedulingType: 'single-elimination' | 'double-elimination' | 'qualifier-tournament',
   courtConfigs: CourtConfig[],
   teammatePairs: Array<{ player1: string; player2: string }> = [],
   isSingles: boolean = false
 ): Match[] {
+  // Handle qualifier tournament
+  if (schedulingType === 'qualifier-tournament') {
+    const { generateQualifierTournamentSchedule } = require('./qualifier-tournament-scheduler');
+    return generateQualifierTournamentSchedule(
+      players,
+      gameDuration,
+      courts,
+      courtConfigs,
+      teammatePairs,
+      isSingles
+    );
+  }
   // For doubles tournaments, validate we have teams (pairs)
   if (!isSingles) {
     // Convert players to teams (pairs)
