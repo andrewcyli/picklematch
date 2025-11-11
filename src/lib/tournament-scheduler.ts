@@ -174,18 +174,27 @@ function createSingleEliminationStructure(
   const matches: Match[] = [];
   const rounds = Math.log2(bracketSize);
   
-  let matchIdCounter = 0;
-  let currentTime = 0;
-  let currentCourt = 0;
+  // Track when each court will be available
+  const courtAvailability = new Array(courts).fill(0);
   
   // Generate matches for each round
   for (let round = 1; round <= rounds; round++) {
     const matchesInRound = Math.pow(2, rounds - round);
     const roundName = getRoundName(round, rounds);
     
+    // Reset court tracking for new round to ensure even distribution
+    if (round > 1) {
+      const maxTime = Math.max(...courtAvailability);
+      courtAvailability.fill(maxTime);
+    }
+    
     for (let matchNum = 0; matchNum < matchesInRound; matchNum++) {
       const matchId = `tournament-r${round}-m${matchNum + 1}`;
-      const courtConfig = courtConfigs[currentCourt % courtConfigs.length];
+      
+      // Find the court that will be available earliest
+      const courtIndex = courtAvailability.indexOf(Math.min(...courtAvailability));
+      const courtConfig = courtConfigs[courtIndex % courtConfigs.length];
+      const startTime = courtAvailability[courtIndex];
       
       const metadata: TournamentMetadata = {
         bracketType: 'winners',
@@ -215,8 +224,8 @@ function createSingleEliminationStructure(
       matches.push({
         id: matchId,
         court: courtConfig.courtNumber,
-        startTime: currentTime,
-        endTime: currentTime + gameDuration,
+        startTime: startTime,
+        endTime: startTime + gameDuration,
         team1: isSingles ? ['TBD'] as [string] : ['TBD', 'TBD'] as [string, string],
         team2: isSingles ? ['TBD'] as [string] : ['TBD', 'TBD'] as [string, string],
         status: round === 1 ? 'scheduled' : 'waiting',
@@ -225,19 +234,8 @@ function createSingleEliminationStructure(
         tournamentMetadata: metadata,
       });
       
-      currentCourt++;
-      matchIdCounter++;
-      
-      // Move to next time slot when all courts are used
-      if (currentCourt % courts === 0) {
-        currentTime += gameDuration;
-      }
-    }
-    
-    // Ensure next round starts at a new time slot
-    if (currentCourt % courts !== 0) {
-      currentTime += gameDuration;
-      currentCourt = 0;
+      // Update court availability
+      courtAvailability[courtIndex] += gameDuration;
     }
   }
   
@@ -258,17 +256,27 @@ function createDoubleEliminationStructure(
   const losersMatches: Match[] = [];
   const rounds = Math.log2(bracketSize);
   
-  let currentTime = 0;
-  let currentCourt = 0;
+  // Track when each court will be available
+  const courtAvailability = new Array(courts).fill(0);
   
   // Generate winners bracket
   for (let round = 1; round <= rounds; round++) {
     const matchesInRound = Math.pow(2, rounds - round);
     const roundName = getRoundName(round, rounds);
     
+    // Reset court tracking for new round to ensure even distribution
+    if (round > 1) {
+      const maxTime = Math.max(...courtAvailability);
+      courtAvailability.fill(maxTime);
+    }
+    
     for (let matchNum = 0; matchNum < matchesInRound; matchNum++) {
       const matchId = `tournament-w-r${round}-m${matchNum + 1}`;
-      const courtConfig = courtConfigs[currentCourt % courtConfigs.length];
+      
+      // Find the court that will be available earliest
+      const courtIndex = courtAvailability.indexOf(Math.min(...courtAvailability));
+      const courtConfig = courtConfigs[courtIndex % courtConfigs.length];
+      const startTime = courtAvailability[courtIndex];
       
       const metadata: TournamentMetadata = {
         bracketType: 'winners',
@@ -315,8 +323,8 @@ function createDoubleEliminationStructure(
       winnersMatches.push({
         id: matchId,
         court: courtConfig.courtNumber,
-        startTime: currentTime,
-        endTime: currentTime + gameDuration,
+        startTime: startTime,
+        endTime: startTime + gameDuration,
         team1: isSingles ? ['TBD'] as [string] : ['TBD', 'TBD'] as [string, string],
         team2: isSingles ? ['TBD'] as [string] : ['TBD', 'TBD'] as [string, string],
         status: round === 1 ? 'scheduled' : 'waiting',
@@ -325,15 +333,8 @@ function createDoubleEliminationStructure(
         tournamentMetadata: metadata,
       });
       
-      currentCourt++;
-      if (currentCourt % courts === 0) {
-        currentTime += gameDuration;
-      }
-    }
-    
-    if (currentCourt % courts !== 0) {
-      currentTime += gameDuration;
-      currentCourt = 0;
+      // Update court availability
+      courtAvailability[courtIndex] += gameDuration;
     }
   }
   
@@ -344,9 +345,17 @@ function createDoubleEliminationStructure(
       ? Math.pow(2, rounds - Math.ceil(round / 2) - 1)
       : Math.pow(2, rounds - Math.ceil(round / 2) - 1);
     
+    // Reset court tracking for new round
+    const maxTime = Math.max(...courtAvailability);
+    courtAvailability.fill(maxTime);
+    
     for (let matchNum = 0; matchNum < matchesInRound; matchNum++) {
       const matchId = `tournament-l-r${round}-m${matchNum + 1}`;
-      const courtConfig = courtConfigs[currentCourt % courtConfigs.length];
+      
+      // Find the court that will be available earliest
+      const courtIndex = courtAvailability.indexOf(Math.min(...courtAvailability));
+      const courtConfig = courtConfigs[courtIndex % courtConfigs.length];
+      const startTime = courtAvailability[courtIndex];
       
       const metadata: TournamentMetadata = {
         bracketType: 'losers',
@@ -369,8 +378,8 @@ function createDoubleEliminationStructure(
       losersMatches.push({
         id: matchId,
         court: courtConfig.courtNumber,
-        startTime: currentTime,
-        endTime: currentTime + gameDuration,
+        startTime: startTime,
+        endTime: startTime + gameDuration,
         team1: isSingles ? ['TBD'] as [string] : ['TBD', 'TBD'] as [string, string],
         team2: isSingles ? ['TBD'] as [string] : ['TBD', 'TBD'] as [string, string],
         status: 'waiting',
@@ -379,25 +388,20 @@ function createDoubleEliminationStructure(
         tournamentMetadata: metadata,
       });
       
-      currentCourt++;
-      if (currentCourt % courts === 0) {
-        currentTime += gameDuration;
-      }
-    }
-    
-    if (currentCourt % courts !== 0) {
-      currentTime += gameDuration;
-      currentCourt = 0;
+      // Update court availability
+      courtAvailability[courtIndex] += gameDuration;
     }
   }
   
   // Add losers finals
+  const maxTime = Math.max(...courtAvailability);
   const courtConfig = courtConfigs[0];
+  
   losersMatches.push({
     id: 'tournament-losers-finals',
     court: courtConfig.courtNumber,
-    startTime: currentTime,
-    endTime: currentTime + gameDuration,
+    startTime: maxTime,
+    endTime: maxTime + gameDuration,
     team1: isSingles ? ['TBD'] as [string] : ['TBD', 'TBD'] as [string, string],
     team2: isSingles ? ['TBD'] as [string] : ['TBD', 'TBD'] as [string, string],
     status: 'waiting',
@@ -413,14 +417,14 @@ function createDoubleEliminationStructure(
     },
   });
   
-  currentTime += gameDuration;
+  const grandFinalsStart = maxTime + gameDuration;
   
   // Add grand finals
   losersMatches.push({
     id: 'tournament-grand-finals',
     court: courtConfig.courtNumber,
-    startTime: currentTime,
-    endTime: currentTime + gameDuration,
+    startTime: grandFinalsStart,
+    endTime: grandFinalsStart + gameDuration,
     team1: isSingles ? ['TBD'] as [string] : ['TBD', 'TBD'] as [string, string],
     team2: isSingles ? ['TBD'] as [string] : ['TBD', 'TBD'] as [string, string],
     status: 'waiting',

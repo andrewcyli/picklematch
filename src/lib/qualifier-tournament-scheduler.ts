@@ -154,9 +154,10 @@ function generateGroupStageMatches(
   isSingles: boolean
 ): Match[] {
   const matches: Match[] = [];
-  let currentTime = 0;
-  let currentCourt = 0;
   let teamIndex = 0;
+  
+  // Track when each court will be available
+  const courtAvailability = new Array(courts).fill(0);
   
   // Create groups and their matches
   const groups: { id: string; size: number; teams: string[][] }[] = [];
@@ -204,7 +205,10 @@ function generateGroupStageMatches(
     );
     
     groupMatches.forEach((match, idx) => {
-      const courtConfig = courtConfigs[currentCourt % courtConfigs.length];
+      // Find the court that will be available earliest
+      const courtIndex = courtAvailability.indexOf(Math.min(...courtAvailability));
+      const courtConfig = courtConfigs[courtIndex % courtConfigs.length];
+      const startTime = courtAvailability[courtIndex];
       
       const metadata: QualifierMetadata = {
         groupId: `Group ${group.id}`,
@@ -231,8 +235,8 @@ function generateGroupStageMatches(
       matches.push({
         id: `qual-g${group.id}-m${idx + 1}`,
         court: courtConfig.courtNumber,
-        startTime: currentTime,
-        endTime: currentTime + gameDuration,
+        startTime: startTime,
+        endTime: startTime + gameDuration,
         team1: match.team1!,
         team2: match.team2!,
         status: match.team1![0] === 'TBD' ? 'waiting' : 'scheduled',
@@ -241,17 +245,9 @@ function generateGroupStageMatches(
         qualifierMetadata: metadata
       });
       
-      currentCourt++;
-      if (currentCourt % courts === 0) {
-        currentTime += gameDuration;
-      }
+      // Update court availability
+      courtAvailability[courtIndex] += gameDuration;
     });
-    
-    // Ensure next group starts on new time slot
-    if (currentCourt % courts !== 0) {
-      currentTime += gameDuration;
-      currentCourt = 0;
-    }
   });
   
   return matches;
@@ -329,17 +325,27 @@ function generateKnockoutBracket(
   const matches: Match[] = [];
   const rounds = Math.log2(qualifierCount);
   
-  let currentTime = startTime;
-  let currentCourt = 0;
+  // Track when each court will be available (start from group stage end time)
+  const courtAvailability = new Array(courts).fill(startTime);
   
   // Generate matches for each round
   for (let round = 1; round <= rounds; round++) {
     const matchesInRound = Math.pow(2, rounds - round);
     const roundName = getRoundName(round, rounds);
     
+    // Reset court tracking for new round to ensure even distribution
+    if (round > 1) {
+      const maxTime = Math.max(...courtAvailability);
+      courtAvailability.fill(maxTime);
+    }
+    
     for (let matchNum = 0; matchNum < matchesInRound; matchNum++) {
       const matchId = `knockout-r${round}-m${matchNum + 1}`;
-      const courtConfig = courtConfigs[currentCourt % courtConfigs.length];
+      
+      // Find the court that will be available earliest
+      const courtIndex = courtAvailability.indexOf(Math.min(...courtAvailability));
+      const courtConfig = courtConfigs[courtIndex % courtConfigs.length];
+      const matchStartTime = courtAvailability[courtIndex];
       
       const metadata: TournamentMetadata = {
         bracketType: 'winners',
@@ -374,8 +380,8 @@ function generateKnockoutBracket(
       matches.push({
         id: matchId,
         court: courtConfig.courtNumber,
-        startTime: currentTime,
-        endTime: currentTime + gameDuration,
+        startTime: matchStartTime,
+        endTime: matchStartTime + gameDuration,
         team1: isSingles ? ['TBD'] as [string] : ['TBD', 'TBD'] as [string, string],
         team2: isSingles ? ['TBD'] as [string] : ['TBD', 'TBD'] as [string, string],
         status: 'waiting',
@@ -384,16 +390,8 @@ function generateKnockoutBracket(
         tournamentMetadata: metadata,
       });
       
-      currentCourt++;
-      if (currentCourt % courts === 0) {
-        currentTime += gameDuration;
-      }
-    }
-    
-    // Ensure next round starts at a new time slot
-    if (currentCourt % courts !== 0) {
-      currentTime += gameDuration;
-      currentCourt = 0;
+      // Update court availability
+      courtAvailability[courtIndex] += gameDuration;
     }
   }
   
