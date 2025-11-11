@@ -325,6 +325,17 @@ export const ScheduleView = ({
     }
     const team1Score = typeof pending.team1 === 'number' ? pending.team1 : Number(pending.team1);
     const team2Score = typeof pending.team2 === 'number' ? pending.team2 : Number(pending.team2);
+    
+    // Prevent ties in tournament mode
+    if (isTournamentMode && team1Score === team2Score) {
+      toast({
+        title: "No ties allowed",
+        description: "Tournament matches must have a winner",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     const match = matches.find(m => m.id === matchId);
     const wasAlreadyScored = matchScores.has(matchId);
 

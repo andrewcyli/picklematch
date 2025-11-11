@@ -1,9 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Match } from "@/lib/scheduler";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Trophy, Clock } from "lucide-react";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface TournamentBracketViewProps {
   matches: Match[];
@@ -16,6 +18,8 @@ export function TournamentBracketView({
   matchScores,
   allPlayers,
 }: TournamentBracketViewProps) {
+  const isMobile = useIsMobile();
+  
   // Group matches by bracket type and round
   const groupedMatches = useMemo(() => {
     const groups = new Map<string, Map<number, Match[]>>();
@@ -90,33 +94,69 @@ export function TournamentBracketView({
           {bracketType === 'grand-finals' && 'Grand Finals'}
         </h3>
 
-        <div className="flex gap-8 overflow-x-auto pb-4">
-          {sortedRounds.map((roundNum) => {
-            const roundMatches = roundsMap.get(roundNum) || [];
-            const roundName =
-              roundMatches[0]?.tournamentMetadata?.roundName || `Round ${roundNum}`;
+        {isMobile ? (
+          <Carousel className="w-full">
+            <CarouselContent>
+              {sortedRounds.map((roundNum) => {
+                const roundMatches = roundsMap.get(roundNum) || [];
+                const roundName =
+                  roundMatches[0]?.tournamentMetadata?.roundName || `Round ${roundNum}`;
 
-            return (
-              <div key={roundNum} className="flex flex-col gap-4 min-w-[250px]">
-                <h4 className="text-center font-semibold text-sm sticky top-0 bg-background py-2 border-b">
-                  {roundName}
-                </h4>
+                return (
+                  <CarouselItem key={roundNum}>
+                    <div className="flex flex-col gap-4 px-4">
+                      <h4 className="text-center font-semibold text-sm bg-background py-2 border-b">
+                        {roundName}
+                      </h4>
 
-                <div className="flex flex-col gap-6">
-                  {roundMatches.map((match) => (
-                    <MatchBracketCard
-                      key={match.id}
-                      match={match}
-                      score={matchScores.get(match.id)}
-                      allMatches={matches}
-                      getPlayerLabel={getPlayerLabel}
-                    />
-                  ))}
+                      <div className="flex flex-col gap-6">
+                        {roundMatches.map((match) => (
+                          <MatchBracketCard
+                            key={match.id}
+                            match={match}
+                            score={matchScores.get(match.id)}
+                            allMatches={matches}
+                            getPlayerLabel={getPlayerLabel}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </CarouselItem>
+                );
+              })}
+            </CarouselContent>
+            <CarouselPrevious />
+            <CarouselNext />
+          </Carousel>
+        ) : (
+          <div className="flex gap-8 overflow-x-auto pb-4">
+            {sortedRounds.map((roundNum) => {
+              const roundMatches = roundsMap.get(roundNum) || [];
+              const roundName =
+                roundMatches[0]?.tournamentMetadata?.roundName || `Round ${roundNum}`;
+
+              return (
+                <div key={roundNum} className="flex flex-col gap-4 min-w-[250px]">
+                  <h4 className="text-center font-semibold text-sm sticky top-0 bg-background py-2 border-b">
+                    {roundName}
+                  </h4>
+
+                  <div className="flex flex-col gap-6">
+                    {roundMatches.map((match) => (
+                      <MatchBracketCard
+                        key={match.id}
+                        match={match}
+                        score={matchScores.get(match.id)}
+                        allMatches={matches}
+                        getPlayerLabel={getPlayerLabel}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   };
