@@ -322,6 +322,19 @@ const Index = () => {
         toast.error("Doubles tournaments require an even number of players. Please add or remove one player.");
         return;
       }
+
+      // Enforce 4/8/16 teams for single or double elimination (validate on Players page)
+      if (gameConfig.schedulingType === 'single-elimination' || gameConfig.schedulingType === 'double-elimination') {
+        const teamCount = gameConfig.tournamentPlayStyle === 'doubles' ? playerList.length / 2 : playerList.length;
+        if (![4, 8, 16].includes(teamCount)) {
+          const requiredText = gameConfig.tournamentPlayStyle === 'singles'
+            ? '4, 8, or 16 players'
+            : '8, 16, or 32 players (to form 4, 8, or 16 teams)';
+          toast.error(`${gameConfig.schedulingType === 'single-elimination' ? 'Single' : 'Double'} elimination requires exactly ${requiredText}.`);
+          return;
+        }
+      }
+
       // Tournament mode - generate complete bracket
       const isQualifierMode = gameConfig.schedulingType === 'qualifier-tournament';
       
