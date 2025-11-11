@@ -95,6 +95,32 @@ export const GameCodeDialog = ({
           </div>
         </div>
 
+        {/* Tournament Modes Section */}
+        <div className="py-3 px-2 sm:px-3 rounded-lg bg-gradient-to-br from-primary/10 to-accent/10 border border-primary/20">
+          <div className="flex items-center gap-2 mb-2">
+            <Trophy className="w-4 h-4 text-primary" />
+            <h3 className="font-semibold text-sm">Tournament Modes</h3>
+          </div>
+          <div className="space-y-1.5 text-xs text-muted-foreground">
+            <div className="flex items-start gap-1.5">
+              <span className="text-primary mt-0.5">🔄</span>
+              <span><strong className="text-foreground">Round Robin:</strong> Social play, everyone meets everyone</span>
+            </div>
+            <div className="flex items-start gap-1.5">
+              <span className="text-primary mt-0.5">⚡</span>
+              <span><strong className="text-foreground">Single Elim:</strong> Fast knockout bracket (4/8/16 teams)</span>
+            </div>
+            <div className="flex items-start gap-1.5">
+              <span className="text-primary mt-0.5">🔥</span>
+              <span><strong className="text-foreground">Double Elim:</strong> Second chance bracket (4/8/16 teams)</span>
+            </div>
+            <div className="flex items-start gap-1.5">
+              <span className="text-primary mt-0.5">🎯</span>
+              <span><strong className="text-foreground">Qualifier:</strong> Groups then knockout (4-24 teams)</span>
+            </div>
+          </div>
+        </div>
+
         {/* Sports Icons */}
         <div className="text-center text-xs sm:text-sm text-muted-foreground py-2 border-t border-b">Perfect for 🏓Pickleball • 🏸 Badminton • 🎾 Tennis</div>
 

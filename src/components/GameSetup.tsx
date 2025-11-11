@@ -203,6 +203,25 @@ export const GameSetup = ({
             </label>
           </div>
         </RadioGroup>
+        
+        {/* Scheduling Mode Explanation */}
+        <Alert className="mt-3 border-primary/20 bg-primary/5">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="text-xs leading-relaxed">
+            {schedulingType === 'round-robin' && (
+              <span><strong>Round Robin:</strong> Every player plays with and against different teammates throughout the session. Ideal for social play where everyone gets to know each other.</span>
+            )}
+            {schedulingType === 'single-elimination' && (
+              <span><strong>Single Elimination:</strong> One loss and you're out. Fast-paced tournament format requiring exactly 4, 8, or 16 teams. Winners advance until one champion remains.</span>
+            )}
+            {schedulingType === 'double-elimination' && (
+              <span><strong>Double Elimination:</strong> Teams get a second chance via the losers bracket. Requires 4, 8, or 16 teams. More forgiving than single elimination while maintaining competitive intensity.</span>
+            )}
+            {schedulingType === 'qualifier-tournament' && (
+              <span><strong>Qualifier Tournament:</strong> Groups stage followed by knockout rounds. Supports 4-24 teams. Teams compete in small groups, then top performers advance to single-elimination finals.</span>
+            )}
+          </AlertDescription>
+        </Alert>
       </div>
 
       {/* Tournament Play Style - Only show for tournament modes */}
