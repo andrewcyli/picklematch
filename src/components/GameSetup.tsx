@@ -219,36 +219,6 @@ export const GameSetup = ({
             </label>
           </div>
         </RadioGroup>
-        
-        {/* Tournament player count validation */}
-        {schedulingType === 'qualifier-tournament' && (playerCount < 4 || playerCount > 24) && (
-          <Alert variant="destructive" className="mt-2">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="text-xs">
-              Qualifier tournament requires 4-24 {tournamentPlayStyle === 'singles' ? 'players' : 'teams (pairs)'}. Please adjust player count.
-            </AlertDescription>
-          </Alert>
-        )}
-        {(schedulingType === 'single-elimination' || schedulingType === 'double-elimination') && (() => {
-          const teamCount = tournamentPlayStyle === 'doubles' ? playerCount / 2 : playerCount;
-          const isValid = [4, 8, 16].includes(teamCount);
-          return !isValid && (
-            <Alert variant="destructive" className="mt-2">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="text-xs">
-                {schedulingType === 'single-elimination' ? 'Single' : 'Double'} elimination requires exactly {tournamentPlayStyle === 'singles' ? '4, 8, or 16 players' : '8, 16, or 32 players (for 4, 8, or 16 teams)'}. Current: {tournamentPlayStyle === 'singles' ? `${playerCount} players` : `${playerCount} players (${teamCount} teams)`}.
-              </AlertDescription>
-            </Alert>
-          );
-        })()}
-        {schedulingType !== 'round-robin' && tournamentPlayStyle === 'doubles' && playerCount % 2 !== 0 && (
-          <Alert variant="destructive" className="mt-2">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="text-xs">
-              Doubles tournaments require an even number of players to form teams. Please add or remove one player.
-            </AlertDescription>
-          </Alert>
-        )}
       </div>
 
       {/* Tournament Play Style - Only show for tournament modes */}
