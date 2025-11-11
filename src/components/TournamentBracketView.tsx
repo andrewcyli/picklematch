@@ -172,21 +172,28 @@ function BracketViewInternal({
         </h3>
 
         {isMobile ? (
-          <Carousel className="w-full">
-            <CarouselContent>
+          <Carousel 
+            className="w-full"
+            opts={{
+              align: "start",
+              loop: false,
+              dragFree: false,
+            }}
+          >
+            <CarouselContent className="-ml-2 md:-ml-4">
               {sortedRounds.map((roundNum) => {
                 const roundMatches = roundsMap.get(roundNum) || [];
                 const roundName =
                   roundMatches[0]?.tournamentMetadata?.roundName || `Round ${roundNum}`;
 
                 return (
-                  <CarouselItem key={roundNum}>
-                    <div className="flex flex-col gap-4 px-4">
-                      <h4 className="text-center font-semibold text-sm bg-background py-2 border-b">
+                  <CarouselItem key={roundNum} className="pl-2 md:pl-4 basis-full">
+                    <div className="flex flex-col gap-3 h-full">
+                      <h4 className="text-center font-semibold text-base bg-primary/5 py-3 rounded-lg border sticky top-0 z-10">
                         {roundName}
                       </h4>
 
-                      <div className="flex flex-col gap-6">
+                      <div className="flex flex-col gap-4 pb-4 overflow-y-auto">
                         {roundMatches.map((match) => (
                           <MatchBracketCard
                             key={match.id}
@@ -202,8 +209,10 @@ function BracketViewInternal({
                 );
               })}
             </CarouselContent>
-            <CarouselPrevious />
-            <CarouselNext />
+            <div className="hidden sm:block">
+              <CarouselPrevious />
+              <CarouselNext />
+            </div>
           </Carousel>
         ) : (
           <div className="flex gap-8 overflow-x-auto pb-4">
@@ -264,7 +273,7 @@ function MatchBracketCard({ match, score, allMatches, getPlayerLabel }: MatchBra
   return (
     <Card
       className={cn(
-        'p-3 transition-all',
+        'p-4 transition-all shadow-sm',
         match.status === 'completed' && 'bg-green-50 dark:bg-green-950/20 border-green-500/50',
         match.status === 'in-progress' && 'bg-blue-50 dark:bg-blue-950/20 border-blue-500/50',
         match.status === 'scheduled' && 'border-primary/50',
@@ -272,17 +281,17 @@ function MatchBracketCard({ match, score, allMatches, getPlayerLabel }: MatchBra
         match.status === 'bye' && 'opacity-40'
       )}
     >
-      <div className="space-y-2">
+      <div className="space-y-3">
         {/* Team 1 */}
         <div className={cn(
-          "flex justify-between items-center px-2 py-1 rounded",
+          "flex justify-between items-center px-3 py-2 rounded",
           isTeam1Winner && "bg-primary/10 font-bold"
         )}>
-          <span className="truncate flex-1 text-sm">
+          <span className="truncate flex-1 text-sm sm:text-base">
             {team1Label}
           </span>
           {score && (
-            <span className={cn("ml-2 font-bold", isTeam1Winner && "text-primary")}>
+            <span className={cn("ml-3 font-bold text-base", isTeam1Winner && "text-primary")}>
               {score.team1}
             </span>
           )}
@@ -292,28 +301,28 @@ function MatchBracketCard({ match, score, allMatches, getPlayerLabel }: MatchBra
 
         {/* Team 2 */}
         <div className={cn(
-          "flex justify-between items-center px-2 py-1 rounded",
+          "flex justify-between items-center px-3 py-2 rounded",
           isTeam2Winner && "bg-primary/10 font-bold"
         )}>
-          <span className="truncate flex-1 text-sm">
+          <span className="truncate flex-1 text-sm sm:text-base">
             {team2Label}
           </span>
           {score && (
-            <span className={cn("ml-2 font-bold", isTeam2Winner && "text-primary")}>
+            <span className={cn("ml-3 font-bold text-base", isTeam2Winner && "text-primary")}>
               {score.team2}
             </span>
           )}
         </div>
 
         {/* Match info */}
-        <div className="text-xs text-muted-foreground flex justify-between items-center pt-1">
-          <span className="flex items-center gap-1">
-            <Clock className="w-3 h-3" />
+        <div className="text-xs text-muted-foreground flex justify-between items-center pt-2 border-t">
+          <span className="flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5" />
             Court {match.court}
           </span>
-          <div className="flex gap-1">
+          <div className="flex gap-1.5">
             {match.tournamentMetadata?.bracketPosition && (
-              <Badge variant="outline" className="text-xs h-5">
+              <Badge variant="outline" className="text-xs h-5 px-2">
                 {match.tournamentMetadata.bracketPosition}
               </Badge>
             )}
@@ -326,7 +335,7 @@ function MatchBracketCard({ match, score, allMatches, getPlayerLabel }: MatchBra
                     ? 'secondary'
                     : 'outline'
                 }
-                className="text-xs h-5"
+                className="text-xs h-5 px-2"
               >
                 {match.status}
               </Badge>

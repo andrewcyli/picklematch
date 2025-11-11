@@ -48,7 +48,7 @@ export function QualifierStageView({
         <p className="text-xs text-muted-foreground">Top team from each group advances</p>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
         {Array.from(groupedMatches.entries()).map(([groupId, groupMatches]) => {
           const groupSize = groupMatches[0]?.qualifierMetadata?.groupSize || 2;
           const isComplete = isGroupComplete(groupMatches, matchScores);
@@ -56,11 +56,11 @@ export function QualifierStageView({
           const winner = isComplete ? determineGroupWinner(standings, groupMatches, matchScores) : null;
           
           return (
-            <Card key={groupId} className="p-4 space-y-3">
+            <Card key={groupId} className="p-3 md:p-4 space-y-3">
               {/* Group Header */}
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="font-bold text-sm">{groupId}</h4>
+                  <h4 className="font-bold text-sm sm:text-base">{groupId}</h4>
                   <p className="text-xs text-muted-foreground">
                     {groupSize === 2 
                       ? 'Head-to-Head' 
