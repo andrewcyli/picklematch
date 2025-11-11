@@ -7,6 +7,7 @@ import { Trophy, Clock, Users } from "lucide-react";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { QualifierStageView } from "./QualifierStageView";
 
 interface TournamentBracketViewProps {
   matches: Match[];
@@ -76,7 +77,6 @@ function QualifierStageViewInternal({
   matches: Match[];
   matchScores: Map<string, { team1: number; team2: number }>;
 }) {
-  const { QualifierStageView } = require('./QualifierStageView');
   return <QualifierStageView matches={matches} matchScores={matchScores} />;
 }
 

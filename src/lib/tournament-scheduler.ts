@@ -1,4 +1,5 @@
 import { Match, CourtConfig, TournamentMetadata } from './scheduler';
+import { generateQualifierTournamentSchedule } from './qualifier-tournament-scheduler';
 
 /**
  * Generate a complete tournament schedule (single or double elimination)
@@ -14,7 +15,6 @@ export function generateTournamentSchedule(
 ): Match[] {
   // Handle qualifier tournament
   if (schedulingType === 'qualifier-tournament') {
-    const { generateQualifierTournamentSchedule } = require('./qualifier-tournament-scheduler');
     return generateQualifierTournamentSchedule(
       players,
       gameDuration,
