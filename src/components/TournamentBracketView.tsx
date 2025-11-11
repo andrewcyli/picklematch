@@ -188,12 +188,12 @@ function BracketViewInternal({
 
                 return (
                   <CarouselItem key={roundNum} className="pl-2 md:pl-4 basis-full">
-                    <div className="flex flex-col gap-3 h-full">
-                      <h4 className="text-center font-semibold text-base bg-primary/5 py-3 rounded-lg border sticky top-0 z-10">
+                    <div className="flex flex-col h-[calc(100vh-240px)]">
+                      <h4 className="text-center font-semibold text-sm bg-primary/5 py-2 rounded-lg border mb-3 flex-shrink-0">
                         {roundName}
                       </h4>
 
-                      <div className="flex flex-col gap-4 pb-4 overflow-y-auto">
+                      <div className="flex-1 flex flex-col justify-center gap-2 overflow-y-auto py-2">
                         {roundMatches.map((match) => (
                           <MatchBracketCard
                             key={match.id}
@@ -201,6 +201,7 @@ function BracketViewInternal({
                             score={matchScores.get(match.id)}
                             allMatches={matches}
                             getPlayerLabel={getPlayerLabel}
+                            isMobile={true}
                           />
                         ))}
                       </div>
@@ -261,9 +262,10 @@ interface MatchBracketCardProps {
   score: { team1: number; team2: number } | undefined;
   allMatches: Match[];
   getPlayerLabel: (match: Match, slot: 'team1' | 'team2') => string;
+  isMobile?: boolean;
 }
 
-function MatchBracketCard({ match, score, allMatches, getPlayerLabel }: MatchBracketCardProps) {
+function MatchBracketCard({ match, score, allMatches, getPlayerLabel, isMobile = false }: MatchBracketCardProps) {
   const team1Label = getPlayerLabel(match, 'team1');
   const team2Label = getPlayerLabel(match, 'team2');
   
@@ -273,7 +275,8 @@ function MatchBracketCard({ match, score, allMatches, getPlayerLabel }: MatchBra
   return (
     <Card
       className={cn(
-        'p-4 transition-all shadow-sm',
+        'transition-all shadow-sm',
+        isMobile ? 'p-2' : 'p-4',
         match.status === 'completed' && 'bg-green-50 dark:bg-green-950/20 border-green-500/50',
         match.status === 'in-progress' && 'bg-blue-50 dark:bg-blue-950/20 border-blue-500/50',
         match.status === 'scheduled' && 'border-primary/50',
@@ -281,17 +284,18 @@ function MatchBracketCard({ match, score, allMatches, getPlayerLabel }: MatchBra
         match.status === 'bye' && 'opacity-40'
       )}
     >
-      <div className="space-y-3">
+      <div className={cn("space-y-2", isMobile && "space-y-1.5")}>
         {/* Team 1 */}
         <div className={cn(
-          "flex justify-between items-center px-3 py-2 rounded",
+          "flex justify-between items-center rounded",
+          isMobile ? "px-2 py-1" : "px-3 py-2",
           isTeam1Winner && "bg-primary/10 font-bold"
         )}>
-          <span className="truncate flex-1 text-sm sm:text-base">
+          <span className={cn("truncate flex-1", isMobile ? "text-xs" : "text-sm sm:text-base")}>
             {team1Label}
           </span>
           {score && (
-            <span className={cn("ml-3 font-bold text-base", isTeam1Winner && "text-primary")}>
+            <span className={cn("ml-2 font-bold", isMobile ? "text-sm" : "text-base", isTeam1Winner && "text-primary")}>
               {score.team1}
             </span>
           )}
@@ -301,27 +305,31 @@ function MatchBracketCard({ match, score, allMatches, getPlayerLabel }: MatchBra
 
         {/* Team 2 */}
         <div className={cn(
-          "flex justify-between items-center px-3 py-2 rounded",
+          "flex justify-between items-center rounded",
+          isMobile ? "px-2 py-1" : "px-3 py-2",
           isTeam2Winner && "bg-primary/10 font-bold"
         )}>
-          <span className="truncate flex-1 text-sm sm:text-base">
+          <span className={cn("truncate flex-1", isMobile ? "text-xs" : "text-sm sm:text-base")}>
             {team2Label}
           </span>
           {score && (
-            <span className={cn("ml-3 font-bold text-base", isTeam2Winner && "text-primary")}>
+            <span className={cn("ml-2 font-bold", isMobile ? "text-sm" : "text-base", isTeam2Winner && "text-primary")}>
               {score.team2}
             </span>
           )}
         </div>
 
         {/* Match info */}
-        <div className="text-xs text-muted-foreground flex justify-between items-center pt-2 border-t">
-          <span className="flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5" />
-            Court {match.court}
+        <div className={cn(
+          "text-xs text-muted-foreground flex justify-between items-center border-t",
+          isMobile ? "pt-1" : "pt-2"
+        )}>
+          <span className="flex items-center gap-1">
+            <Clock className={cn(isMobile ? "w-3 h-3" : "w-3.5 h-3.5")} />
+            <span className={cn(isMobile && "text-[10px]")}>Court {match.court}</span>
           </span>
-          <div className="flex gap-1.5">
-            {match.tournamentMetadata?.bracketPosition && (
+          <div className="flex gap-1">
+            {!isMobile && match.tournamentMetadata?.bracketPosition && (
               <Badge variant="outline" className="text-xs h-5 px-2">
                 {match.tournamentMetadata.bracketPosition}
               </Badge>
@@ -335,9 +343,9 @@ function MatchBracketCard({ match, score, allMatches, getPlayerLabel }: MatchBra
                     ? 'secondary'
                     : 'outline'
                 }
-                className="text-xs h-5 px-2"
+                className={cn("text-xs h-5", isMobile ? "px-1.5 text-[10px]" : "px-2")}
               >
-                {match.status}
+                {isMobile ? match.status.charAt(0).toUpperCase() : match.status}
               </Badge>
             )}
           </div>
