@@ -56,11 +56,12 @@ export const GameSetup = ({
   }, (_, i) => (i + 1) * 15);
   const handleCourtsChange = (newCourts: number) => {
     setCourts(newCourts);
+    const defaultType: 'singles' | 'doubles' = schedulingType !== 'round-robin' ? tournamentPlayStyle : 'doubles';
     const newConfigs = Array.from({
       length: newCourts
     }, (_, i) => courtConfigs[i] || {
       courtNumber: i + 1,
-      type: 'doubles' as const
+      type: defaultType
     });
     setCourtConfigs(newConfigs);
   };
@@ -72,17 +73,32 @@ export const GameSetup = ({
     setCourtConfigs(newConfigs);
   };
   const handleContinue = () => {
+    // For single/double elimination, validate team count is 4, 8, or 16
+    if (schedulingType === 'single-elimination' || schedulingType === 'double-elimination') {
+      const teamCount = tournamentPlayStyle === 'doubles' ? playerCount / 2 : playerCount;
+      if (![4, 8, 16].includes(teamCount)) {
+        const requiredCounts = tournamentPlayStyle === 'doubles' ? '8, 16, or 32' : '4, 8, or 16';
+        toast.error(`${schedulingType === 'single-elimination' ? 'Single' : 'Double'} elimination requires exactly ${requiredCounts} ${tournamentPlayStyle === 'singles' ? 'players' : 'players (for 4, 8, or 16 teams)'}.`);
+        return;
+      }
+    }
+    
     // Validate even player count for doubles tournaments
     if (schedulingType !== 'round-robin' && tournamentPlayStyle === 'doubles' && playerCount % 2 !== 0) {
       toast.error("Doubles tournaments require an even number of players. Please add or remove one player.");
       return;
     }
     
+    // For tournament modes, set all courts to match the play style
+    const finalCourtConfigs = schedulingType !== 'round-robin' 
+      ? courtConfigs.map(config => ({ ...config, type: tournamentPlayStyle as 'singles' | 'doubles' }))
+      : courtConfigs;
+    
     onComplete({
       gameDuration,
       totalTime,
       courts,
-      courtConfigs,
+      courtConfigs: finalCourtConfigs,
       schedulingType,
       tournamentPlayStyle: schedulingType !== 'round-robin' ? tournamentPlayStyle : undefined
     });
@@ -194,12 +210,12 @@ export const GameSetup = ({
             <label className={`relative flex flex-col items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all ${schedulingType === 'single-elimination' ? "border-primary bg-primary/5 shadow-md" : "border-border hover:border-primary/50"}`}>
               <RadioGroupItem value="single-elimination" className="sr-only" />
               <span className="text-sm font-bold">Single Elim</span>
-              <p className="text-xs text-muted-foreground text-center mt-1">Lose once, you're out</p>
+              <p className="text-xs text-muted-foreground text-center mt-1">4/8/16 teams only</p>
             </label>
             <label className={`relative flex flex-col items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all ${schedulingType === 'double-elimination' ? "border-primary bg-primary/5 shadow-md" : "border-border hover:border-primary/50"}`}>
               <RadioGroupItem value="double-elimination" className="sr-only" />
               <span className="text-sm font-bold">Double Elim</span>
-              <p className="text-xs text-muted-foreground text-center mt-1">Two chances to stay in</p>
+              <p className="text-xs text-muted-foreground text-center mt-1">4/8/16 teams only</p>
             </label>
           </div>
         </RadioGroup>
@@ -213,14 +229,18 @@ export const GameSetup = ({
             </AlertDescription>
           </Alert>
         )}
-        {(schedulingType === 'single-elimination' || schedulingType === 'double-elimination') && (playerCount < 4 || playerCount > 16) && (
-          <Alert variant="destructive" className="mt-2">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="text-xs">
-              {schedulingType === 'single-elimination' ? 'Single' : 'Double'} elimination requires 4-16 {tournamentPlayStyle === 'singles' ? 'players' : 'teams (pairs)'}. Please adjust player count.
-            </AlertDescription>
-          </Alert>
-        )}
+        {(schedulingType === 'single-elimination' || schedulingType === 'double-elimination') && (() => {
+          const teamCount = tournamentPlayStyle === 'doubles' ? playerCount / 2 : playerCount;
+          const isValid = [4, 8, 16].includes(teamCount);
+          return !isValid && (
+            <Alert variant="destructive" className="mt-2">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                {schedulingType === 'single-elimination' ? 'Single' : 'Double'} elimination requires exactly {tournamentPlayStyle === 'singles' ? '4, 8, or 16 players' : '8, 16, or 32 players (for 4, 8, or 16 teams)'}. Current: {tournamentPlayStyle === 'singles' ? `${playerCount} players` : `${playerCount} players (${teamCount} teams)`}.
+              </AlertDescription>
+            </Alert>
+          );
+        })()}
         {schedulingType !== 'round-robin' && tournamentPlayStyle === 'doubles' && playerCount % 2 !== 0 && (
           <Alert variant="destructive" className="mt-2">
             <AlertCircle className="h-4 w-4" />
@@ -235,7 +255,13 @@ export const GameSetup = ({
       {schedulingType !== 'round-robin' && (
         <div className="space-y-2">
           <Label className="text-sm font-semibold">Tournament Play Style</Label>
-          <RadioGroup value={tournamentPlayStyle} onValueChange={(v) => setTournamentPlayStyle(v as 'singles' | 'doubles')}>
+          <p className="text-xs text-muted-foreground">All courts will be configured for this play style</p>
+          <RadioGroup value={tournamentPlayStyle} onValueChange={(v) => {
+            const newStyle = v as 'singles' | 'doubles';
+            setTournamentPlayStyle(newStyle);
+            // Update all court configs to match the tournament play style
+            setCourtConfigs(courtConfigs.map(config => ({ ...config, type: newStyle })));
+          }}>
             <div className="grid grid-cols-2 gap-2">
               <label className={`relative flex flex-col items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all ${tournamentPlayStyle === 'singles' ? "border-primary bg-primary/5 shadow-md" : "border-border hover:border-primary/50"}`}>
                 <RadioGroupItem value="singles" className="sr-only" />
@@ -308,28 +334,30 @@ export const GameSetup = ({
           </Select>
         </div>
 
-        {/* Court Configuration */}
-        <div className="space-y-2 sm:col-span-2">
-          <Label className="text-sm font-semibold">
-            Court Configuration
-          </Label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {courtConfigs.map(config => <div key={config.courtNumber} className="flex items-center justify-between p-3 rounded-lg border bg-card">
-                <Label htmlFor={`court-${config.courtNumber}`} className="text-sm font-medium">
-                  Court {config.courtNumber}
-                </Label>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs ${config.type === 'singles' ? 'text-muted-foreground' : 'text-foreground font-medium'}`}>
-                    Doubles
-                  </span>
-                  <Switch id={`court-${config.courtNumber}`} checked={config.type === 'singles'} onCheckedChange={() => toggleCourtType(config.courtNumber)} className="scale-90" />
-                  <span className={`text-xs ${config.type === 'singles' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
-                    Singles
-                  </span>
-                </div>
-              </div>)}
+        {/* Court Configuration - Only show for round-robin */}
+        {schedulingType === 'round-robin' && (
+          <div className="space-y-2 sm:col-span-2">
+            <Label className="text-sm font-semibold">
+              Court Configuration
+            </Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {courtConfigs.map(config => <div key={config.courtNumber} className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                  <Label htmlFor={`court-${config.courtNumber}`} className="text-sm font-medium">
+                    Court {config.courtNumber}
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs ${config.type === 'singles' ? 'text-muted-foreground' : 'text-foreground font-medium'}`}>
+                      Doubles
+                    </span>
+                    <Switch id={`court-${config.courtNumber}`} checked={config.type === 'singles'} onCheckedChange={() => toggleCourtType(config.courtNumber)} className="scale-90" />
+                    <span className={`text-xs ${config.type === 'singles' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                      Singles
+                    </span>
+                  </div>
+                </div>)}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Continue Button */}
