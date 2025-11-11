@@ -13,6 +13,12 @@ export interface QualifierMetadata {
   groupMatchNum: number;
   isGroupStage: boolean;
   advancesToKnockout?: boolean;
+  // For groups of 4 bracket progression
+  isGroupSemifinal?: boolean;
+  isGroupFinal?: boolean;
+  advancesToGroupMatch?: string; // For semifinals → final
+  sourceGroupMatch1?: string; // For finals (which semifinals feed in)
+  sourceGroupMatch2?: string;
 }
 
 /**
@@ -200,6 +206,28 @@ function generateGroupStageMatches(
     groupMatches.forEach((match, idx) => {
       const courtConfig = courtConfigs[currentCourt % courtConfigs.length];
       
+      const metadata: QualifierMetadata = {
+        groupId: `Group ${group.id}`,
+        groupSize: group.size as 2 | 3 | 4,
+        groupMatchNum: idx + 1,
+        isGroupStage: true,
+        advancesToKnockout: group.size !== 4 || idx === 2, // Only final of G4 advances
+      };
+      
+      // For groups of 4, add bracket progression metadata
+      if (group.size === 4) {
+        if (idx === 0 || idx === 1) {
+          // Semifinals
+          metadata.isGroupSemifinal = true;
+          metadata.advancesToGroupMatch = `qual-g${group.id}-m3`; // Advance to final
+        } else if (idx === 2) {
+          // Final
+          metadata.isGroupFinal = true;
+          metadata.sourceGroupMatch1 = `qual-g${group.id}-m1`;
+          metadata.sourceGroupMatch2 = `qual-g${group.id}-m2`;
+        }
+      }
+      
       matches.push({
         id: `qual-g${group.id}-m${idx + 1}`,
         court: courtConfig.courtNumber,
@@ -207,16 +235,10 @@ function generateGroupStageMatches(
         endTime: currentTime + gameDuration,
         team1: match.team1!,
         team2: match.team2!,
-        status: 'scheduled',
+        status: match.team1![0] === 'TBD' ? 'waiting' : 'scheduled',
         isSingles: match.isSingles,
         isLocked: false,
-        qualifierMetadata: {
-          groupId: `Group ${group.id}`,
-          groupSize: group.size as 2 | 3 | 4,
-          groupMatchNum: idx + 1,
-          isGroupStage: true,
-          advancesToKnockout: true
-        }
+        qualifierMetadata: metadata
       });
       
       currentCourt++;
@@ -264,14 +286,26 @@ function generateRoundRobinForGroup(
       });
     });
   } else if (groupSize === 4) {
-    // 6 matches: round-robin
-    const pairs = [[0, 1], [2, 3], [0, 2], [1, 3], [0, 3], [1, 2]];
-    pairs.forEach(([i, j]) => {
-      matches.push({
-        team1: isSingles ? [teams[i][0]] as [string] : [teams[i][0], teams[i][1] || teams[i][0]] as [string, string],
-        team2: isSingles ? [teams[j][0]] as [string] : [teams[j][0], teams[j][1] || teams[j][0]] as [string, string],
-        isSingles
-      });
+    // Single elimination bracket (3 matches)
+    // Semifinal 1: Team 0 vs Team 1
+    matches.push({
+      team1: isSingles ? [teams[0][0]] as [string] : [teams[0][0], teams[0][1] || teams[0][0]] as [string, string],
+      team2: isSingles ? [teams[1][0]] as [string] : [teams[1][0], teams[1][1] || teams[1][0]] as [string, string],
+      isSingles
+    });
+    
+    // Semifinal 2: Team 2 vs Team 3
+    matches.push({
+      team1: isSingles ? [teams[2][0]] as [string] : [teams[2][0], teams[2][1] || teams[2][0]] as [string, string],
+      team2: isSingles ? [teams[3][0]] as [string] : [teams[3][0], teams[3][1] || teams[3][0]] as [string, string],
+      isSingles
+    });
+    
+    // Final: Winner of M1 vs Winner of M2 (TBD initially)
+    matches.push({
+      team1: isSingles ? ['TBD'] as [string] : ['TBD', 'TBD'] as [string, string],
+      team2: isSingles ? ['TBD'] as [string] : ['TBD', 'TBD'] as [string, string],
+      isSingles
     });
   }
   

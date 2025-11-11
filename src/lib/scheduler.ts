@@ -22,6 +22,12 @@ export interface QualifierMetadata {
   groupMatchNum: number;
   isGroupStage: boolean;
   advancesToKnockout?: boolean;
+  // For groups of 4 bracket progression
+  isGroupSemifinal?: boolean;
+  isGroupFinal?: boolean;
+  advancesToGroupMatch?: string; // For semifinals → final
+  sourceGroupMatch1?: string; // For finals (which semifinals feed in)
+  sourceGroupMatch2?: string;
 }
 
 export interface GroupStanding {

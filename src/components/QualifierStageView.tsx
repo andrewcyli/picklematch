@@ -62,57 +62,72 @@ export function QualifierStageView({
                 <div>
                   <h4 className="font-bold text-sm">{groupId}</h4>
                   <p className="text-xs text-muted-foreground">
-                    {groupSize === 2 ? 'Head-to-Head' : `Round Robin (${groupSize} teams)`}
+                    {groupSize === 2 
+                      ? 'Head-to-Head' 
+                      : groupSize === 4 
+                        ? 'Single Elimination' 
+                        : `Round Robin (${groupSize} teams)`
+                    }
                   </p>
                 </div>
                 <Badge variant={groupSize === 4 ? "default" : groupSize === 3 ? "secondary" : "outline"}>
-                  {groupSize === 4 ? 'G4' : groupSize === 3 ? 'G3' : 'G2'}
+                  {groupSize === 4 ? 'Bracket' : groupSize === 3 ? 'G3' : 'G2'}
                 </Badge>
               </div>
               
               {/* Matches */}
               <div className="space-y-2">
-                {groupMatches.map((match) => {
+                {groupMatches.map((match, matchIdx) => {
                   const score = matchScores.get(match.id);
                   const hasScore = !!score;
                   
+                  // Show round label for groups of 4
+                  const showRoundLabel = groupSize === 4 && (matchIdx === 0 || matchIdx === 2);
+                  
                   return (
-                    <div 
-                      key={match.id}
-                      className={`p-2 rounded border text-xs ${
-                        hasScore ? 'bg-muted/50' : 'bg-background'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className={`flex-1 ${hasScore && score.team1 > score.team2 ? 'font-semibold' : ''}`}>
-                          {getPlayerLabel(match.team1, match.isSingles)}
-                        </span>
-                        <div className="flex items-center gap-1 font-mono">
-                          {hasScore ? (
-                            <>
-                              <span className={score.team1 > score.team2 ? 'font-bold' : ''}>
-                                {score.team1}
-                              </span>
-                              <span>-</span>
-                              <span className={score.team2 > score.team1 ? 'font-bold' : ''}>
-                                {score.team2}
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-muted-foreground">vs</span>
-                          )}
+                    <div key={match.id}>
+                      {showRoundLabel && (
+                        <div className="text-xs font-semibold text-muted-foreground mb-1 mt-2">
+                          {matchIdx === 0 ? 'Semifinals' : 'Final'}
                         </div>
-                        <span className={`flex-1 text-right ${hasScore && score.team2 > score.team1 ? 'font-semibold' : ''}`}>
-                          {getPlayerLabel(match.team2, match.isSingles)}
-                        </span>
+                      )}
+                      
+                      <div 
+                        className={`p-2 rounded border text-xs ${
+                          hasScore ? 'bg-muted/50' : 'bg-background'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`flex-1 ${hasScore && score.team1 > score.team2 ? 'font-semibold' : ''}`}>
+                            {getPlayerLabel(match.team1, match.isSingles)}
+                          </span>
+                          <div className="flex items-center gap-1 font-mono">
+                            {hasScore ? (
+                              <>
+                                <span className={score.team1 > score.team2 ? 'font-bold' : ''}>
+                                  {score.team1}
+                                </span>
+                                <span>-</span>
+                                <span className={score.team2 > score.team1 ? 'font-bold' : ''}>
+                                  {score.team2}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground">vs</span>
+                            )}
+                          </div>
+                          <span className={`flex-1 text-right ${hasScore && score.team2 > score.team1 ? 'font-semibold' : ''}`}>
+                            {getPlayerLabel(match.team2, match.isSingles)}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
               
-              {/* Standings */}
-              {groupSize > 2 && standings.length > 0 && (
+              {/* Standings (only for groups of 3) */}
+              {groupSize === 3 && standings.length > 0 && (
                 <div className="pt-2 border-t">
                   <p className="text-xs font-semibold mb-2">Standings</p>
                   <div className="space-y-1">
@@ -150,12 +165,12 @@ export function QualifierStageView({
                 </div>
               )}
               
-              {/* Winner badge for groups of 2 */}
-              {groupSize === 2 && winner && (
+              {/* Winner display */}
+              {groupSize !== 3 && winner && (
                 <div className="flex items-center justify-center gap-2 pt-2 border-t">
                   <Trophy className="w-4 h-4 text-primary" />
                   <span className="text-xs font-semibold">
-                    Winner: {getPlayerLabel(winner, groupMatches[0]?.isSingles)}
+                    {groupSize === 4 ? 'Champion' : 'Winner'}: {getPlayerLabel(winner, groupMatches[0]?.isSingles)}
                   </span>
                 </div>
               )}

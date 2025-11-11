@@ -13,7 +13,7 @@ import { useStopwatch } from "@/hooks/use-stopwatch";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from "@/components/ui/carousel";
 import { TournamentBracketDialog } from "./TournamentBracketDialog";
 import { advanceWinnerToNextMatch } from "@/lib/tournament-progression";
-import { advanceGroupWinnersToKnockout } from "@/lib/qualifier-progression";
+import { advanceGroupWinnersToKnockout, advanceWithinGroupBrackets } from "@/lib/qualifier-progression";
 interface ScheduleViewProps {
   matches: Match[];
   onBack: () => void;
@@ -410,7 +410,11 @@ export const ScheduleView = ({
         
         // For qualifier tournaments, handle group progression
         if (match.qualifierMetadata?.isGroupStage) {
-          const advancedMatches = advanceGroupWinnersToKnockout(updatedMatches, newScores);
+          // First, advance within group brackets (for groups of 4)
+          let progressedMatches = advanceWithinGroupBrackets(updatedMatches, newScores);
+          
+          // Then, check if any groups are complete and advance to knockout
+          const advancedMatches = advanceGroupWinnersToKnockout(progressedMatches, newScores);
           onScheduleUpdate(advancedMatches, allPlayers);
         } else {
           // Standard tournament progression

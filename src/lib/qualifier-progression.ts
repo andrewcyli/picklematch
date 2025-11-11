@@ -78,6 +78,30 @@ export function calculateGroupStandings(
 }
 
 /**
+ * Determine winner for groups of 4 (single elimination)
+ * Winner is simply the winner of the final match (match 3)
+ */
+export function determineGroupOf4Winner(
+  groupMatches: Match[],
+  matchScores: Map<string, { team1: number; team2: number }>
+): string[] | null {
+  // Find the final match (match 3)
+  const finalMatch = groupMatches.find(m => 
+    m.qualifierMetadata?.isGroupFinal
+  );
+  
+  if (!finalMatch) return null;
+  
+  const finalScore = matchScores.get(finalMatch.id);
+  if (!finalScore) return null; // Final not complete
+  
+  // Return winner of final
+  return finalScore.team1 > finalScore.team2 
+    ? finalMatch.team1 
+    : finalMatch.team2;
+}
+
+/**
  * Determine group winner with tie-breaking
  */
 export function determineGroupWinner(
@@ -85,6 +109,14 @@ export function determineGroupWinner(
   groupMatches: Match[],
   matchScores: Map<string, { team1: number; team2: number }>
 ): string[] | null {
+  if (standings.length === 0 && groupMatches.length === 0) return null;
+  
+  // For groups of 4, use bracket winner (not standings)
+  const groupSize = groupMatches[0]?.qualifierMetadata?.groupSize;
+  if (groupSize === 4) {
+    return determineGroupOf4Winner(groupMatches, matchScores);
+  }
+  
   if (standings.length === 0) return null;
   
   // Sort by tie-breaking rules
@@ -132,6 +164,17 @@ export function isGroupComplete(
   groupMatches: Match[],
   matchScores: Map<string, { team1: number; team2: number }>
 ): boolean {
+  const groupSize = groupMatches[0]?.qualifierMetadata?.groupSize;
+  
+  // For groups of 4, only final match needs to be complete
+  if (groupSize === 4) {
+    const finalMatch = groupMatches.find(m => 
+      m.qualifierMetadata?.isGroupFinal
+    );
+    return finalMatch ? matchScores.has(finalMatch.id) : false;
+  }
+  
+  // For groups of 2 and 3, all matches must be complete
   return groupMatches.every(m => matchScores.has(m.id));
 }
 
@@ -202,6 +245,69 @@ export function advanceGroupWinnersToKnockout(
         };
       }
     });
+  });
+  
+  return updatedMatches;
+}
+
+/**
+ * Advance winners within group of 4 brackets (semifinals → final)
+ */
+export function advanceWithinGroupBrackets(
+  allMatches: Match[],
+  matchScores: Map<string, { team1: number; team2: number }>
+): Match[] {
+  const updatedMatches = [...allMatches];
+  
+  // Find all completed semifinal matches in groups of 4
+  const semifinalMatches = allMatches.filter(m => 
+    m.qualifierMetadata?.isGroupSemifinal && 
+    matchScores.has(m.id)
+  );
+  
+  semifinalMatches.forEach(semifinal => {
+    const score = matchScores.get(semifinal.id)!;
+    const winner = score.team1 > score.team2 
+      ? semifinal.team1 
+      : semifinal.team2;
+    
+    const nextMatchId = semifinal.qualifierMetadata?.advancesToGroupMatch;
+    if (!nextMatchId) return;
+    
+    // Find the final match this advances to
+    const finalMatchIndex = updatedMatches.findIndex(m => m.id === nextMatchId);
+    if (finalMatchIndex === -1) return;
+    
+    const finalMatch = updatedMatches[finalMatchIndex];
+    const metadata = finalMatch.qualifierMetadata;
+    
+    // Determine which slot to fill (team1 or team2)
+    const isFirstSemifinal = metadata?.sourceGroupMatch1 === semifinal.id;
+    
+    if (isFirstSemifinal) {
+      updatedMatches[finalMatchIndex] = {
+        ...finalMatch,
+        team1: finalMatch.isSingles
+          ? [winner[0]] as [string]
+          : [winner[0], winner[1] || winner[0]] as [string, string]
+      };
+    } else {
+      updatedMatches[finalMatchIndex] = {
+        ...finalMatch,
+        team2: finalMatch.isSingles
+          ? [winner[0]] as [string]
+          : [winner[0], winner[1] || winner[0]] as [string, string]
+      };
+    }
+    
+    // Update status to scheduled if both teams are filled
+    const updated = updatedMatches[finalMatchIndex];
+    if (!updated.team1.includes('TBD') && !updated.team2.includes('TBD')) {
+      updatedMatches[finalMatchIndex] = {
+        ...updated,
+        status: 'scheduled'
+      };
+    }
   });
   
   return updatedMatches;
