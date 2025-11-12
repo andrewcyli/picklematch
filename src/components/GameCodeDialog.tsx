@@ -122,7 +122,7 @@ export const GameCodeDialog = ({
         </div>
 
         {/* Sports Icons */}
-        <div className="text-center text-xs sm:text-sm text-muted-foreground py-2 border-t border-b">Perfect for 🏓Pickleball • 🏸 Badminton • 🎾 Tennis</div>
+        <div className="text-center text-xs sm:text-sm text-muted-foreground py-2 border-t border-b">Perfect for 🏓 Pickleball Tournaments & Social Play</div>
 
         {/* Join/Create Section */}
         <div className="space-y-3 sm:space-y-4 pt-3 sm:pt-4">
