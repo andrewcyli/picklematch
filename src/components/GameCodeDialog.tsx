@@ -37,10 +37,10 @@ export const GameCodeDialog = ({
             </div>
           </div>
           <DialogTitle className="text-xl sm:text-2xl text-center bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent">
-            TeamUp Social Play 🎾
+            PickleballMatch.Fun 🏓
           </DialogTitle>
           <DialogDescription className="text-center text-sm sm:text-base">
-            Smart team rotation & scoring for racket sports tournaments
+            Smart rotation & scoring for pickleball tournaments
           </DialogDescription>
         </DialogHeader>
 
