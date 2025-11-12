@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { validateGameCode } from "@/lib/validation";
 import { Trophy, Users, Clock, BarChart3, Sparkles, Zap } from "lucide-react";
+import logo from "@/assets/logo.png";
 interface GameCodeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -30,15 +31,10 @@ export const GameCodeDialog = ({
   };
   return <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] max-h-[85vh] overflow-y-auto">
-        <DialogHeader className="space-y-2">
-          <div className="flex items-center justify-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary via-primary to-accent flex items-center justify-center shadow-lg">
-              <Trophy className="w-6 h-6 text-white" />
-            </div>
+        <DialogHeader className="space-y-4">
+          <div className="flex items-center justify-center">
+            <img src={logo} alt="PickleballMatch.Fun" className="h-16 sm:h-20 w-auto" />
           </div>
-          <DialogTitle className="text-xl sm:text-2xl text-center bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent">
-            PickleballMatch.Fun 🏓
-          </DialogTitle>
           <DialogDescription className="text-center text-sm sm:text-base">
             Smart rotation & scoring for pickleball tournaments
           </DialogDescription>
