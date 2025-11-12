@@ -2,14 +2,11 @@ import { Match } from "@/lib/scheduler";
 import { Card } from "@/components/ui/card";
 import { Trophy, Target } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { ShareButton } from "./ShareButton";
 
 interface LeaderboardProps {
   players: string[];
   matches: Match[];
   matchScores: Map<string, { team1: number; team2: number }>;
-  gameId?: string;
-  gameCode?: string;
 }
 
 interface PlayerStats {
@@ -24,7 +21,7 @@ interface PlayerStats {
   differentialPerGame: number; // differential / matchesPlayed
 }
 
-export const Leaderboard = ({ players, matches, matchScores, gameId, gameCode }: LeaderboardProps) => {
+export const Leaderboard = ({ players, matches, matchScores }: LeaderboardProps) => {
   // Calculate stats for each player
   const playerStats = players.map(player => {
     let wins = 0;
@@ -94,24 +91,14 @@ export const Leaderboard = ({ players, matches, matchScores, gameId, gameCode }:
   return (
     <div className="flex flex-col h-full">
       <div className="flex-shrink-0 mb-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-accent to-accent/80 flex items-center justify-center">
-              <Trophy className="w-4 h-4 text-accent-foreground" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-foreground">Leaderboard</h2>
-              <p className="text-[10px] text-muted-foreground">Player rankings</p>
-            </div>
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-accent to-accent/80 flex items-center justify-center">
+            <Trophy className="w-4 h-4 text-accent-foreground" />
           </div>
-          <ShareButton
-            shareType="leaderboard"
-            shareData={{ stats: sortedStats }}
-            gameId={gameId}
-            gameCode={gameCode}
-            variant="outline"
-            size="sm"
-          />
+          <div>
+            <h2 className="text-base font-bold text-foreground">Leaderboard</h2>
+            <p className="text-[10px] text-muted-foreground">Player rankings</p>
+          </div>
         </div>
         <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
           Track player performance with real-time win rates, match records, and point differentials. 
