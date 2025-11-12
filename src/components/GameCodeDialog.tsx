@@ -40,6 +40,19 @@ export const GameCodeDialog = ({
           </DialogDescription>
         </DialogHeader>
 
+        {/* Google AdSense - Horizontal Ad */}
+        <div className="py-3">
+          <ins className="adsbygoogle"
+               style={{ display: 'block' }}
+               data-ad-client="ca-pub-6788044289759238"
+               data-ad-slot="6900679793"
+               data-ad-format="auto"
+               data-full-width-responsive="true"></ins>
+          <script dangerouslySetInnerHTML={{
+            __html: '(adsbygoogle = window.adsbygoogle || []).push({});'
+          }} />
+        </div>
+
         {/* Features Grid */}
         <div className="grid grid-cols-2 gap-2 sm:gap-3 py-3">
           <div className="flex items-start gap-2 p-2 sm:p-3 rounded-lg bg-primary/5 border border-primary/10">
