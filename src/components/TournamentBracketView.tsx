@@ -8,12 +8,15 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { QualifierStageView } from "./QualifierStageView";
+import { ShareButton } from "./ShareButton";
 
 interface TournamentBracketViewProps {
   matches: Match[];
   matchScores: Map<string, { team1: number; team2: number }>;
   allPlayers: string[];
   isQualifierMode?: boolean;
+  gameId?: string;
+  gameCode?: string;
 }
 
 export function TournamentBracketView({
@@ -21,6 +24,8 @@ export function TournamentBracketView({
   matchScores,
   allPlayers,
   isQualifierMode = false,
+  gameId,
+  gameCode,
 }: TournamentBracketViewProps) {
   // Check if this is qualifier mode by checking for qualifier metadata
   const hasQualifierStage = useMemo(() => 
@@ -44,31 +49,57 @@ export function TournamentBracketView({
   // If qualifier mode, show tabs
   if (actualIsQualifierMode) {
     return (
-      <Tabs defaultValue="qualifier" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 h-auto">
-          <TabsTrigger value="qualifier" className="text-xs sm:text-sm py-2">
-            <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-            <span className="hidden xs:inline">Qualifier Stage</span>
-            <span className="xs:hidden">Qualifier</span>
-          </TabsTrigger>
-          <TabsTrigger value="knockout" className="text-xs sm:text-sm py-2">
-            <Trophy className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-            <span className="hidden xs:inline">Knockout Bracket</span>
-            <span className="xs:hidden">Knockout</span>
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="qualifier" className="mt-3 sm:mt-4">
-          <QualifierStageViewInternal matches={qualifierMatches} matchScores={matchScores} />
-        </TabsContent>
-        <TabsContent value="knockout" className="mt-3 sm:mt-4">
-          <BracketViewInternal matches={knockoutMatches} matchScores={matchScores} allPlayers={allPlayers} />
-        </TabsContent>
-      </Tabs>
+      <div className="space-y-3">
+        <div className="flex justify-end">
+          <ShareButton
+            shareType="bracket"
+            shareData={{ matches: knockoutMatches, scores: Array.from(matchScores.entries()) }}
+            gameId={gameId}
+            gameCode={gameCode}
+            variant="outline"
+            size="sm"
+          />
+        </div>
+        <Tabs defaultValue="qualifier" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 h-auto">
+            <TabsTrigger value="qualifier" className="text-xs sm:text-sm py-2">
+              <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+              <span className="hidden xs:inline">Qualifier Stage</span>
+              <span className="xs:hidden">Qualifier</span>
+            </TabsTrigger>
+            <TabsTrigger value="knockout" className="text-xs sm:text-sm py-2">
+              <Trophy className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+              <span className="hidden xs:inline">Knockout Bracket</span>
+              <span className="xs:hidden">Knockout</span>
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="qualifier" className="mt-3 sm:mt-4">
+            <QualifierStageViewInternal matches={qualifierMatches} matchScores={matchScores} />
+          </TabsContent>
+          <TabsContent value="knockout" className="mt-3 sm:mt-4">
+            <BracketViewInternal matches={knockoutMatches} matchScores={matchScores} allPlayers={allPlayers} />
+          </TabsContent>
+        </Tabs>
+      </div>
     );
   }
   
   // Standard tournament bracket view
-  return <BracketViewInternal matches={matches} matchScores={matchScores} allPlayers={allPlayers} />;
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-end">
+        <ShareButton
+          shareType="bracket"
+          shareData={{ matches, scores: Array.from(matchScores.entries()) }}
+          gameId={gameId}
+          gameCode={gameCode}
+          variant="outline"
+          size="sm"
+        />
+      </div>
+      <BracketViewInternal matches={matches} matchScores={matchScores} allPlayers={allPlayers} />
+    </div>
+  );
 }
 
 // Internal component for qualifier stage view

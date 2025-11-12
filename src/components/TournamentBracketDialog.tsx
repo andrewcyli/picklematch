@@ -15,6 +15,8 @@ interface TournamentBracketDialogProps {
   matchScores: Map<string, { team1: number; team2: number }>;
   allPlayers: string[];
   schedulingType: 'single-elimination' | 'double-elimination' | 'qualifier-tournament';
+  gameId?: string;
+  gameCode?: string;
 }
 
 export function TournamentBracketDialog({
@@ -24,6 +26,8 @@ export function TournamentBracketDialog({
   matchScores,
   allPlayers,
   schedulingType,
+  gameId,
+  gameCode,
 }: TournamentBracketDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -44,6 +48,8 @@ export function TournamentBracketDialog({
             matches={matches}
             matchScores={matchScores}
             allPlayers={allPlayers}
+            gameId={gameId}
+            gameCode={gameCode}
           />
         </div>
       </DialogContent>

@@ -610,7 +610,7 @@ const Index = () => {
                   
                   
                 </div>
-                {matchScores.size > 0 ? <Leaderboard players={players} matches={matches} matchScores={matchScores} /> : <div className="text-center py-12">
+                {matchScores.size > 0 ? <Leaderboard players={players} matches={matches} matchScores={matchScores} gameId={gameId || undefined} gameCode={gameCode} /> : <div className="text-center py-12">
                     <p className="text-muted-foreground">No completed matches yet</p>
                   </div>}
               </div>
