@@ -7,7 +7,7 @@ import { ScheduleView } from "@/components/ScheduleView";
 import { CheckInOut } from "@/components/CheckInOut";
 import { BottomNav } from "@/components/BottomNav";
 import { generateSchedule, Match } from "@/lib/scheduler";
-import { Trophy, Users, UserCircle, AlertCircle } from "lucide-react";
+import { Trophy, Users, UserCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Leaderboard } from "@/components/Leaderboard";
@@ -38,7 +38,6 @@ const Index = () => {
   const [isRestoringSession, setIsRestoringSession] = useState(true);
   const [showPlayerIdentitySelector, setShowPlayerIdentitySelector] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [unexpectedReload, setUnexpectedReload] = useState(false);
   
   // Refs for preventing duplicate operations
   const isRestoringRef = useRef(false);
@@ -82,7 +81,7 @@ const Index = () => {
     });
   };
 
-  // Track page load to detect unexpected reloads
+  // Track page load
   useEffect(() => {
     debugLogger.log('lifecycle', 'Component mounted', {
       userAgent: navigator.userAgent,
@@ -90,23 +89,7 @@ const Index = () => {
       sessionId: Date.now()
     });
 
-    // Check if this is an unexpected reload
-    const lastActivity = safeStorage.getItem('last_activity');
-    if (lastActivity) {
-      const timeSinceActivity = Date.now() - parseInt(lastActivity);
-      if (timeSinceActivity < 5000) {
-        debugLogger.log('error', 'Unexpected reload detected', { timeSinceActivity });
-        setUnexpectedReload(true);
-      }
-    }
-
-    // Update activity timestamp periodically
-    const activityInterval = setInterval(() => {
-      safeStorage.setItem('last_activity', Date.now().toString());
-    }, 2000);
-
     return () => {
-      clearInterval(activityInterval);
       debugLogger.log('lifecycle', 'Component unmounted');
     };
   }, []);
@@ -662,7 +645,6 @@ const Index = () => {
     setSetupComplete(false);
     setMatchScores(new Map());
     setShowGameCodeDialog(false);
-    setUnexpectedReload(false);
     toast.success("New session started");
   };
   // Show loading state while restoring session
@@ -677,45 +659,6 @@ const Index = () => {
     </div>;
   }
   return <div className="h-screen bg-gradient-to-br from-background via-secondary/30 to-accent/5 relative flex flex-col">
-      {/* Unexpected reload warning */}
-      {unexpectedReload && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-md">
-          <div className="bg-destructive/10 border border-destructive/50 rounded-lg p-4 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-destructive mb-2">
-                Unexpected reload detected
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    const logs = debugLogger.exportLogs();
-                    const blob = new Blob([logs], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `debug-logs-${Date.now()}.json`;
-                    a.click();
-                    toast.success('Debug logs exported');
-                  }}
-                >
-                  Export Logs
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setUnexpectedReload(false)}
-                >
-                  Dismiss
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      
       {/* Decorative background elements */}
       <div className="absolute inset-0 opacity-5 pointer-events-none">
         <div className="absolute top-20 right-10 w-64 h-64 bg-primary rounded-full blur-3xl"></div>
