@@ -1,96 +1,69 @@
 
 
-## Scheduler Simulation Tests
+## Dynamic Player Changes Test Suite
 
-Create a comprehensive test suite that runs the round-robin scheduler with various player counts (4-16) on 2 courts, then validates fairness, conflict-freedom, rest distribution, and randomness.
+Add new test cases to `src/lib/scheduler.test.ts` that simulate players leaving and joining mid-game, then validate the same requirements (no conflicts, fairness, rest, randomness) on the combined schedule.
 
-### Test File
-**`src/lib/scheduler.test.ts`**
+### Approach
 
-### Test Setup
-- Install vitest/testing dependencies (already available)
-- Create `vitest.config.ts` and `src/test/setup.ts` if missing
-- Import `generateSchedule` from `scheduler.ts`
+The tests will use the existing `regenerateScheduleFromSlot` function to simulate real-world scenarios:
 
-### Test Cases
+1. Generate an initial schedule with N players
+2. "Play" the first K slots (mark them as completed)
+3. Modify the player list (add/remove players)
+4. Call `regenerateScheduleFromSlot` with the new player list and played matches
+5. Combine played + regenerated matches and validate all constraints
 
-**1. No Player Conflicts (Critical)**
-For each player count (4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16):
-- Generate schedule with 2 courts, doubles, 10-min games, 200-min total
-- For every time slot, verify no player appears in more than one match
-- Also check that no player appears twice within the same match
+### Test Scenarios
 
-**2. Fairness of Play (Same Number of Rounds)**
-For each player count:
-- Count total matches per player across the full schedule
-- Assert that max - min match count is at most 2 (allowing minor variance due to odd player counts)
-- Report the distribution for visibility
+**1. Player Leaves Mid-Game**
+- Start with 11 players, play 5 slots
+- Remove 1 player, regenerate remaining schedule
+- Validate: no conflicts, fairness among remaining 10 players, rest constraints
 
-**3. Rest Distribution (No Excessive Consecutive Play or Wait)**
-For each player count:
-- Track consecutive matches per player (max streak without a gap)
-- Assert max consecutive is at most 3
-- Track max gap between matches (slots waiting)
-- Assert max gap is reasonable relative to player/court ratio
+**2. New Player Joins Mid-Game**
+- Start with 10 players, play 5 slots
+- Add 1 new player (total 11), regenerate remaining schedule
+- Validate: no conflicts, new player gets fair play time in remaining matches (within +/-2 of other players' remaining match counts)
 
-**4. Group Diversity / Randomness**
-For each player count >= 8:
-- Track how often the same 4-player group repeats
-- Assert no group repeats more than twice in a row
-- Run the scheduler 3 times and verify schedules are not identical (randomness check)
+**3. Multiple Changes (2 leave, 1 joins)**
+- Start with 12 players, play 5 slots
+- Remove 2 players, add 1 new player (total 11), regenerate
+- Validate all constraints on remaining schedule
 
-**5. Edge Cases**
-- Exactly 4 players, 2 courts (only 1 court should be used)
-- 5 players, 2 courts (1 player always resting)
-- Large count (16 players, 2 courts)
+**4. Various Player Counts with Mid-Game Changes**
+- For player counts 8, 10, 11, 12, 14:
+  - Play 5 slots, remove 1 player, add 1 different player
+  - Validate conflict-free and fair distribution in remaining matches
+
+**5. Fairness for New Players**
+- Start with 10 players, play 8 slots
+- Add 2 new players, regenerate remaining ~12 slots
+- Verify new players' match count is within 2 of average remaining match count for existing players (from slot 8 onwards only)
+
+### Validation Rules (same as existing tests, applied to combined/remaining schedule)
+
+- **No conflicts**: No player in two matches at the same time slot
+- **No duplicates**: No player appears twice in the same match
+- **Fairness (remaining matches only)**: For players present in the regenerated portion, max-min match count difference is no more than 2
+- **Consecutive play**: No player plays more than 3 consecutive slots
+- **Wait time**: No excessive gaps between matches
 
 ### Technical Details
 
-```typescript
-// Test structure example
-import { describe, it, expect } from "vitest";
-import { generateSchedule } from "./scheduler";
+**File modified**: `src/lib/scheduler.test.ts`
 
-describe("Round Robin Scheduler", () => {
-  const COURTS = 2;
-  const GAME_DURATION = 10;
-  const TOTAL_TIME = 200;
+A new `describe("Dynamic Player Changes")` block will be added containing all the scenarios above. Each test will:
 
-  for (const playerCount of [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16]) {
-    describe(`${playerCount} players`, () => {
-      const players = Array.from({ length: playerCount }, (_, i) => `P${i + 1}`);
-      const matches = generateSchedule(players, GAME_DURATION, TOTAL_TIME, COURTS);
-
-      it("no player appears in two matches at the same time slot", () => {
-        // Group matches by startTime, check for duplicate players
-      });
-
-      it("fair play distribution (max-min match count <= 2)", () => {
-        // Count matches per player, check variance
-      });
-
-      it("no player plays more than 3 consecutive matches", () => {
-        // Track consecutive slots per player
-      });
-
-      it("no player waits more than a reasonable number of slots", () => {
-        // Track gaps, assert max gap <= ceil(playerCount / (COURTS * 4)) + 2
-      });
-    });
-  }
-
-  it("produces different schedules on repeated generation (randomness)", () => {
-    // Generate 3 schedules, verify not all identical
-  });
-});
+```
+1. const initialMatches = generateSchedule(initialPlayers, ...)
+2. const playedMatches = initialMatches.filter(m => m.startTime < cutoffSlot * GAME_DURATION)
+3. const regenerated = regenerateScheduleFromSlot(
+     newPlayers, playedMatches, cutoffSlot * GAME_DURATION,
+     GAME_DURATION, TOTAL_TIME, COURTS
+   )
+4. Validate regenerated matches against all constraints
 ```
 
-### Files to Create/Modify
-1. **Create** `vitest.config.ts` - Vitest configuration
-2. **Create** `src/test/setup.ts` - Test setup with matchMedia mock
-3. **Create** `src/lib/scheduler.test.ts` - The main test suite
-4. **Modify** `tsconfig.app.json` - Add `"vitest/globals"` to types
-
-### Running
-Tests will be executed via the run-tests tool after implementation.
+For fairness of new players, only matches from the regeneration point onward are counted, since new players obviously have zero matches before they joined.
 
