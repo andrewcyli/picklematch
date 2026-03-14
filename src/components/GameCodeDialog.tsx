@@ -1,18 +1,23 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { validateGameCode } from "@/lib/validation";
-import { Trophy, Users, Clock, BarChart3, Sparkles, Zap } from "lucide-react";
+import { Trophy, Users, Clock, BarChart3, Sparkles, Zap, PartyPopper } from "lucide-react";
 import logo from "@/assets/logo.png";
+
+// Storage key for tracking if user has visited before
+const VISITED_BEFORE_KEY = "picklematch_visited_before";
+
 interface GameCodeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onJoinGame: (gameCode: string) => void;
   onCreateGame: () => void;
 }
+
 export const GameCodeDialog = ({
   open,
   onOpenChange,
@@ -20,6 +25,14 @@ export const GameCodeDialog = ({
   onCreateGame
 }: GameCodeDialogProps) => {
   const [gameCode, setGameCode] = useState("");
+  const [isFirstVisit, setIsFirstVisit] = useState(true);
+
+  useEffect(() => {
+    // Check if user has visited before
+    const visited = localStorage.getItem(VISITED_BEFORE_KEY);
+    setIsFirstVisit(!visited);
+  }, []);
+
   const handleJoin = () => {
     const code = gameCode.trim().toUpperCase();
     const validation = validateGameCode(code);
@@ -29,10 +42,36 @@ export const GameCodeDialog = ({
     }
     onJoinGame(code);
   };
-  return <Dialog open={open} onOpenChange={onOpenChange}>
+
+  const handleCreateGame = () => {
+    // Mark as visited
+    localStorage.setItem(VISITED_BEFORE_KEY, "true");
+    onCreateGame();
+  };
+
+  const handleClose = (isOpen: boolean) => {
+    if (!isOpen) {
+      // Mark as visited when they dismiss the dialog
+      localStorage.setItem(VISITED_BEFORE_KEY, "true");
+    }
+    onOpenChange(isOpen);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[500px] max-h-[85vh] overflow-y-auto" aria-labelledby="game-dialog-title" aria-describedby="game-dialog-description">
         <DialogHeader className="space-y-4">
           <DialogTitle id="game-dialog-title" className="sr-only">Get Started with PickleballMatch.Fun</DialogTitle>
+          
+          {/* Welcome Message for First-Time Users */}
+          {isFirstVisit && (
+            <div className="flex items-center justify-center gap-2 text-primary">
+              <PartyPopper className="w-6 h-6" />
+              <span className="font-semibold text-lg">Welcome! 👋</span>
+              <PartyPopper className="w-6 h-6" />
+            </div>
+          )}
+          
           <div className="flex items-center justify-center">
             <img src={logo} alt="PickleballMatch.Fun" className="h-16 sm:h-20 w-auto" />
           </div>
@@ -136,27 +175,42 @@ export const GameCodeDialog = ({
 
         {/* Join/Create Section */}
         <div className="space-y-3 sm:space-y-4 pt-3 sm:pt-4">
-          <div className="space-y-2">
-            <Label htmlFor="game-code" className="text-xs sm:text-sm font-semibold">Join Existing Game</Label>
-            <div className="flex gap-2">
-              <Input id="game-code" value={gameCode} onChange={e => setGameCode(e.target.value.toUpperCase())} placeholder="Enter 6-char code" maxLength={6} className="flex-1 uppercase font-mono text-base sm:text-lg tracking-wider" />
-              <Button onClick={handleJoin} disabled={gameCode.length !== 6} className="px-4 sm:px-6">
-                Join
-              </Button>
-            </div>
-          </div>
+          {/* Primary CTA - Create New Game - More Prominent */}
+          <Button 
+            onClick={handleCreateGame} 
+            className="w-full text-base sm:text-lg py-6 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg"
+          >
+            🎉 {isFirstVisit ? "Start New Tournament" : "Create New Game"}
+          </Button>
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">Or</span>
+              <span className="bg-background px-2 text-muted-foreground">Or join existing</span>
             </div>
           </div>
 
-          <Button onClick={onCreateGame} className="w-full" variant="default">🤝 Create New Game</Button>
+          <div className="space-y-2">
+            <Label htmlFor="game-code" className="text-xs sm:text-sm font-semibold">Enter Game Code</Label>
+            <div className="flex gap-2">
+              <Input 
+                id="game-code" 
+                value={gameCode} 
+                onChange={e => setGameCode(e.target.value.toUpperCase())} 
+                placeholder="ABC123" 
+                maxLength={6} 
+                className="flex-1 uppercase font-mono text-base sm:text-lg tracking-wider" 
+                onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
+              />
+              <Button onClick={handleJoin} disabled={gameCode.length !== 6} className="px-4 sm:px-6">
+                Join
+              </Button>
+            </div>
+          </div>
         </div>
       </DialogContent>
-    </Dialog>;
+    </Dialog>
+  );
 };
