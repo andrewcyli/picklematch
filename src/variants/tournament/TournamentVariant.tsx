@@ -277,8 +277,8 @@ export const TournamentVariant: React.FC = () => {
     }
   };
 
-  const handlePlayersUpdate = async (players: string[], pairs?: { player1: string; player2: string }[]) => {
-    if (!state.gameConfig || !state.gameId) return;
+  const handlePlayersUpdate = async (players: string[], pairs?: { player1: string; player2: string }[]): Promise<boolean> => {
+    if (!state.gameConfig || !state.gameId) return false;
 
     const previousPlayers = state.players;
     const previousConfig = state.gameConfig;
@@ -297,7 +297,7 @@ export const TournamentVariant: React.FC = () => {
       state.setPlayers(previousPlayers);
       state.setGameConfig(previousConfig);
       toast.error("Doubles tournaments require an even number of players.");
-      return;
+      return false;
     }
 
     if ((schedulingType === "single-elimination" || schedulingType === "double-elimination") && ![4, 8, 16].includes(teamCount)) {
@@ -308,7 +308,7 @@ export const TournamentVariant: React.FC = () => {
           ? "Bracket tournaments require exactly 4, 8, or 16 players."
           : "Bracket doubles require 8, 16, or 32 players to form 4, 8, or 16 teams."
       );
-      return;
+      return false;
     }
 
     try {
@@ -344,15 +344,18 @@ export const TournamentVariant: React.FC = () => {
         .update({ players, matches: sanitized as any, game_config: gameConfig as any })
         .eq("id", state.gameId);
       if (error) throw error;
-      // Bracket-first: show bracket dialog immediately after generation
+      
+      // Bracket-first: ONLY show bracket dialog after successful save (Issue #1 fix)
       setShowBracketDialog(true);
       toast.success(schedulingType === "qualifier-tournament" ? "Qualifier bracket generated!" : "Tournament bracket generated!");
+      return true; // Issue #1 fix: Return success
     } catch (error: any) {
       state.setPlayers(previousPlayers);
       state.setGameConfig(previousConfig);
       state.setMatches(previousMatches);
       state.setMatchScores(previousScores);
       toast.error(error?.message || "Failed to generate tournament bracket. Changes reverted.");
+      return false; // Issue #1 fix: Return failure
     }
   };
 

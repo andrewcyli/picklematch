@@ -275,8 +275,8 @@ export const QualifierVariant: React.FC = () => {
     }
   };
 
-  const handlePlayersUpdate = async (players: string[], pairs?: { player1: string; player2: string }[]) => {
-    if (!state.gameConfig || !state.gameId) return;
+  const handlePlayersUpdate = async (players: string[], pairs?: { player1: string; player2: string }[]): Promise<boolean> => {
+    if (!state.gameConfig || !state.gameId) return false;
 
     const previousPlayers = state.players;
     const previousConfig = state.gameConfig;
@@ -294,7 +294,7 @@ export const QualifierVariant: React.FC = () => {
       state.setPlayers(previousPlayers);
       state.setGameConfig(previousConfig);
       toast.error("Doubles tournaments require an even number of players.");
-      return;
+      return false;
     }
 
     if (teamCount < 4 || teamCount > 24) {
@@ -304,7 +304,7 @@ export const QualifierVariant: React.FC = () => {
         ? "Qualifier tournaments require 4-24 players." 
         : "Qualifier tournaments require 8-48 players (4-24 teams)."
       );
-      return;
+      return false;
     }
 
     try {
@@ -326,15 +326,18 @@ export const QualifierVariant: React.FC = () => {
         .update({ players, matches: sanitized as any, game_config: gameConfig as any })
         .eq("id", state.gameId);
       if (error) throw error;
-      // Bracket-first: show bracket dialog immediately after generation
+      
+      // Issue #1 fix: ONLY show bracket dialog after successful save
       setShowBracketDialog(true);
       toast.success("Qualifier bracket generated! Group stage ready.");
+      return true; // Issue #1 fix: Return success
     } catch (error: any) {
       state.setPlayers(previousPlayers);
       state.setGameConfig(previousConfig);
       state.setMatches(previousMatches);
       state.setMatchScores(previousScores);
       toast.error(error?.message || "Failed to generate qualifier bracket. Changes reverted.");
+      return false; // Issue #1 fix: Return failure
     }
   };
 

@@ -104,6 +104,25 @@ export const ScheduleView = ({
     };
   };
 
+  // Issue #2: Helper to get stage label for qualifier tournaments
+  const getStageLabel = (match: Match): string | null => {
+    if (!isTournamentMode || gameConfig.schedulingType !== 'qualifier-tournament') return null;
+    
+    if (match.qualifierMetadata?.isGroupStage) {
+      if (match.qualifierMetadata.isGroupSemifinal) return 'Group Semi';
+      if (match.qualifierMetadata.isGroupFinal) return 'Group Final';
+      return `Group ${match.qualifierMetadata.groupId}`;
+    }
+    
+    // Knockout stage labels based on tournament metadata
+    if (match.tournamentMetadata) {
+      const { roundName } = match.tournamentMetadata;
+      if (roundName) return roundName;
+    }
+    
+    return 'Knockout';
+  };
+
   // Find current match based on scores
   const currentMatch = useMemo(() => {
     const unscoredMatch = matches.find(m => !matchScores.has(m.id));
@@ -473,10 +492,11 @@ export const ScheduleView = ({
   };
 
   // Helper to check if a match has downstream dependent matches that are already populated
+  // Issue #3: Complete integrity checks for qualifier group->knockout dependencies
   const hasDownstreamMatches = (match: Match): boolean => {
     if (!match.tournamentMetadata && !match.qualifierMetadata) return false;
     
-    // Check tournament progression
+    // Check tournament progression (standard bracket advancement)
     if (match.tournamentMetadata?.advancesTo) {
       const nextMatch = matches.find(m => m.id === match.tournamentMetadata?.advancesTo);
       if (nextMatch && !nextMatch.team1.includes('TBD') && !nextMatch.team2.includes('TBD')) {
@@ -484,10 +504,60 @@ export const ScheduleView = ({
       }
     }
     
-    // Check qualifier group progression
+    // Check qualifier group progression (within-group advancement)
     if (match.qualifierMetadata?.advancesToGroupMatch) {
       const nextMatch = matches.find(m => m.id === match.qualifierMetadata?.advancesToGroupMatch);
       if (nextMatch && !nextMatch.team1.includes('TBD') && !nextMatch.team2.includes('TBD')) {
+        return true;
+      }
+    }
+    
+    // Issue #3 fix: Check qualifier group->knockout dependencies via sourceMatch metadata
+    // When a group winner advances to knockout, the knockout match has sourceMatch1/sourceMatch2
+    // pointing to the group ID. We need to check if this match's group has been advanced.
+    if (match.qualifierMetadata?.isGroupStage) {
+      const groupId = match.qualifierMetadata.groupId;
+      
+      // Find any knockout match that sources from this group
+      const dependentKnockoutMatch = matches.find(m => 
+        !m.qualifierMetadata?.isGroupStage && // It's a knockout match
+        m.tournamentMetadata && 
+        (m.tournamentMetadata.sourceMatch1 === groupId || 
+         m.tournamentMetadata.sourceMatch2 === groupId)
+      );
+      
+      if (dependentKnockoutMatch) {
+        // Check if the knockout match has been populated (not TBD)
+        const hasRealTeam1 = !dependentKnockoutMatch.team1.includes('TBD');
+        const hasRealTeam2 = !dependentKnockoutMatch.team2.includes('TBD');
+        
+        // If either slot is filled and this match is the source, it's downstream
+        if (dependentKnockoutMatch.tournamentMetadata?.sourceMatch1 === groupId && hasRealTeam1) {
+          return true;
+        }
+        if (dependentKnockoutMatch.tournamentMetadata?.sourceMatch2 === groupId && hasRealTeam2) {
+          return true;
+        }
+      }
+    }
+    
+    // Issue #3 fix: Also check if this specific match is a source for knockout advancement
+    // This handles the case where sourceMatch references the match ID directly
+    const knockoutMatchBySourceId = matches.find(m =>
+      !m.qualifierMetadata?.isGroupStage &&
+      m.tournamentMetadata &&
+      (m.tournamentMetadata.sourceMatch1 === match.id || 
+       m.tournamentMetadata.sourceMatch2 === match.id)
+    );
+    
+    if (knockoutMatchBySourceId) {
+      const hasRealTeam1 = !knockoutMatchBySourceId.team1.includes('TBD');
+      const hasRealTeam2 = !knockoutMatchBySourceId.team2.includes('TBD');
+      
+      if (knockoutMatchBySourceId.tournamentMetadata?.sourceMatch1 === match.id && hasRealTeam1) {
+        return true;
+      }
+      if (knockoutMatchBySourceId.tournamentMetadata?.sourceMatch2 === match.id && hasRealTeam2) {
         return true;
       }
     }
@@ -942,9 +1012,20 @@ export const ScheduleView = ({
                           <div className="space-y-1 max-w-full overflow-hidden">
                             {/* Match Status Header */}
                             <div className="flex items-center justify-between">
-                              <Badge className={`text-xs py-0 ${isCurrentMatch ? 'bg-primary text-primary-foreground' : isNextMatch ? 'bg-accent text-accent-foreground' : isPreviousMatch ? 'bg-muted text-muted-foreground' : 'bg-secondary text-secondary-foreground'}`}>
-                                {String.fromCharCode(64 + courtConfig.courtNumber)}{idx + 1} {isCurrentMatch ? '• Current' : isNextMatch ? '• Up Next' : isPreviousMatch ? '• Done' : ''}
-                              </Badge>
+                              <div className="flex items-center gap-1">
+                                <Badge className={`text-xs py-0 ${isCurrentMatch ? 'bg-primary text-primary-foreground' : isNextMatch ? 'bg-accent text-accent-foreground' : isPreviousMatch ? 'bg-muted text-muted-foreground' : 'bg-secondary text-secondary-foreground'}`}>
+                                  {String.fromCharCode(64 + courtConfig.courtNumber)}{idx + 1} {isCurrentMatch ? '• Current' : isNextMatch ? '• Up Next' : isPreviousMatch ? '• Done' : ''}
+                                </Badge>
+                                {/* Issue #2: Stage label for qualifier tournaments */}
+                                {(() => {
+                                  const stageLabel = getStageLabel(match);
+                                  return stageLabel ? (
+                                    <Badge variant="outline" className="text-[10px] py-0 bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800">
+                                      {stageLabel}
+                                    </Badge>
+                                  ) : null;
+                                })()}
+                              </div>
                               <Badge variant="outline" className="text-[10px] py-0">
                                 <Clock className="w-2.5 h-2.5 mr-0.5" />
                                 {match.elapsedTime || `${new Date(Date.now() + match.startTime * 60000).toLocaleTimeString('en-US', {

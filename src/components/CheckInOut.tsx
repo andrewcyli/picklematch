@@ -11,7 +11,7 @@ interface CheckInOutProps {
   onPlayersUpdate: (players: string[], teammatePairs?: {
     player1: string;
     player2: string;
-  }[]) => void;
+  }[]) => Promise<boolean>;
   matches?: Match[];
   matchScores?: Map<string, {
     team1: number;
@@ -56,9 +56,10 @@ export const CheckInOut = ({
       <div className="flex-1 min-h-0">
         <PlayerSetup 
           onPlayersChange={onPlayersChange}
-          onComplete={(playerList, pairs) => {
-            onPlayersUpdate(playerList, pairs);
-            if (onNavigateToMatches) {
+          onComplete={async (playerList, pairs) => {
+            // Issue #1 fix: Only navigate if generation/save succeeds
+            const success = await onPlayersUpdate(playerList, pairs);
+            if (success && onNavigateToMatches) {
               onNavigateToMatches();
             }
           }} 
