@@ -4,12 +4,12 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Trophy, Users, Calendar, Target, ChevronRight, Medal } from "lucide-react";
+import { Trophy, Users, Calendar, Target, ChevronRight, Medal, Swords, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 
-import { AppShell, ResponsiveNavigation, useShell } from "@/shell";
+import { AppShell, ResponsiveNavigation, useShell, PlayerViewHeader } from "@/shell";
 import { GameCodeDialog } from "@/components/GameCodeDialog";
 import { GameSetup } from "@/components/GameSetup";
 import { CheckInOut } from "@/components/CheckInOut";
@@ -17,9 +17,14 @@ import { ScheduleView } from "@/components/ScheduleView";
 import { Leaderboard } from "@/components/Leaderboard";
 import { MatchHistory } from "@/components/MatchHistory";
 import { TournamentBracketDialog } from "@/components/TournamentBracketDialog";
+import { PlayerIdentitySelector } from "@/components/PlayerIdentitySelector";
+import { MyMatchesView } from "@/components/MyMatchesView";
 import { supabase } from "@/integrations/supabase/client";
 import { safeStorage } from "@/lib/safe-storage";
 import { generateQualifierTournamentSchedule, computeTournamentStructure } from "@/lib/qualifier-tournament-scheduler";
+import { usePlayerIdentity } from "@/hooks/use-player-identity";
+import { usePlayerMatches } from "@/hooks/use-player-matches";
+import { usePlayerNotifications } from "@/hooks/use-player-notifications";
 import type { Match, GameConfig } from "@/core/types";
 
 interface StageInfo {
@@ -187,6 +192,22 @@ export const QualifierVariant: React.FC = () => {
     schedulingType: 'qualifier-tournament',
     tournamentPlayStyle: config.tournamentPlayStyle || 'doubles',
   });
+
+  const [showPlayerSelector, setShowPlayerSelector] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  const { playerName: identityPlayerName, isPlayerView: isIdentityPlayerView, claimIdentity, releaseIdentity } = usePlayerIdentity(state.gameId);
+  const playerMatches = usePlayerMatches(state.matches as any, identityPlayerName, state.matchScores);
+
+  usePlayerNotifications(state.matches as any, identityPlayerName, state.gameId, state.matchScores);
+
+  // Update current time every second for player view
+  useEffect(() => {
+    if (isIdentityPlayerView) {
+      const interval = setInterval(() => setCurrentTime(new Date()), 1000);
+      return () => clearInterval(interval);
+    }
+  }, [isIdentityPlayerView]);
 
   const joinExistingGame = async (code: string) => {
     const { data, error } = await supabase.from("games").select("*").eq("game_code", code).single();
@@ -406,8 +427,31 @@ export const QualifierVariant: React.FC = () => {
   }
 
   return (
-    <AppShell bottomNav={<ResponsiveNavigation disabled={showGameCodeDialog} />}>
+    <AppShell
+      header={isIdentityPlayerView && identityPlayerName ? (
+        <PlayerViewHeader
+          playerName={identityPlayerName}
+          onExit={() => {
+            releaseIdentity();
+            toast.success("Switched to organizer view");
+          }}
+        />
+      ) : undefined}
+      bottomNav={<ResponsiveNavigation disabled={showGameCodeDialog} />}
+    >
       <GameCodeDialog open={showGameCodeDialog} onOpenChange={setShowGameCodeDialog} onJoinGame={joinExistingGame} onCreateGame={createNewGame} />
+
+      {showPlayerSelector && (
+        <PlayerIdentitySelector
+          players={state.players}
+          onSelect={async (name) => {
+            await claimIdentity(name);
+            setShowPlayerSelector(false);
+            toast.success(`You're now playing as ${name}!`);
+          }}
+          onCancel={() => setShowPlayerSelector(false)}
+        />
+      )}
 
       <Card className="p-2 sm:p-3 shadow-sport border-2 border-primary/10 backdrop-blur-sm bg-card/80 flex-1 flex flex-col min-h-0 mb-14">
         {/* Stage Progress Header - Shows tournament structure */}
@@ -495,16 +539,38 @@ export const QualifierVariant: React.FC = () => {
         {activeSection === "matches" && state.gameConfig && (
           <div className="flex-1 min-h-0 overflow-y-auto">
             {state.matches.length > 0 ? (
-              <ScheduleView
-                matches={state.matches as any}
-                onBack={() => setActiveSection("players")}
-                gameConfig={state.gameConfig as any}
-                allPlayers={state.players}
-                onScheduleUpdate={(matches, players) => handleScheduleUpdate(matches as any, players)}
-                matchScores={state.matchScores}
-                onMatchScoresUpdate={state.setMatchScores}
-                onCourtConfigUpdate={handleCourtConfigUpdate}
-              />
+              isIdentityPlayerView && identityPlayerName ? (
+                <MyMatchesView
+                  playerName={identityPlayerName}
+                  matchGroups={playerMatches}
+                  matchScores={state.matchScores}
+                  currentTime={currentTime}
+                  allMatches={state.matches}
+                  onReleaseIdentity={() => {
+                    releaseIdentity();
+                    toast.success("Switched to organizer view");
+                  }}
+                  onSkipMatch={() => {}}
+                />
+              ) : (
+                <ScheduleView
+                  matches={state.matches as any}
+                  onBack={() => setActiveSection("players")}
+                  gameConfig={state.gameConfig as any}
+                  allPlayers={state.players}
+                  onScheduleUpdate={(matches, players) => handleScheduleUpdate(matches as any, players)}
+                  matchScores={state.matchScores}
+                  onMatchScoresUpdate={state.setMatchScores}
+                  onCourtConfigUpdate={handleCourtConfigUpdate}
+                  isPlayerView={isIdentityPlayerView}
+                  playerName={identityPlayerName}
+                  onReleaseIdentity={() => {
+                    releaseIdentity();
+                    toast.success("Switched to organizer view");
+                  }}
+                  onShowPlayerSelector={() => setShowPlayerSelector(true)}
+                />
+              )
             ) : (
               <div className="flex flex-col items-center justify-center h-full min-h-[300px] p-6 text-center">
                 <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
