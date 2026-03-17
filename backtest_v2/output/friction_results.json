@@ -1,0 +1,438 @@
+{
+  "ideal_results": [
+    {
+      "name": "Obvious NO / Absurd Markets",
+      "num_trades": 114,
+      "total_pnl": -4471.45,
+      "win_rate": 0.0175,
+      "roi": -4.4714,
+      "sharpe_ratio": -31.93,
+      "max_drawdown": 4.4321,
+      "profit_factor": 0.01
+    },
+    {
+      "name": "Mean Reversion",
+      "num_trades": 1496,
+      "total_pnl": 199062.74,
+      "win_rate": 0.5134,
+      "roi": 199.0627,
+      "sharpe_ratio": 2.67,
+      "max_drawdown": 0.5896,
+      "profit_factor": 21.42
+    },
+    {
+      "name": "Momentum / Trend Following",
+      "num_trades": 2023,
+      "total_pnl": -3405.02,
+      "win_rate": 0.2808,
+      "roi": -3.405,
+      "sharpe_ratio": -0.62,
+      "max_drawdown": 4.4471,
+      "profit_factor": 0.83
+    },
+    {
+      "name": "Late-Stage Convergence",
+      "num_trades": 208,
+      "total_pnl": 368.79,
+      "win_rate": 0.9904,
+      "roi": 0.3688,
+      "sharpe_ratio": 3.02,
+      "max_drawdown": 0.08,
+      "profit_factor": 3.3
+    },
+    {
+      "name": "Volatility Selling / Range Trading",
+      "num_trades": 735,
+      "total_pnl": 4551.17,
+      "win_rate": 0.6585,
+      "roi": 4.5512,
+      "sharpe_ratio": 5.84,
+      "max_drawdown": 0.1374,
+      "profit_factor": 4.19
+    },
+    {
+      "name": "Mispricing Detection / Edge Finder",
+      "num_trades": 910,
+      "total_pnl": 86370.73,
+      "win_rate": 0.4912,
+      "roi": 86.3707,
+      "sharpe_ratio": 2.31,
+      "max_drawdown": 0.3989,
+      "profit_factor": 15.91
+    },
+    {
+      "name": "Kelly Criterion Composite",
+      "num_trades": 186,
+      "total_pnl": 233.23,
+      "win_rate": 0.6559,
+      "roi": 0.2332,
+      "sharpe_ratio": 0.91,
+      "max_drawdown": 0.3251,
+      "profit_factor": 1.19
+    }
+  ],
+  "friction_results": [
+    {
+      "name": "Obvious NO / Absurd Markets (Friction-Adjusted)",
+      "num_trades": 113,
+      "total_pnl": -4857.08,
+      "win_rate": 0.0177,
+      "roi": -4.8571,
+      "sharpe_ratio": -31.71,
+      "max_drawdown": 4.8167,
+      "profit_factor": 0.01,
+      "friction_breakdown": {
+        "spread_cost": 313.5,
+        "slippage_cost": 2.78,
+        "fee_cost": 0.0,
+        "latency_cost": 1.7,
+        "frontrun_cost": 9.0,
+        "api_failure_cost": 0.0,
+        "manipulation_cost": 10.0,
+        "resolution_risk_cost": 125.0,
+        "killed_trades": 1,
+        "total_friction": 461.98
+      }
+    },
+    {
+      "name": "Mean Reversion (Friction-Adjusted)",
+      "num_trades": 1488,
+      "total_pnl": 193676.04,
+      "win_rate": 0.3784,
+      "roi": 193.676,
+      "sharpe_ratio": 2.6,
+      "max_drawdown": 0.9123,
+      "profit_factor": 15.75,
+      "friction_breakdown": {
+        "spread_cost": 4090.95,
+        "slippage_cost": 41.05,
+        "fee_cost": 0.0,
+        "latency_cost": 289.59,
+        "frontrun_cost": 235.0,
+        "api_failure_cost": 22.95,
+        "manipulation_cost": 112.5,
+        "resolution_risk_cost": 650.0,
+        "killed_trades": 8,
+        "total_friction": 5442.03
+      }
+    },
+    {
+      "name": "Momentum / Trend Following (Friction-Adjusted)",
+      "num_trades": 2015,
+      "total_pnl": -10342.75,
+      "win_rate": 0.196,
+      "roi": -10.3428,
+      "sharpe_ratio": -1.89,
+      "max_drawdown": 10.3765,
+      "profit_factor": 0.59,
+      "friction_breakdown": {
+        "spread_cost": 5069.88,
+        "slippage_cost": 45.49,
+        "fee_cost": 0.0,
+        "latency_cost": 453.98,
+        "frontrun_cost": 371.0,
+        "api_failure_cost": 27.25,
+        "manipulation_cost": 147.5,
+        "resolution_risk_cost": 975.0,
+        "killed_trades": 8,
+        "total_friction": 7090.11
+      }
+    },
+    {
+      "name": "Late-Stage Convergence (Friction-Adjusted)",
+      "num_trades": 207,
+      "total_pnl": -546.99,
+      "win_rate": 0.2657,
+      "roi": -0.547,
+      "sharpe_ratio": -3.6,
+      "max_drawdown": 0.5483,
+      "profit_factor": 0.21,
+      "friction_breakdown": {
+        "spread_cost": 648.8,
+        "slippage_cost": 4.82,
+        "fee_cost": 0.0,
+        "latency_cost": 5.12,
+        "frontrun_cost": 36.8,
+        "api_failure_cost": 1.85,
+        "manipulation_cost": 20.0,
+        "resolution_risk_cost": 240.0,
+        "killed_trades": 1,
+        "total_friction": 957.39
+      }
+    },
+    {
+      "name": "Volatility Selling / Range Trading (Friction-Adjusted)",
+      "num_trades": 730,
+      "total_pnl": 2507.4,
+      "win_rate": 0.5274,
+      "roi": 2.5074,
+      "sharpe_ratio": 3.18,
+      "max_drawdown": 0.2942,
+      "profit_factor": 2.06,
+      "friction_breakdown": {
+        "spread_cost": 1632.0,
+        "slippage_cost": 14.18,
+        "fee_cost": 0.0,
+        "latency_cost": 27.55,
+        "frontrun_cost": 71.2,
+        "api_failure_cost": 17.04,
+        "manipulation_cost": 38.0,
+        "resolution_risk_cost": 300.0,
+        "killed_trades": 5,
+        "total_friction": 2099.97
+      }
+    },
+    {
+      "name": "Mispricing Detection / Edge Finder (Friction-Adjusted)",
+      "num_trades": 905,
+      "total_pnl": 82414.62,
+      "win_rate": 0.3359,
+      "roi": 82.4146,
+      "sharpe_ratio": 2.21,
+      "max_drawdown": 1.0757,
+      "profit_factor": 10.87,
+      "friction_breakdown": {
+        "spread_cost": 3017.75,
+        "slippage_cost": 29.71,
+        "fee_cost": 0.0,
+        "latency_cost": 161.64,
+        "frontrun_cost": 158.4,
+        "api_failure_cost": 22.03,
+        "manipulation_cost": 75.0,
+        "resolution_risk_cost": 570.0,
+        "killed_trades": 5,
+        "total_friction": 4034.54
+      }
+    },
+    {
+      "name": "Kelly Criterion Composite (Friction-Adjusted)",
+      "num_trades": 185,
+      "total_pnl": -387.29,
+      "win_rate": 0.573,
+      "roi": -0.3873,
+      "sharpe_ratio": -1.52,
+      "max_drawdown": 0.5614,
+      "profit_factor": 0.72,
+      "friction_breakdown": {
+        "spread_cost": 490.38,
+        "slippage_cost": 4.32,
+        "fee_cost": 0.0,
+        "latency_cost": 2.52,
+        "frontrun_cost": 12.7,
+        "api_failure_cost": 4.44,
+        "manipulation_cost": 8.48,
+        "resolution_risk_cost": 152.71,
+        "killed_trades": 1,
+        "total_friction": 675.54
+      }
+    }
+  ],
+  "new_strategy_results": [
+    {
+      "name": "Information Edge (Weather/Data)",
+      "num_trades": 201,
+      "total_pnl": 29725.51,
+      "win_rate": 1.0,
+      "roi": 29.7255,
+      "sharpe_ratio": 1.94,
+      "max_drawdown": 0.0,
+      "profit_factor": 2972550.8
+    },
+    {
+      "name": "Contrarian Anti-Herding",
+      "num_trades": 285,
+      "total_pnl": 24479.21,
+      "win_rate": 0.5053,
+      "roi": 24.4792,
+      "sharpe_ratio": 2.61,
+      "max_drawdown": 0.2732,
+      "profit_factor": 13.29
+    },
+    {
+      "name": "Boring Market Yield",
+      "num_trades": 93,
+      "total_pnl": 54.08,
+      "win_rate": 0.9462,
+      "roi": 0.0541,
+      "sharpe_ratio": 0.29,
+      "max_drawdown": 0.124,
+      "profit_factor": 1.14
+    }
+  ],
+  "new_strategy_friction_results": [
+    {
+      "name": "Information Edge (Weather/Data) (Friction-Adjusted)",
+      "num_trades": 200,
+      "total_pnl": 28582.33,
+      "win_rate": 0.98,
+      "roi": 28.5823,
+      "sharpe_ratio": 1.86,
+      "max_drawdown": 0.0195,
+      "profit_factor": 686.02,
+      "friction_breakdown": {
+        "spread_cost": 640.06,
+        "slippage_cost": 7.13,
+        "fee_cost": 0.0,
+        "latency_cost": 8.18,
+        "frontrun_cost": 16.8,
+        "api_failure_cost": 313.4,
+        "manipulation_cost": 12.0,
+        "resolution_risk_cost": 180.0,
+        "killed_trades": 1,
+        "total_friction": 1177.57
+      }
+    },
+    {
+      "name": "Contrarian Anti-Herding (Friction-Adjusted)",
+      "num_trades": 283,
+      "total_pnl": 23516.34,
+      "win_rate": 0.4346,
+      "roi": 23.5163,
+      "sharpe_ratio": 2.52,
+      "max_drawdown": 0.3579,
+      "profit_factor": 10.33,
+      "friction_breakdown": {
+        "spread_cost": 705.01,
+        "slippage_cost": 8.3,
+        "fee_cost": 0.0,
+        "latency_cost": 39.0,
+        "frontrun_cost": 21.0,
+        "api_failure_cost": 46.73,
+        "manipulation_cost": 25.0,
+        "resolution_risk_cost": 150.0,
+        "killed_trades": 2,
+        "total_friction": 995.04
+      }
+    },
+    {
+      "name": "Boring Market Yield (Friction-Adjusted)",
+      "num_trades": 92,
+      "total_pnl": -575.72,
+      "win_rate": 0.4022,
+      "roi": -0.5757,
+      "sharpe_ratio": -2.89,
+      "max_drawdown": 0.5784,
+      "profit_factor": 0.21,
+      "friction_breakdown": {
+        "spread_cost": 482.4,
+        "slippage_cost": 5.9,
+        "fee_cost": 0.0,
+        "latency_cost": 2.35,
+        "frontrun_cost": 8.0,
+        "api_failure_cost": 4.84,
+        "manipulation_cost": 12.0,
+        "resolution_risk_cost": 160.0,
+        "killed_trades": 1,
+        "total_friction": 675.5
+      }
+    }
+  ],
+  "friction_profiles": {
+    "obvious_no": {
+      "name": "Obvious NO / Absurd Markets",
+      "overall_resistance": 5.89,
+      "latency_sensitivity": 2.0,
+      "competition_sensitivity": 3.0,
+      "spread_sensitivity": 4.0,
+      "fee_sensitivity": 1.0,
+      "slippage_sensitivity": 6.0,
+      "liquidity_sensitivity": 7.0,
+      "api_sensitivity": 2.0,
+      "manipulation_sensitivity": 3.0,
+      "resolution_sensitivity": 9.0,
+      "description": "Low latency sensitivity but extremely high resolution risk. The fundamental problem is that 'absurd' events sometimes happen."
+    },
+    "mean_reversion": {
+      "name": "Mean Reversion",
+      "overall_resistance": 3.89,
+      "latency_sensitivity": 7.0,
+      "competition_sensitivity": 8.0,
+      "spread_sensitivity": 8.0,
+      "fee_sensitivity": 3.0,
+      "slippage_sensitivity": 6.0,
+      "liquidity_sensitivity": 7.0,
+      "api_sensitivity": 6.0,
+      "manipulation_sensitivity": 7.0,
+      "resolution_sensitivity": 3.0,
+      "description": "Highly sensitive to competition and spreads. The small edge from mean reversion is easily consumed by friction."
+    },
+    "momentum": {
+      "name": "Momentum / Trend Following",
+      "overall_resistance": 3.67,
+      "latency_sensitivity": 8.0,
+      "competition_sensitivity": 9.0,
+      "spread_sensitivity": 7.0,
+      "fee_sensitivity": 3.0,
+      "slippage_sensitivity": 5.0,
+      "liquidity_sensitivity": 6.0,
+      "api_sensitivity": 7.0,
+      "manipulation_sensitivity": 8.0,
+      "resolution_sensitivity": 4.0,
+      "description": "Extremely sensitive to competition and latency. Momentum signals are the most crowded trade in prediction markets."
+    },
+    "late_convergence": {
+      "name": "Late-Stage Convergence",
+      "overall_resistance": 5.33,
+      "latency_sensitivity": 3.0,
+      "competition_sensitivity": 5.0,
+      "spread_sensitivity": 9.0,
+      "fee_sensitivity": 2.0,
+      "slippage_sensitivity": 4.0,
+      "liquidity_sensitivity": 6.0,
+      "api_sensitivity": 3.0,
+      "manipulation_sensitivity": 2.0,
+      "resolution_sensitivity": 8.0,
+      "description": "Spread is the critical friction factor. With only 1-5% edge per trade, even a 2% spread eliminates most profit. Resolution risk is also high."
+    },
+    "volatility_selling": {
+      "name": "Volatility Selling / Range Trading",
+      "overall_resistance": 4.89,
+      "latency_sensitivity": 5.0,
+      "competition_sensitivity": 6.0,
+      "spread_sensitivity": 7.0,
+      "fee_sensitivity": 2.0,
+      "slippage_sensitivity": 5.0,
+      "liquidity_sensitivity": 6.0,
+      "api_sensitivity": 4.0,
+      "manipulation_sensitivity": 6.0,
+      "resolution_sensitivity": 5.0,
+      "description": "Moderate friction sensitivity overall. The main risk is that spreads consume the range-trading edge, and breakouts cause losses."
+    },
+    "mispricing": {
+      "name": "Mispricing Detection / Edge Finder",
+      "overall_resistance": 5.0,
+      "latency_sensitivity": 6.0,
+      "competition_sensitivity": 7.0,
+      "spread_sensitivity": 6.0,
+      "fee_sensitivity": 2.0,
+      "slippage_sensitivity": 5.0,
+      "liquidity_sensitivity": 5.0,
+      "api_sensitivity": 5.0,
+      "manipulation_sensitivity": 5.0,
+      "resolution_sensitivity": 4.0,
+      "description": "Moderate to high friction sensitivity. Mispricings are corrected quickly by competing bots, reducing the available edge."
+    },
+    "kelly_composite": {
+      "name": "Kelly Criterion Composite",
+      "overall_resistance": 5.33,
+      "latency_sensitivity": 5.0,
+      "competition_sensitivity": 6.0,
+      "spread_sensitivity": 6.0,
+      "fee_sensitivity": 2.0,
+      "slippage_sensitivity": 4.0,
+      "liquidity_sensitivity": 5.0,
+      "api_sensitivity": 4.0,
+      "manipulation_sensitivity": 5.0,
+      "resolution_sensitivity": 5.0,
+      "description": "Moderate friction sensitivity. Kelly sizing helps manage risk but the underlying signals are affected by the same friction."
+    }
+  },
+  "friction_params": {
+    "latency_range": "0.5-2.0s",
+    "frontrun_prob_range": "5-40%",
+    "spread_range": "2-15%",
+    "api_failure_rate": "2%",
+    "manipulation_prob": "3%",
+    "resolution_risk_prob": "2%"
+  }
+}
