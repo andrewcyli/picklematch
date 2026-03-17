@@ -291,11 +291,15 @@ export const QualifierVariant: React.FC = () => {
     const teamCount = isSingles ? players.length : Math.floor(players.length / 2);
 
     if (!isSingles && players.length % 2 !== 0) {
+      state.setPlayers(previousPlayers);
+      state.setGameConfig(previousConfig);
       toast.error("Doubles tournaments require an even number of players.");
       return;
     }
 
     if (teamCount < 4 || teamCount > 24) {
+      state.setPlayers(previousPlayers);
+      state.setGameConfig(previousConfig);
       toast.error(isSingles 
         ? "Qualifier tournaments require 4-24 players." 
         : "Qualifier tournaments require 8-48 players (4-24 teams)."
@@ -322,7 +326,8 @@ export const QualifierVariant: React.FC = () => {
         .update({ players, matches: sanitized as any, game_config: gameConfig as any })
         .eq("id", state.gameId);
       if (error) throw error;
-      setActiveSection("matches");
+      // Bracket-first: show bracket dialog immediately after generation
+      setShowBracketDialog(true);
       toast.success("Qualifier bracket generated! Group stage ready.");
     } catch (error: any) {
       state.setPlayers(previousPlayers);

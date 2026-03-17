@@ -161,11 +161,12 @@ const getTournamentStructure = (playerCount: number, isSingles: boolean, schedul
 };
 
 // Get current tournament step
-const getCurrentStep = (activeSection: string, matches: Match[]): TournamentStep => {
+const getCurrentStep = (activeSection: string, matches: Match[], matchScores: Map<string, { team1: number; team2: number }>): TournamentStep => {
   if (activeSection === 'setup') return 'setup';
   if (activeSection === 'players' && matches.length === 0) return 'players';
-  if (activeSection === 'players' && matches.length > 0) return 'bracket';
-  return 'matches';
+  if (matches.length > 0 && matchScores.size === 0) return 'bracket';
+  if (matches.length > 0 && matchScores.size > 0) return 'matches';
+  return 'players';
 };
 
 export const TournamentVariant: React.FC = () => {
@@ -293,11 +294,15 @@ export const TournamentVariant: React.FC = () => {
     const teamCount = isSingles ? players.length : players.length / 2;
 
     if (!isSingles && players.length % 2 !== 0) {
+      state.setPlayers(previousPlayers);
+      state.setGameConfig(previousConfig);
       toast.error("Doubles tournaments require an even number of players.");
       return;
     }
 
     if ((schedulingType === "single-elimination" || schedulingType === "double-elimination") && ![4, 8, 16].includes(teamCount)) {
+      state.setPlayers(previousPlayers);
+      state.setGameConfig(previousConfig);
       toast.error(
         isSingles
           ? "Bracket tournaments require exactly 4, 8, or 16 players."
@@ -339,7 +344,8 @@ export const TournamentVariant: React.FC = () => {
         .update({ players, matches: sanitized as any, game_config: gameConfig as any })
         .eq("id", state.gameId);
       if (error) throw error;
-      setActiveSection("matches");
+      // Bracket-first: show bracket dialog immediately after generation
+      setShowBracketDialog(true);
       toast.success(schedulingType === "qualifier-tournament" ? "Qualifier bracket generated!" : "Tournament bracket generated!");
     } catch (error: any) {
       state.setPlayers(previousPlayers);
@@ -401,7 +407,7 @@ export const TournamentVariant: React.FC = () => {
   const progress = state.matches.length > 0 ? (completedMatches.length / state.matches.length) * 100 : 0;
 
   // Get current step
-  const currentStep = getCurrentStep(activeSection, state.matches);
+  const currentStep = getCurrentStep(activeSection, state.matches, state.matchScores);
 
   if (state.isRestoringSession) {
     return (
@@ -444,7 +450,7 @@ export const TournamentVariant: React.FC = () => {
                 step="Bracket" 
                 icon={Swords} 
                 isActive={currentStep === 'bracket'} 
-                isComplete={completedMatches.length > 0}
+                isComplete={currentStep === 'matches' || completedMatches.length > 0}
               />
               <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground" />
               <StepIndicator 

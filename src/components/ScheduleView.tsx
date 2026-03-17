@@ -341,6 +341,19 @@ export const ScheduleView = ({
     const match = matches.find(m => m.id === matchId);
     const wasAlreadyScored = matchScores.has(matchId);
 
+    // Progression integrity check: block edits that would change winner when downstream matches exist
+    if (wasAlreadyScored && isTournamentMode && match) {
+      const currentScore = matchScores.get(matchId)!;
+      if (wouldWinnerChange(currentScore, team1Score, team2Score) && hasDownstreamMatches(match)) {
+        toast({
+          title: "Cannot change winner",
+          description: "Downstream matches are already scheduled. Reset those matches first or contact an organizer.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
     // Update scores state
     const newScores = new Map(matchScores);
     newScores.set(matchId, {
@@ -457,6 +470,40 @@ export const ScheduleView = ({
       newPending.set(matchId, current);
       setPendingScores(newPending);
     }
+  };
+
+  // Helper to check if a match has downstream dependent matches that are already populated
+  const hasDownstreamMatches = (match: Match): boolean => {
+    if (!match.tournamentMetadata && !match.qualifierMetadata) return false;
+    
+    // Check tournament progression
+    if (match.tournamentMetadata?.advancesTo) {
+      const nextMatch = matches.find(m => m.id === match.tournamentMetadata?.advancesTo);
+      if (nextMatch && !nextMatch.team1.includes('TBD') && !nextMatch.team2.includes('TBD')) {
+        return true;
+      }
+    }
+    
+    // Check qualifier group progression
+    if (match.qualifierMetadata?.advancesToGroupMatch) {
+      const nextMatch = matches.find(m => m.id === match.qualifierMetadata?.advancesToGroupMatch);
+      if (nextMatch && !nextMatch.team1.includes('TBD') && !nextMatch.team2.includes('TBD')) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
+  // Helper to check if the winner would change with new scores
+  const wouldWinnerChange = (
+    currentScore: { team1: number; team2: number },
+    newTeam1Score: number,
+    newTeam2Score: number
+  ): boolean => {
+    const currentWinner = currentScore.team1 > currentScore.team2 ? 'team1' : 'team2';
+    const newWinner = newTeam1Score > newTeam2Score ? 'team1' : 'team2';
+    return currentWinner !== newWinner;
   };
   const checkPlayerConflicts = (scores: Map<string, {
     team1: number;
@@ -772,6 +819,8 @@ export const ScheduleView = ({
                   <Trophy className="w-4 h-4" />
                   {gameConfig.schedulingType === 'single-elimination' 
                     ? 'Single Elimination Tournament'
+                    : gameConfig.schedulingType === 'qualifier-tournament'
+                    ? 'Qualifier Tournament'
                     : 'Double Elimination Tournament'}
                 </h3>
                 <p className="text-xs text-muted-foreground">
