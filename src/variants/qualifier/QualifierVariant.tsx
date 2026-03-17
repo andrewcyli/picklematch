@@ -550,7 +550,6 @@ export const QualifierVariant: React.FC = () => {
                     releaseIdentity();
                     toast.success("Switched to organizer view");
                   }}
-                  onSkipMatch={() => {}}
                 />
               ) : (
                 <ScheduleView

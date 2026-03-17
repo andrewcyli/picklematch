@@ -514,7 +514,11 @@ export const TournamentVariant: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold">
-                    {state.gameConfig.schedulingType === 'double-elimination' ? 'Double Elimination' : 'Single Elimination'}
+                    {state.gameConfig.schedulingType === 'double-elimination' 
+                      ? 'Double Elimination' 
+                      : state.gameConfig.schedulingType === 'qualifier-tournament'
+                        ? 'Qualifier Tournament'
+                        : 'Single Elimination'}
                   </h3>
                   <p className="text-xs text-muted-foreground">
                     {structure ? `${structure.teamCount} teams • ${structure.rounds} rounds` : `${state.players.length} players`}
@@ -594,7 +598,6 @@ export const TournamentVariant: React.FC = () => {
                     releaseIdentity();
                     toast.success("Switched to organizer view");
                   }}
-                  onSkipMatch={() => {}}
                 />
               ) : (
                 <ScheduleView

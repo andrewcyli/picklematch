@@ -59,7 +59,31 @@ export const ShellProvider: React.FC<{
 
     // Listen for popstate events (back/forward navigation)
     window.addEventListener('popstate', updateVariantFromPath);
-    return () => window.removeEventListener('popstate', updateVariantFromPath);
+    
+    // Intercept history.pushState and history.replaceState for router navigation
+    const originalPushState = window.history.pushState;
+    const originalReplaceState = window.history.replaceState;
+    
+    const handleStateChange = () => {
+      // Use setTimeout to ensure the URL has updated
+      setTimeout(updateVariantFromPath, 0);
+    };
+    
+    window.history.pushState = function(...args) {
+      originalPushState.apply(this, args);
+      handleStateChange();
+    };
+    
+    window.history.replaceState = function(...args) {
+      originalReplaceState.apply(this, args);
+      handleStateChange();
+    };
+    
+    return () => {
+      window.removeEventListener('popstate', updateVariantFromPath);
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
+    };
   }, []);
   const [isPlayerView, setIsPlayerView] = useState(false);
   const [playerName, setPlayerName] = useState<string | null>(null);

@@ -126,12 +126,8 @@ export const AppShell: React.FC<AppShellProps> = ({
           </header>
         )}
 
-        {/* Content - with safe area handling */}
-        <div className={cn(
-          "flex-1 flex flex-col min-h-0",
-          // Issue #6: Extra bottom margin on mobile AND tablet for safe areas
-          !hideBottomNav && (isMobilePortrait || isMobileLandscape || isTablet) && "mb-safe"
-        )}>
+        {/* Content - safe area handling via bottomPadding on main element only */}
+        <div className="flex-1 flex flex-col min-h-0">
           {children}
         </div>
       </main>

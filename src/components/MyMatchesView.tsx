@@ -118,11 +118,11 @@ export const MyMatchesView = ({
             </div>
           </div>
 
-          {(status === "current" || status === "upnext") && (
+          {(status === "current" || status === "upnext") && onSkipMatch && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onSkipMatch?.(match.id)}
+              onClick={() => onSkipMatch(match.id)}
               className="text-xs"
             >
               Skip Match
