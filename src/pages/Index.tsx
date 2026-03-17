@@ -468,9 +468,9 @@ const Index = () => {
   const handlePlayersUpdate = async (playerList: string[], teammatePairs?: {
     player1: string;
     player2: string;
-  }[]) => {
+  }[]): Promise<boolean> => {
     setPlayers(playerList);
-    if (!gameConfig) return;
+    if (!gameConfig) return false;
     const updatedConfig = {
       ...gameConfig,
       teammatePairs
@@ -482,7 +482,7 @@ const Index = () => {
       // Validate even player count for doubles tournaments
       if (gameConfig.tournamentPlayStyle === 'doubles' && playerList.length % 2 !== 0) {
         toast.error("Doubles tournaments require an even number of players. Please add or remove one player.");
-        return;
+        return false;
       }
 
       // Enforce 4/8/16 teams for single or double elimination (validate on Players page)
@@ -491,7 +491,7 @@ const Index = () => {
         if (![4, 8, 16].includes(teamCount)) {
           const requiredText = gameConfig.tournamentPlayStyle === 'singles' ? '4, 8, or 16 players' : '8, 16, or 32 players (to form 4, 8, or 16 teams)';
           toast.error(`${gameConfig.schedulingType === 'single-elimination' ? 'Single' : 'Double'} elimination requires exactly ${requiredText}.`);
-          return;
+          return false;
         }
       }
 
@@ -518,11 +518,12 @@ const Index = () => {
             if (error) throw error;
             toast.success("Qualifier tournament generated!");
           }
+          return true;
         } catch (error: any) {
           toast.error(error.message || "Failed to generate qualifier tournament");
           console.error(error);
+          return false;
         }
-        return;
       }
       const {
         generateTournamentSchedule
@@ -547,11 +548,12 @@ const Index = () => {
           if (error) throw error;
           toast.success("Tournament bracket generated!");
         }
+        return true;
       } catch (error: any) {
         toast.error(error.message || "Failed to generate tournament");
         console.error(error);
+        return false;
       }
-      return;
     }
 
     // Round-robin mode - preserve matches and regenerate
@@ -602,9 +604,11 @@ const Index = () => {
         const message = preservedCount > 0 ? `Players updated! ${preservedCount} match(es) preserved, future matches regenerated.` : "Schedule generated!";
         toast.success(message);
       }
+      return true;
     } catch (error) {
       toast.error("Failed to update players");
       console.error(error);
+      return false;
     }
   };
   const handleScheduleUpdate = async (newMatches: Match[], newPlayers: string[]) => {
