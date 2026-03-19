@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ShellProvider } from "@/shell";
+import { Trophy, Users } from "lucide-react";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
@@ -11,6 +12,9 @@ import NotFound from "./pages/NotFound";
 import { lazy, Suspense } from "react";
 
 const VariantSelector = lazy(() => import("@/shell/VariantSelector"));
+const PrototypeLab = lazy(() => import("@/prototypes/PrototypeLab"));
+const PreviewPlaceholder = lazy(() => import("@/prototypes/PreviewPlaceholder"));
+const ClubhousePrototype = lazy(() => import("@/prototypes/clubhouse/ClubhousePrototype"));
 const ClassicVariant = lazy(() => import("@/variants/classic/ClassicVariant"));
 const TournamentVariant = lazy(() => import("@/variants/tournament/TournamentVariant"));
 const QualifierVariant = lazy(() => import("@/variants/qualifier/QualifierVariant"));
@@ -42,25 +46,79 @@ const App = () => {
                 {/* Legacy root - preserves existing behavior for backward compatibility */}
                 <Route path="/" element={<Index />} />
                 
-                {/* New variant selector at /start - entry point for new users */}
+                {/* Existing scheduling-mode selector */}
                 <Route path="/start" element={<VariantSelector />} />
+
+                {/* UX prototype lab */}
+                <Route path="/prototypes" element={<PrototypeLab />} />
+                <Route path="/clubhouse" element={<Navigate to="/clubhouse/" replace />} />
+                <Route path="/clubhouse/*" element={<ClubhousePrototype />} />
+                <Route
+                  path="/arena"
+                  element={<Navigate to="/arena/" replace />}
+                />
+                <Route
+                  path="/arena/*"
+                  element={
+                    <PreviewPlaceholder
+                      eyebrow="Arena prototype"
+                      title="Arena — event-night intensity on top of tournament logic"
+                      description="This route stakes out the tournament-first product direction: broadcast visuals, bracket hero moments, and live-score framing. The current tournament engine is already available underneath while the dedicated shell remains to be built."
+                      accentClassName="from-zinc-950 via-zinc-800 to-lime-500"
+                      icon={Trophy}
+                      foundationPath="/tournament/"
+                      foundationLabel="/tournament/"
+                      built={[
+                        "Dedicated preview route for the Arena concept",
+                        "Product positioning and shell direction separated from scheduling-mode routing",
+                        "Clear handoff to the existing tournament foundation for functional testing",
+                      ]}
+                      remaining={[
+                        "Broadcast-first bracket shell",
+                        "Live scoreboard hero and large-format scoring interactions",
+                        "Seeding, winner celebration, and spectator-specific views",
+                      ]}
+                    />
+                  }
+                />
+                <Route path="/quick-court" element={<Navigate to="/quick-court/" replace />} />
+                <Route
+                  path="/quick-court/*"
+                  element={
+                    <PreviewPlaceholder
+                      eyebrow="Quick Court prototype"
+                      title="Quick Court — drop-in speed and minimal friction"
+                      description="This route defines the low-friction, spontaneous-play direction. The current classic engine remains the practical functional base while the streamlined linear shell and court-first interaction model are built next."
+                      accentClassName="from-slate-200 via-white to-slate-500"
+                      icon={Users}
+                      foundationPath="/classic/"
+                      foundationLabel="/classic/"
+                      built={[
+                        "Dedicated preview route for the Quick Court concept",
+                        "A separate product story from Clubhouse and Arena",
+                        "Direct path to the existing round-robin foundation for behavior validation",
+                      ]}
+                      remaining={[
+                        "Linear 3-step shell with no persistent nav",
+                        "One-court-first cards and waitlist promotion UX",
+                        "Faster player entry and end-of-session summary flow",
+                      ]}
+                    />
+                  }
+                />
                 
-                {/* Classic Round-Robin Variant - Social/Social play */}
+                {/* Scheduling-mode foundations */}
                 <Route path="/classic" element={<Navigate to="/classic/" replace />} />
                 <Route path="/classic/*" element={<ClassicVariant />} />
-                
-                {/* Tournament Bracket Variant - Competitive play */}
                 <Route path="/tournament" element={<Navigate to="/tournament/" replace />} />
                 <Route path="/tournament/*" element={<TournamentVariant />} />
-                
-                {/* Qualifier Stage Variant - Groups + Knockout */}
                 <Route path="/qualifier" element={<Navigate to="/qualifier/" replace />} />
                 <Route path="/qualifier/*" element={<QualifierVariant />} />
                 
                 {/* Shortcut redirects for common paths */}
                 <Route path="/play" element={<Navigate to="/classic/" replace />} />
                 <Route path="/game" element={<Navigate to="/classic/" replace />} />
-                <Route path="/new" element={<Navigate to="/start" replace />} />
+                <Route path="/new" element={<Navigate to="/prototypes" replace />} />
                 
                 {/* Catch-all */}
                 <Route path="*" element={<NotFound />} />
