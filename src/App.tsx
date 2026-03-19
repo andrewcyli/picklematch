@@ -51,12 +51,7 @@ const App = () => {
 
                 {/* UX prototype lab */}
                 <Route path="/prototypes" element={<PrototypeLab />} />
-                <Route path="/clubhouse" element={<Navigate to="/clubhouse/" replace />} />
                 <Route path="/clubhouse/*" element={<ClubhousePrototype />} />
-                <Route
-                  path="/arena"
-                  element={<Navigate to="/arena/" replace />}
-                />
                 <Route
                   path="/arena/*"
                   element={
@@ -81,7 +76,6 @@ const App = () => {
                     />
                   }
                 />
-                <Route path="/quick-court" element={<Navigate to="/quick-court/" replace />} />
                 <Route
                   path="/quick-court/*"
                   element={
@@ -108,11 +102,8 @@ const App = () => {
                 />
                 
                 {/* Scheduling-mode foundations */}
-                <Route path="/classic" element={<Navigate to="/classic/" replace />} />
                 <Route path="/classic/*" element={<ClassicVariant />} />
-                <Route path="/tournament" element={<Navigate to="/tournament/" replace />} />
                 <Route path="/tournament/*" element={<TournamentVariant />} />
-                <Route path="/qualifier" element={<Navigate to="/qualifier/" replace />} />
                 <Route path="/qualifier/*" element={<QualifierVariant />} />
                 
                 {/* Shortcut redirects for common paths */}
