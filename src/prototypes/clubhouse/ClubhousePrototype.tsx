@@ -31,11 +31,13 @@ import type { GameConfig, Match, Section } from "@/core/types";
 import {
   ClassicHistoryView,
   ClassicLeaderboardView,
-  ClassicMatchesView,
-  ClassicMyMatchesView,
   ClassicPlayersView,
   ClassicSetupView,
 } from "@/variants/classic/components";
+import {
+  ClubhouseOrganizerSession,
+  ClubhousePlayerSession,
+} from "@/prototypes/clubhouse/ClubhouseSessionExperience";
 
 const NAV_ITEMS: Array<{ section: Section; label: string; shortLabel: string }> = [
   { section: "setup", label: "Home", shortLabel: "Home" },
@@ -385,7 +387,6 @@ const ClubhousePrototype: React.FC = () => {
   const { activeSection, setActiveSection } = useShell();
   const [showGameCodeDialog, setShowGameCodeDialog] = useState(true);
   const [showPlayerSelector, setShowPlayerSelector] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
 
   const state = useClubhouseGameState();
   const { players, matches, gameConfig, gameId, gameCode, matchScores, setMatchScores } = state;
@@ -393,13 +394,6 @@ const ClubhousePrototype: React.FC = () => {
   const { playerName, isPlayerView, claimIdentity, releaseIdentity } = usePlayerIdentity(gameId);
   const playerMatches = usePlayerMatches(matches as any, playerName, matchScores);
   usePlayerNotifications(matches as any, playerName, gameId, matchScores);
-
-  useEffect(() => {
-    if (isPlayerView) {
-      const interval = setInterval(() => setCurrentTime(new Date()), 1000);
-      return () => clearInterval(interval);
-    }
-  }, [isPlayerView]);
 
   useEffect(() => {
     const joinMode = new URLSearchParams(window.location.search).get("mode");
@@ -727,11 +721,10 @@ const ClubhousePrototype: React.FC = () => {
                 ) : null}
 
                 {isPlayerView && playerName ? (
-                  <ClassicMyMatchesView
+                  <ClubhousePlayerSession
                     playerName={playerName}
                     matchGroups={playerMatches}
                     matchScores={matchScores}
-                    currentTime={currentTime}
                     allMatches={matches}
                     onReleaseIdentity={() => {
                       releaseIdentity();
@@ -740,7 +733,7 @@ const ClubhousePrototype: React.FC = () => {
                     onSkipMatch={handleSkipMatch}
                   />
                 ) : (
-                  <ClassicMatchesView
+                  <ClubhouseOrganizerSession
                     matches={matches}
                     gameConfig={gameConfig}
                     players={players}
@@ -748,8 +741,6 @@ const ClubhousePrototype: React.FC = () => {
                     onMatchScoresUpdate={setMatchScores}
                     onScheduleUpdate={handleScheduleUpdate}
                     onCourtConfigUpdate={handleCourtConfigUpdate}
-                    isPlayerView={isPlayerView}
-                    playerName={playerName}
                     onShowPlayerSelector={() => setShowPlayerSelector(true)}
                   />
                 )}

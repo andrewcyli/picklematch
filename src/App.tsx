@@ -4,7 +4,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ShellProvider } from "@/shell";
-import { Trophy, Users } from "lucide-react";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
@@ -13,8 +12,9 @@ import { lazy, Suspense } from "react";
 
 const VariantSelector = lazy(() => import("@/shell/VariantSelector"));
 const PrototypeLab = lazy(() => import("@/prototypes/PrototypeLab"));
-const PreviewPlaceholder = lazy(() => import("@/prototypes/PreviewPlaceholder"));
 const ClubhousePrototype = lazy(() => import("@/prototypes/clubhouse/ClubhousePrototype"));
+const ArenaPrototype = lazy(() => import("@/prototypes/ArenaPrototype"));
+const QuickCourtPrototype = lazy(() => import("@/prototypes/QuickCourtPrototype"));
 const ClassicVariant = lazy(() => import("@/variants/classic/ClassicVariant"));
 const TournamentVariant = lazy(() => import("@/variants/tournament/TournamentVariant"));
 const QualifierVariant = lazy(() => import("@/variants/qualifier/QualifierVariant"));
@@ -52,54 +52,8 @@ const App = () => {
                 {/* UX prototype lab */}
                 <Route path="/prototypes" element={<PrototypeLab />} />
                 <Route path="/clubhouse/*" element={<ClubhousePrototype />} />
-                <Route
-                  path="/arena/*"
-                  element={
-                    <PreviewPlaceholder
-                      eyebrow="Arena prototype"
-                      title="Arena — event-night intensity on top of tournament logic"
-                      description="This route stakes out the tournament-first product direction: broadcast visuals, bracket hero moments, and live-score framing. The current tournament engine is already available underneath while the dedicated shell remains to be built."
-                      accentClassName="from-zinc-950 via-zinc-800 to-lime-500"
-                      icon={Trophy}
-                      foundationPath="/tournament/"
-                      foundationLabel="/tournament/"
-                      built={[
-                        "Dedicated preview route for the Arena concept",
-                        "Product positioning and shell direction separated from scheduling-mode routing",
-                        "Clear handoff to the existing tournament foundation for functional testing",
-                      ]}
-                      remaining={[
-                        "Broadcast-first bracket shell",
-                        "Live scoreboard hero and large-format scoring interactions",
-                        "Seeding, winner celebration, and spectator-specific views",
-                      ]}
-                    />
-                  }
-                />
-                <Route
-                  path="/quick-court/*"
-                  element={
-                    <PreviewPlaceholder
-                      eyebrow="Quick Court prototype"
-                      title="Quick Court — drop-in speed and minimal friction"
-                      description="This route defines the low-friction, spontaneous-play direction. The current classic engine remains the practical functional base while the streamlined linear shell and court-first interaction model are built next."
-                      accentClassName="from-slate-200 via-white to-slate-500"
-                      icon={Users}
-                      foundationPath="/classic/"
-                      foundationLabel="/classic/"
-                      built={[
-                        "Dedicated preview route for the Quick Court concept",
-                        "A separate product story from Clubhouse and Arena",
-                        "Direct path to the existing round-robin foundation for behavior validation",
-                      ]}
-                      remaining={[
-                        "Linear 3-step shell with no persistent nav",
-                        "One-court-first cards and waitlist promotion UX",
-                        "Faster player entry and end-of-session summary flow",
-                      ]}
-                    />
-                  }
-                />
+                <Route path="/arena/*" element={<ArenaPrototype />} />
+                <Route path="/quick-court/*" element={<QuickCourtPrototype />} />
                 
                 {/* Scheduling-mode foundations */}
                 <Route path="/classic/*" element={<ClassicVariant />} />
