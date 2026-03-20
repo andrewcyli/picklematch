@@ -1,11 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  Activity,
   ArrowRight,
+  CheckCircle2,
+  CircleDot,
   Clock3,
   Copy,
   ListOrdered,
+  LogIn,
+  PlayCircle,
   Share2,
   TimerReset,
   Trophy,
@@ -15,7 +18,6 @@ import {
 } from "lucide-react";
 
 import { AppShell, PlayerViewHeader, useShell } from "@/shell";
-import { GameCodeDialog } from "@/components/GameCodeDialog";
 import { PlayerIdentitySelector } from "@/components/PlayerIdentitySelector";
 import { CheckInOut } from "@/components/CheckInOut";
 import { ScheduleView } from "@/components/ScheduleView";
@@ -27,6 +29,7 @@ import { ShareButton } from "@/components/ShareButton";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { safeStorage } from "@/lib/safe-storage";
@@ -36,6 +39,7 @@ import { usePlayerMatches } from "@/hooks/use-player-matches";
 import { usePlayerNotifications } from "@/hooks/use-player-notifications";
 import { generateSchedule, type CourtConfig } from "@/lib/scheduler";
 import { cn } from "@/lib/utils";
+import { validateGameCode } from "@/lib/validation";
 import type { GameConfig, Match, Section } from "@/core/types";
 
 const QUICK_STORAGE_KEYS = {
@@ -44,11 +48,18 @@ const QUICK_STORAGE_KEYS = {
 };
 
 const QUICK_NAV: Array<{ id: Section; label: string; shortLabel: string }> = [
-  { id: "setup", label: "Ready", shortLabel: "Ready" },
+  { id: "setup", label: "Start", shortLabel: "Start" },
   { id: "players", label: "Players", shortLabel: "Players" },
   { id: "matches", label: "Courts", shortLabel: "Courts" },
   { id: "leaderboard", label: "Leaders", shortLabel: "Leaders" },
   { id: "history", label: "Done", shortLabel: "Done" },
+];
+
+const FLOW_STEPS: Array<{ id: Section; label: string }> = [
+  { id: "setup", label: "Start" },
+  { id: "players", label: "Players" },
+  { id: "matches", label: "Courts" },
+  { id: "leaderboard", label: "Leaderboard" },
 ];
 
 const parseQuickNames = (value: string) =>
@@ -104,7 +115,9 @@ const useQuickCourtGameState = () => {
 
   useEffect(() => {
     const initAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         const { data, error } = await supabase.auth.signInAnonymously();
         if (!error) setUserId(data.user?.id || null);
@@ -115,7 +128,9 @@ const useQuickCourtGameState = () => {
 
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_, session) => {
       setUserId(session?.user?.id || null);
     });
 
@@ -234,33 +249,78 @@ const QuickCourtBottomNav: React.FC<{ disabled?: boolean }> = ({ disabled = fals
   );
 };
 
+const FlowTracker: React.FC<{ activeSection: Section; unlocked: Set<Section> }> = ({ activeSection, unlocked }) => (
+  <div className="px-1 pt-4 pb-3">
+    <div className="rounded-[1.5rem] border border-slate-200 bg-white/85 p-3 shadow-sm backdrop-blur-sm">
+      <div className="flex items-center gap-2 overflow-x-auto">
+        {FLOW_STEPS.map((step, index) => {
+          const complete = unlocked.has(step.id) && step.id !== activeSection;
+          const active = step.id === activeSection;
+          return (
+            <React.Fragment key={step.id}>
+              <div
+                className={cn(
+                  "flex min-w-fit items-center gap-2 rounded-full px-3 py-2 text-xs font-medium",
+                  active && "bg-slate-900 text-white",
+                  complete && !active && "bg-emerald-50 text-emerald-700",
+                  !active && !complete && "bg-slate-100 text-slate-500"
+                )}
+              >
+                {complete ? <CheckCircle2 className="h-3.5 w-3.5" /> : <CircleDot className="h-3.5 w-3.5" />}
+                {step.label}
+              </div>
+              {index < FLOW_STEPS.length - 1 ? <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-300" /> : null}
+            </React.Fragment>
+          );
+        })}
+      </div>
+    </div>
+  </div>
+);
+
 const QuickHero: React.FC<{
   gameCode: string;
   players: string[];
   matches: Match[];
   matchScores: Map<string, { team1: number; team2: number }>;
+  gameConfig: GameConfig | null;
+  activeSection: Section;
   onShowPlayerSelector: () => void;
-}> = ({ gameCode, players, matches, matchScores, onShowPlayerSelector }) => {
+}> = ({ gameCode, players, matches, matchScores, gameConfig, activeSection, onShowPlayerSelector }) => {
   const remaining = Math.max(matches.length - matchScores.size, 0);
+  const titleBySection: Record<Section, string> = {
+    setup: gameCode ? "Set the round-robin and get it moving." : "Start with a join code or spin up a fresh court night.",
+    players: "Get names in fast, then generate the night.",
+    matches: "See who’s on, who’s next, and what each court needs.",
+    leaderboard: "Bragging rights, lightly served.",
+    history: "Wrap the night without adding ceremony.",
+  };
+
+  const descriptionBySection: Record<Section, string> = {
+    setup: gameCode
+      ? "Quick Court stays focused on casual round-robin play: short setup, fast rostering, clear courts."
+      : "No popup intro anymore. Join a session you’ve been invited to, or create one and move straight into quick setup.",
+    players: "Paste names, add walk-ins, lock any doubles pairs if needed, then load the rotation.",
+    matches: "Live cards keep the current game and the next matchup together so organizers aren’t hunting across panels.",
+    leaderboard: "Top performers stay visible, but the product stays social-first.",
+    history: "Finished scores and session recap live here after the run.",
+  };
 
   return (
-    <div className="px-1 pt-4 pb-4">
+    <div className="px-1 pt-1 pb-4">
       <div className="rounded-[2rem] border border-slate-200 bg-[linear-gradient(135deg,#ffffff_0%,#f8fafc_50%,#eef2ff_100%)] p-5 text-slate-900 shadow-[0_30px_80px_rgba(15,23,42,0.08)] sm:p-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <Badge className="border-0 bg-slate-900 text-white">Quick Court</Badge>
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">Low-friction pickup play for two busy courts.</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
-              Quick Court keeps the strong 2-court rotation logic, singles/doubles support, live scoring,
-              leaderboard, and join code — but pushes the product toward faster setup, clearer active-session flow,
-              and less tournament ceremony.
-            </p>
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">{titleBySection[activeSection]}</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">{descriptionBySection[activeSection]}</p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[380px]">
-            <StatCard label="Session code" value={gameCode || "Start one"} />
-            <StatCard label="Players here" value={String(players.length)} />
-            <StatCard label="Still to play" value={String(remaining)} />
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 lg:min-w-[440px]">
+            <StatCard label="Code" value={gameCode || "New"} />
+            <StatCard label="Players" value={String(players.length)} />
+            <StatCard label="Courts" value={String(gameConfig?.courts || 0)} />
+            <StatCard label="To play" value={String(remaining)} />
           </div>
         </div>
 
@@ -271,13 +331,17 @@ const QuickHero: React.FC<{
               Copy code
             </Button>
           ) : null}
-          <Button variant="secondary" className="bg-white" onClick={onShowPlayerSelector}>
-            <UserCircle className="mr-2 h-4 w-4" />
-            I’m playing
-          </Button>
-          <div className="inline-flex items-center">
-            <ShareButton />
-          </div>
+          {gameCode ? (
+            <Button variant="secondary" className="bg-white" onClick={onShowPlayerSelector}>
+              <UserCircle className="mr-2 h-4 w-4" />
+              I’m playing
+            </Button>
+          ) : null}
+          {gameCode ? (
+            <div className="inline-flex items-center">
+              <ShareButton />
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
@@ -291,13 +355,77 @@ const StatCard: React.FC<{ label: string; value: string }> = ({ label, value }) 
   </div>
 );
 
+const QuickEntryCard: React.FC<{
+  onJoinGame: (code: string) => void;
+  onCreateGame: () => void;
+}> = ({ onJoinGame, onCreateGame }) => {
+  const [gameCode, setGameCode] = useState("");
+
+  const handleJoin = () => {
+    const code = gameCode.trim().toUpperCase();
+    const validation = validateGameCode(code);
+    if (!validation.valid) {
+      toast.error(validation.error || "Invalid game code");
+      return;
+    }
+    onJoinGame(code);
+  };
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
+      <Card className="border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <div className="flex items-center gap-2 text-slate-900">
+          <PlayCircle className="h-5 w-5" />
+          <h2 className="text-xl font-semibold">Create a Quick Court session</h2>
+        </div>
+        <p className="mt-3 text-sm leading-6 text-slate-600">
+          Casual round-robin only. Create the room, pick the session length and court mix, then move straight into names.
+        </p>
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <QuickInfo title="1. Start" body="Create the room and get a share code." icon={<Zap className="h-4 w-4" />} />
+          <QuickInfo title="2. Add players" body="Paste the crew or add walk-ins fast." icon={<Users className="h-4 w-4" />} />
+          <QuickInfo title="3. Run courts" body="See live and next-up matchups on one screen." icon={<ArrowRight className="h-4 w-4" />} />
+        </div>
+        <Button onClick={onCreateGame} className="mt-5 h-12 w-full text-base font-semibold">
+          Create session
+        </Button>
+      </Card>
+
+      <Card className="border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <div className="flex items-center gap-2 text-slate-900">
+          <LogIn className="h-5 w-5" />
+          <h2 className="text-xl font-semibold">Join with a code</h2>
+        </div>
+        <p className="mt-3 text-sm leading-6 text-slate-600">
+          Drop into an existing night with the 6-character code from the organizer.
+        </p>
+        <div className="mt-5 space-y-3">
+          <Input
+            value={gameCode}
+            onChange={(e) => setGameCode(e.target.value.toUpperCase())}
+            placeholder="Enter 6-char code"
+            maxLength={6}
+            className="h-12 font-mono text-lg uppercase tracking-[0.3em]"
+          />
+          <Button onClick={handleJoin} disabled={gameCode.trim().length !== 6} variant="secondary" className="h-12 w-full text-base font-semibold">
+            Join session
+          </Button>
+        </div>
+        <div className="mt-5 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+          Use this if the session already exists. If you’re organizing tonight, create first and you’ll get the code right away.
+        </div>
+      </Card>
+    </div>
+  );
+};
+
 const QuickAddPlayersCard: React.FC<{
   players: string[];
   onAddPlayers: (names: string[]) => void;
 }> = ({ players, onAddPlayers }) => {
   const [draft, setDraft] = useState("");
   const parsed = useMemo(() => parseQuickNames(draft), [draft]);
-  const addable = parsed.filter((name) => !players.includes(name));
+  const addable = parsed.filter((name) => !players.some((player) => player.toLowerCase() === name.toLowerCase()));
 
   return (
     <Card className="border-slate-200 bg-white/90 p-5 shadow-sm">
@@ -306,7 +434,7 @@ const QuickAddPlayersCard: React.FC<{
         <h3 className="text-lg font-semibold">Quick add lane</h3>
       </div>
       <p className="mt-2 text-sm leading-6 text-slate-600">
-        Paste names separated by commas or line breaks. Great for getting a drop-in crowd registered in one shot.
+        Paste names separated by commas or line breaks. Ideal for getting a whole drop-in crowd registered in one shot.
       </p>
       <Textarea
         value={draft}
@@ -361,18 +489,20 @@ const QuickCourtBoard: React.FC<{
     const courtIds = Array.from({ length: gameConfig.courts }, (_, index) => index + 1);
     const liveByCourt = new Map<number, Match>();
     const nextByCourt = new Map<number, Match>();
+    const upcoming: Match[] = [];
 
     courtIds.forEach((court) => {
       const queue = matches.filter((match) => match.court === court && !matchScores.has(match.id));
       if (queue[0]) liveByCourt.set(court, queue[0]);
       if (queue[1]) nextByCourt.set(court, queue[1]);
+      queue.slice(0, 2).forEach((match) => upcoming.push(match));
     });
 
     const activePlayers = new Set(Array.from(liveByCourt.values()).flatMap((match) => [...match.team1, ...match.team2]));
     const queuedPlayers = new Set(Array.from(nextByCourt.values()).flatMap((match) => [...match.team1, ...match.team2]));
     const waitingPlayers = players.filter((player) => !activePlayers.has(player) && !queuedPlayers.has(player));
 
-    return { courtIds, liveByCourt, nextByCourt, waitingPlayers };
+    return { courtIds, liveByCourt, nextByCourt, waitingPlayers, upcoming };
   }, [gameConfig.courts, matchScores, matches, players]);
 
   const leaderboardPreview = useMemo(() => {
@@ -398,12 +528,12 @@ const QuickCourtBoard: React.FC<{
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        <Card className="border-slate-200 bg-[linear-gradient(135deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-sm">
+      <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
+        <Card className="border-slate-200 bg-[linear-gradient(135deg,#ffffff_0%,#f8fafc_100%)] p-4 shadow-sm sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Active session</p>
-              <h2 className="mt-1 text-xl font-semibold text-slate-900">Live now + next up, court by court.</h2>
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Courts now</p>
+              <h2 className="mt-1 text-xl font-semibold text-slate-900">Live status and next game in one glance.</h2>
             </div>
             <Button variant="secondary" className="bg-white" onClick={onShowPlayerSelector}>
               <UserCircle className="mr-2 h-4 w-4" />
@@ -411,25 +541,25 @@ const QuickCourtBoard: React.FC<{
             </Button>
           </div>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="mt-4 space-y-3">
             {board.courtIds.map((court) => {
               const live = board.liveByCourt.get(court);
               const next = board.nextByCourt.get(court);
               return (
                 <div key={court} className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Court {getCourtLetter(court)}</div>
-                      <div className="mt-1 text-lg font-semibold text-slate-900">{live ? "On court" : "Waiting"}</div>
+                      <div className="mt-1 text-lg font-semibold text-slate-900">{live ? "Playing now" : "Court open"}</div>
                     </div>
                     <Badge className={cn("border-0", live ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-700")}>
                       {live ? "Live" : "Standby"}
                     </Badge>
                   </div>
 
-                  <div className="mt-4 space-y-3">
-                    <MiniMatchCard title="Playing now" match={live} tone="live" />
-                    <MiniMatchCard title="Next up" match={next} tone="queue" />
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <MiniMatchCard title="On court" match={live} tone="live" />
+                    <MiniMatchCard title="Next in" match={next} tone="queue" />
                   </div>
                 </div>
               );
@@ -443,9 +573,7 @@ const QuickCourtBoard: React.FC<{
               <ListOrdered className="h-5 w-5" />
               <h3 className="font-semibold">Bench / waiting</h3>
             </div>
-            <p className="mt-2 text-sm text-slate-600">
-              People not currently playing and not already queued next. This keeps player in/out visible at a glance.
-            </p>
+            <p className="mt-2 text-sm text-slate-600">Anyone not on court and not already next up.</p>
             <div className="mt-4 flex flex-wrap gap-2">
               {board.waitingPlayers.length > 0 ? (
                 board.waitingPlayers.map((player) => (
@@ -454,10 +582,23 @@ const QuickCourtBoard: React.FC<{
                   </Badge>
                 ))
               ) : (
-                <div className="rounded-2xl bg-slate-100 px-3 py-3 text-sm text-slate-500">
-                  Everyone is either playing or up next.
-                </div>
+                <div className="rounded-2xl bg-slate-100 px-3 py-3 text-sm text-slate-500">Everyone is either playing or next in.</div>
               )}
+            </div>
+          </Card>
+
+          <Card className="border-slate-200 bg-white/90 p-5 shadow-sm">
+            <div className="flex items-center gap-2 text-slate-900">
+              <Clock3 className="h-5 w-5" />
+              <h3 className="font-semibold">Next around the room</h3>
+            </div>
+            <div className="mt-4 space-y-2">
+              {board.upcoming.slice(0, Math.max(2, gameConfig.courts * 2)).map((match) => (
+                <div key={match.id} className="rounded-2xl bg-slate-50 px-3 py-3 text-sm text-slate-700">
+                  <div className="font-medium text-slate-900">Court {getCourtLetter(match.court)}</div>
+                  <div className="mt-1">{match.team1.join(" + ")} vs {match.team2.join(" + ")}</div>
+                </div>
+              ))}
             </div>
           </Card>
 
@@ -470,9 +611,7 @@ const QuickCourtBoard: React.FC<{
               {leaderboardPreview.length > 0 ? leaderboardPreview.map((entry, index) => (
                 <div key={entry.player} className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
-                      {index + 1}
-                    </div>
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">{index + 1}</div>
                     <div>
                       <div className="font-medium text-slate-900">{entry.player}</div>
                       <div className="text-xs text-slate-500">{entry.played} match{entry.played === 1 ? "" : "es"}</div>
@@ -483,7 +622,7 @@ const QuickCourtBoard: React.FC<{
                     <div className="text-xs text-slate-500">{entry.wins} wins</div>
                   </div>
                 </div>
-              )) : <div className="text-sm text-slate-500">No scores yet — leaderboard will wake up once the first game finishes.</div>}
+              )) : <div className="text-sm text-slate-500">No scores yet — leaderboard wakes up after the first finished game.</div>}
             </div>
           </Card>
         </div>
@@ -493,9 +632,9 @@ const QuickCourtBoard: React.FC<{
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3 px-2 pt-1">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Detailed controls</p>
-            <h3 className="text-xl font-semibold text-slate-900">Full scoring + schedule control stays intact below</h3>
+            <h3 className="text-xl font-semibold text-slate-900">Scoring and schedule controls</h3>
           </div>
-          <Badge variant="secondary" className="bg-slate-100 text-slate-700">Same engine, quicker surface</Badge>
+          <Badge variant="secondary" className="bg-slate-100 text-slate-700">Core engine unchanged</Badge>
         </div>
         <ScheduleView
           matches={matches as any}
@@ -521,10 +660,7 @@ const MiniMatchCard: React.FC<{
   match?: Match;
   tone: "live" | "queue";
 }> = ({ title, match, tone }) => (
-  <div className={cn(
-    "rounded-2xl border p-3",
-    tone === "live" ? "border-emerald-200 bg-emerald-50 text-emerald-950" : "border-amber-200 bg-amber-50 text-amber-950"
-  )}>
+  <div className={cn("rounded-2xl border p-3", tone === "live" ? "border-emerald-200 bg-emerald-50 text-emerald-950" : "border-amber-200 bg-amber-50 text-amber-950")}>
     <div className="text-xs uppercase tracking-[0.18em] opacity-70">{title}</div>
     {match ? (
       <>
@@ -539,7 +675,6 @@ const MiniMatchCard: React.FC<{
 
 export const QuickCourtVariant: React.FC = () => {
   const { activeSection, setActiveSection } = useShell();
-  const [showGameCodeDialog, setShowGameCodeDialog] = useState(true);
   const [showPlayerSelector, setShowPlayerSelector] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -565,10 +700,16 @@ export const QuickCourtVariant: React.FC = () => {
   }, [state.userId]);
 
   useEffect(() => {
-    if (showGameCodeDialog) return;
-    if (state.matches.length > 0) setActiveSection("matches");
-    else if (state.players.length > 0 || state.gameConfig) setActiveSection("players");
-  }, [showGameCodeDialog, setActiveSection, state.gameConfig, state.matches.length, state.players.length]);
+    if (state.gameId && !state.gameConfig) {
+      setActiveSection("setup");
+    } else if (state.matches.length > 0) {
+      setActiveSection("matches");
+    } else if (state.gameConfig) {
+      setActiveSection("players");
+    } else {
+      setActiveSection("setup");
+    }
+  }, [setActiveSection, state.gameConfig, state.gameId, state.matches.length]);
 
   const joinExistingGame = async (code: string) => {
     if (!state.userId) {
@@ -592,8 +733,7 @@ export const QuickCourtVariant: React.FC = () => {
       state.syncMatchScoresFromMatches(loadedMatches);
       safeStorage.setItem(QUICK_STORAGE_KEYS.id, data.id);
       safeStorage.setItem(QUICK_STORAGE_KEYS.code, data.game_code);
-      setShowGameCodeDialog(false);
-      setActiveSection(loadedMatches.length > 0 ? "matches" : data.players?.length > 0 ? "players" : "setup");
+      setActiveSection(loadedMatches.length > 0 ? "matches" : data.game_config ? "players" : "setup");
       toast.success(`Joined game: ${code}`);
     } catch {
       toast.error("Failed to join game");
@@ -603,21 +743,17 @@ export const QuickCourtVariant: React.FC = () => {
   const createNewGame = () => {
     safeStorage.removeItem(QUICK_STORAGE_KEYS.id);
     safeStorage.removeItem(QUICK_STORAGE_KEYS.code);
-    setShowGameCodeDialog(false);
-    setActiveSection("setup");
-  };
-
-  const startNewSession = () => {
-    safeStorage.removeItem(QUICK_STORAGE_KEYS.id);
-    safeStorage.removeItem(QUICK_STORAGE_KEYS.code);
     state.setPlayers([]);
     state.setMatches([]);
     state.setGameConfig(null);
     state.setGameId(null);
     state.setGameCode("");
     state.setMatchScores(new Map());
-    setShowGameCodeDialog(false);
     setActiveSection("setup");
+  };
+
+  const startNewSession = () => {
+    createNewGame();
     toast.success("Fresh Quick Court session started");
   };
 
@@ -627,7 +763,13 @@ export const QuickCourtVariant: React.FC = () => {
       return;
     }
 
-    state.setGameConfig(config);
+    const quickConfig: GameConfig = {
+      ...config,
+      schedulingType: "round-robin",
+      tournamentPlayStyle: undefined,
+    };
+
+    state.setGameConfig(quickConfig);
 
     try {
       const { data: codeData } = await supabase.rpc("generate_game_code");
@@ -635,7 +777,7 @@ export const QuickCourtVariant: React.FC = () => {
 
       const { data, error } = await supabase
         .from("games")
-        .insert([{ game_code: newGameCode, game_config: config as any, players: [], matches: [], creator_id: state.userId }])
+        .insert([{ game_code: newGameCode, game_config: quickConfig as any, players: [], matches: [], creator_id: state.userId }])
         .select()
         .single();
 
@@ -769,6 +911,16 @@ export const QuickCourtVariant: React.FC = () => {
 
   const completedMatches = state.matchScores.size;
   const waitingCount = Math.max(state.players.length - Math.min(state.players.length, state.gameConfig?.courts ? state.gameConfig.courts * 4 : 0), 0);
+  const unlockedSections = useMemo(() => {
+    const unlocked = new Set<Section>(["setup"]);
+    if (state.gameConfig) unlocked.add("players");
+    if (state.matches.length > 0) {
+      unlocked.add("matches");
+      unlocked.add("leaderboard");
+      unlocked.add("history");
+    }
+    return unlocked;
+  }, [state.gameConfig, state.matches.length]);
 
   if (state.isRestoringSession) {
     return (
@@ -786,7 +938,7 @@ export const QuickCourtVariant: React.FC = () => {
   return (
     <AppShell
       hideHeader
-      bottomNav={<QuickCourtBottomNav disabled={showGameCodeDialog} />}
+      bottomNav={<QuickCourtBottomNav disabled={!state.gameId && activeSection === "setup" && !state.gameConfig} />}
       header={isPlayerView && playerName ? (
         <PlayerViewHeader
           playerName={playerName}
@@ -797,14 +949,16 @@ export const QuickCourtVariant: React.FC = () => {
         />
       ) : undefined}
     >
-      <GameCodeDialog open={showGameCodeDialog} onOpenChange={setShowGameCodeDialog} onJoinGame={joinExistingGame} onCreateGame={createNewGame} />
-
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col pb-6">
+        <FlowTracker activeSection={activeSection} unlocked={unlockedSections} />
+
         <QuickHero
           gameCode={state.gameCode}
           players={state.players}
           matches={state.matches}
           matchScores={state.matchScores}
+          gameConfig={state.gameConfig}
+          activeSection={activeSection}
           onShowPlayerSelector={() => setShowPlayerSelector(true)}
         />
 
@@ -822,48 +976,31 @@ export const QuickCourtVariant: React.FC = () => {
         ) : null}
 
         <Card className="border-slate-200 bg-white/80 p-3 shadow-[0_24px_60px_rgba(15,23,42,0.06)] backdrop-blur-sm sm:p-4">
-          {activeSection === "setup" && (
-            <div className="space-y-4">
-              <div className="grid gap-4 xl:grid-cols-[1fr_0.95fr]">
-                <Card className="border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="flex items-center gap-2 text-slate-900">
-                    <Zap className="h-5 w-5" />
-                    <h2 className="text-xl font-semibold">Ready to play?</h2>
-                  </div>
-                  <p className="mt-3 text-sm leading-6 text-slate-600">
-                    Set the session once, then move straight into player check-in and active courts. Quick Court favors
-                    faster starts, fewer screens, and keeping the room moving.
-                  </p>
-                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                    <QuickInfo title="1. Setup" body="Choose duration, total session time, and keep the format simple." icon={<Activity className="h-4 w-4" />} />
-                    <QuickInfo title="2. Add players" body="Paste the whole group or check people in one by one." icon={<Users className="h-4 w-4" />} />
-                    <QuickInfo title="3. Run courts" body="Watch live, next-up, waiting, and scores from one place." icon={<ArrowRight className="h-4 w-4" />} />
-                  </div>
-                </Card>
+          {activeSection === "setup" && !state.gameId && !state.gameConfig && (
+            <QuickEntryCard onJoinGame={joinExistingGame} onCreateGame={createNewGame} />
+          )}
 
-                <Card className="border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="flex items-center gap-2 text-slate-900">
-                    <Clock3 className="h-5 w-5" />
-                    <h3 className="text-lg font-semibold">What stays strong underneath</h3>
+          {activeSection === "setup" && state.gameId && !state.gameConfig && (
+            <div className="space-y-4">
+              <Card className="border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Quick setup</p>
+                    <h2 className="mt-1 text-xl font-semibold text-slate-900">Round-robin only. Just the choices that matter tonight.</h2>
                   </div>
-                  <ul className="mt-4 space-y-3 text-sm text-slate-600">
-                    <li>• Strong multi-court rotation logic, especially the 2-court pickup flow</li>
-                    <li>• Singles and doubles setup still supported</li>
-                    <li>• Live scoring, leaderboard, and social share still available</li>
-                    <li>• Player identity mode still one tap away</li>
-                  </ul>
-                </Card>
-              </div>
+                  <Button variant="outline" onClick={startNewSession}>Start over</Button>
+                </div>
+              </Card>
 
               <div className="rounded-[1.75rem] border border-slate-200 bg-white p-4 sm:p-5">
-                <GameSetup onComplete={handleSetupComplete} gameCode={state.gameCode} onNewSession={state.gameId ? startNewSession : undefined} />
+                <GameSetup quickCourtMode onComplete={handleSetupComplete} gameCode={state.gameCode} onNewSession={startNewSession} />
               </div>
             </div>
           )}
 
-          {activeSection === "players" && state.gameCode && (
+          {activeSection === "players" && state.gameCode && state.gameConfig && (
             <div className="space-y-4">
-              <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+              <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
                 <QuickAddPlayersCard players={state.players} onAddPlayers={handleQuickAddPlayers} />
                 <Card className="border-slate-200 bg-white/90 p-5 shadow-sm">
                   <div className="flex items-center gap-2 text-slate-900">
@@ -873,12 +1010,14 @@ export const QuickCourtVariant: React.FC = () => {
                   <div className="mt-4 grid gap-3 sm:grid-cols-3">
                     <StatCard label="Checked in" value={String(state.players.length)} />
                     <StatCard label="Completed" value={String(completedMatches)} />
-                    <StatCard label="Loose bench" value={String(waitingCount)} />
+                    <StatCard label="Bench" value={String(waitingCount)} />
                   </div>
                   <p className="mt-4 text-sm leading-6 text-slate-600">
-                    Keep this lightweight: get names in fast, lock in any doubles pairs if needed, and generate the
-                    rotation when the room feels ready.
+                    This screen is just for rostering. Add the room, lock pairs if needed, then generate the session when you’re ready.
                   </p>
+                  <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+                    Once matches are generated, this page still works for walk-ins and drop-offs without changing the overall flow.
+                  </div>
                 </Card>
               </div>
 
