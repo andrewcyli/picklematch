@@ -855,8 +855,17 @@ export const ScheduleView = ({
     const courtMatches = matches.filter(m => m.court === courtNumber);
     const currentMatchIndex = courtMatches.findIndex(m => !matchScores.has(m.id));
     if (currentMatchIndex >= 0) {
-      // Scroll to current match so it's prominently displayed with next match visible
       api.scrollTo(currentMatchIndex, true);
+    }
+  };
+
+  const scrollToMatch = (courtNumber: number, matchId: string) => {
+    const api = carouselApis.get(courtNumber);
+    if (!api) return;
+    const courtMatches = matches.filter(m => m.court === courtNumber);
+    const matchIndex = courtMatches.findIndex(m => m.id === matchId);
+    if (matchIndex >= 0) {
+      api.scrollTo(matchIndex, true);
     }
   };
 
@@ -946,6 +955,90 @@ export const ScheduleView = ({
             )}
           </Button>
         </div>
+      </div>
+
+      {/* Quick court queue overview */}
+      <div className="grid grid-cols-1 gap-2 px-2 pb-2 md:grid-cols-2">
+        {courtConfigs.map(courtConfig => {
+          const courtMatches = matches.filter(m => m.court === courtConfig.courtNumber);
+          const current = courtMatches.find(m => !matchScores.has(m.id));
+          const next = current ? courtMatches.find(m => !matchScores.has(m.id) && m.id !== current.id) : undefined;
+          const latestFinished = [...courtMatches].reverse().find(m => matchScores.has(m.id));
+          return (
+            <Card key={`overview-${courtConfig.courtNumber}`} className="border-slate-200 bg-white/90 p-3 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Court {String.fromCharCode(64 + courtConfig.courtNumber)}</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">Current + next queue</div>
+                </div>
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => scrollToCurrentMatch(courtConfig.courtNumber)}>
+                  Jump to current
+                </Button>
+              </div>
+
+              <div className="mt-3 grid gap-2 lg:grid-cols-3">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-700">On court</div>
+                  {current ? (
+                    <>
+                      <div className="mt-1 font-medium text-slate-900">{current.team1.join(" + ")} vs {current.team2.join(" + ")}</div>
+                      <div className="mt-2 flex gap-2">
+                        <Button size="sm" className="h-7 text-xs" onClick={() => scrollToMatch(courtConfig.courtNumber, current.id)}>
+                          Open scoring
+                        </Button>
+                        {matchScores.has(current.id) ? (
+                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => editScore(current.id)}>
+                            Edit score
+                          </Button>
+                        ) : null}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="mt-1 text-slate-500">No live match on this court.</div>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-700">Next up</div>
+                  {next ? (
+                    <>
+                      <div className="mt-1 font-medium text-slate-900">{next.team1.join(" + ")} vs {next.team2.join(" + ")}</div>
+                      <div className="mt-2 flex gap-2">
+                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => scrollToMatch(courtConfig.courtNumber, next.id)}>
+                          Preview next
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="mt-1 text-slate-500">No next match queued yet.</div>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600">Latest finished</div>
+                  {latestFinished ? (
+                    <>
+                      <div className="mt-1 font-medium text-slate-900">{latestFinished.team1.join(" + ")} vs {latestFinished.team2.join(" + ")}</div>
+                      <div className="mt-1 text-slate-600">
+                        {matchScores.get(latestFinished.id)?.team1} - {matchScores.get(latestFinished.id)?.team2}
+                      </div>
+                      <div className="mt-2 flex gap-2">
+                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => scrollToMatch(courtConfig.courtNumber, latestFinished.id)}>
+                          Open card
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => editScore(latestFinished.id)}>
+                          Edit score
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="mt-1 text-slate-500">No completed score yet.</div>
+                  )}
+                </div>
+              </div>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Courts Grid - Vertical layout with Court A above Court B */}
