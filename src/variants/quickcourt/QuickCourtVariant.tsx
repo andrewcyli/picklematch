@@ -355,6 +355,78 @@ const StatCard: React.FC<{ label: string; value: string }> = ({ label, value }) 
   </div>
 );
 
+const QuickSectionSummary: React.FC<{
+  activeSection: Section;
+  gameCode: string;
+  players: string[];
+  matches: Match[];
+  matchScores: Map<string, { team1: number; team2: number }>;
+  gameConfig: GameConfig | null;
+  onShowPlayerSelector: () => void;
+}> = ({ activeSection, gameCode, players, matches, matchScores, gameConfig, onShowPlayerSelector }) => {
+  const remaining = Math.max(matches.length - matchScores.size, 0);
+  const copyBySection: Record<Exclude<Section, "setup">, { eyebrow: string; title: string; body: string }> = {
+    players: {
+      eyebrow: "Roster",
+      title: "Add players, lock pairs, then generate the night.",
+      body: "This screen is for names and setup only — no giant hero block, no extra ceremony.",
+    },
+    matches: {
+      eyebrow: "Courts",
+      title: "See who’s on now, who’s next, and who’s waiting.",
+      body: "Run both courts from one place and keep the queue obvious.",
+    },
+    leaderboard: {
+      eyebrow: "Leaderboard",
+      title: "Keep score without making it feel like a full tournament.",
+      body: "Wins and participation stay visible, but lightweight.",
+    },
+    history: {
+      eyebrow: "Completed",
+      title: "Quick recap of the night.",
+      body: "Final scores and finished matches, nothing more dramatic than needed.",
+    },
+  };
+
+  const section = copyBySection[activeSection as Exclude<Section, "setup">];
+  if (!section) return null;
+
+  return (
+    <Card className="mx-1 border-slate-200 bg-white/90 p-4 shadow-sm">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{section.eyebrow}</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">{section.title}</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{section.body}</p>
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-4 lg:min-w-[420px]">
+          <StatCard label="Code" value={gameCode || "New"} />
+          <StatCard label="Players" value={String(players.length)} />
+          <StatCard label="Courts" value={String(gameConfig?.courts || 0)} />
+          <StatCard label="Left" value={String(remaining)} />
+        </div>
+      </div>
+
+      {activeSection === "matches" && gameCode ? (
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Button variant="secondary" className="bg-white" onClick={() => copyToClipboard(gameCode, "Code")}>
+            <Copy className="mr-2 h-4 w-4" />
+            Copy code
+          </Button>
+          <Button variant="secondary" className="bg-white" onClick={onShowPlayerSelector}>
+            <UserCircle className="mr-2 h-4 w-4" />
+            I’m playing
+          </Button>
+          <div className="inline-flex items-center">
+            <ShareButton />
+          </div>
+        </div>
+      ) : null}
+    </Card>
+  );
+};
+
 const QuickEntryCard: React.FC<{
   onJoinGame: (code: string) => void;
   onCreateGame: () => void;
@@ -490,7 +562,7 @@ const QuickCourtBoard: React.FC<{
       const queue = matches.filter((match) => match.court === court && !matchScores.has(match.id));
       if (queue[0]) liveByCourt.set(court, queue[0]);
       if (queue[1]) nextByCourt.set(court, queue[1]);
-      queue.slice(0, 2).forEach((match) => upcoming.push(match));
+      queue.slice(1, 3).forEach((match) => upcoming.push(match));
     });
 
     const activePlayers = new Set(Array.from(liveByCourt.values()).flatMap((match) => [...match.team1, ...match.team2]));
@@ -659,8 +731,30 @@ const MiniMatchCard: React.FC<{
     <div className="text-xs uppercase tracking-[0.18em] opacity-70">{title}</div>
     {match ? (
       <>
-        <div className="mt-2 text-sm font-medium leading-6">{match.team1.join(" + ")} vs {match.team2.join(" + ")}</div>
-        <div className="mt-2 text-xs opacity-70">Starts at {match.startTime} min</div>
+        <div className="mt-3 space-y-2">
+          <div>
+            <div className="text-[11px] uppercase tracking-[0.18em] opacity-60">Side 1</div>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {match.team1.map((player) => (
+                <Badge key={`${match.id}-${title}-t1-${player}`} className="border-0 bg-white/80 text-slate-900">
+                  {player}
+                </Badge>
+              ))}
+            </div>
+          </div>
+          <div className="text-xs font-semibold opacity-70">vs</div>
+          <div>
+            <div className="text-[11px] uppercase tracking-[0.18em] opacity-60">Side 2</div>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {match.team2.map((player) => (
+                <Badge key={`${match.id}-${title}-t2-${player}`} className="border-0 bg-white/80 text-slate-900">
+                  {player}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="mt-3 text-xs opacity-70">Slot {match.startTime} min</div>
       </>
     ) : (
       <div className="mt-2 text-sm opacity-70">Nothing queued here yet.</div>
@@ -695,13 +789,14 @@ export const QuickCourtVariant: React.FC = () => {
     }
   }, [state.userId]);
 
+  const lastAutoSectionRef = useRef<Section | null>(null);
+
   useEffect(() => {
-    if (state.matches.length > 0) {
-      setActiveSection("matches");
-    } else if (state.gameConfig) {
-      setActiveSection("players");
-    } else {
-      setActiveSection("setup");
+    const targetSection: Section = state.matches.length > 0 ? "matches" : state.gameConfig ? "players" : "setup";
+
+    if (lastAutoSectionRef.current !== targetSection) {
+      setActiveSection(targetSection);
+      lastAutoSectionRef.current = targetSection;
     }
   }, [setActiveSection, state.gameConfig, state.matches.length]);
 
@@ -949,15 +1044,27 @@ export const QuickCourtVariant: React.FC = () => {
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col pb-6">
         <FlowTracker activeSection={activeSection} unlocked={unlockedSections} />
 
-        <QuickHero
-          gameCode={state.gameCode}
-          players={state.players}
-          matches={state.matches}
-          matchScores={state.matchScores}
-          gameConfig={state.gameConfig}
-          activeSection={activeSection}
-          onShowPlayerSelector={() => setShowPlayerSelector(true)}
-        />
+        {activeSection === "setup" ? (
+          <QuickHero
+            gameCode={state.gameCode}
+            players={state.players}
+            matches={state.matches}
+            matchScores={state.matchScores}
+            gameConfig={state.gameConfig}
+            activeSection={activeSection}
+            onShowPlayerSelector={() => setShowPlayerSelector(true)}
+          />
+        ) : (
+          <QuickSectionSummary
+            activeSection={activeSection}
+            gameCode={state.gameCode}
+            players={state.players}
+            matches={state.matches}
+            matchScores={state.matchScores}
+            gameConfig={state.gameConfig}
+            onShowPlayerSelector={() => setShowPlayerSelector(true)}
+          />
+        )}
 
         {showPlayerSelector ? (
           <PlayerIdentitySelector
@@ -1049,7 +1156,19 @@ export const QuickCourtVariant: React.FC = () => {
 
           {activeSection === "matches" && state.gameConfig && (
             <div className="space-y-4">
-              {isPlayerView && playerName ? (
+              {state.matches.length === 0 ? (
+                <Card className="border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="max-w-2xl">
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">No courts yet</p>
+                    <h2 className="mt-1 text-2xl font-semibold text-slate-900">Generate the session from Players first.</h2>
+                    <p className="mt-3 text-sm leading-6 text-slate-600">
+                      Quick Court only becomes operational after the roster is set and matches are generated. Go back,
+                      add tonight’s players, then hit the generate action there.
+                    </p>
+                    <Button className="mt-4" onClick={() => setActiveSection("players")}>Back to players</Button>
+                  </div>
+                </Card>
+              ) : isPlayerView && playerName ? (
                 <MyMatchesView
                   playerName={playerName}
                   matchGroups={playerMatches}

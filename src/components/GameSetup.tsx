@@ -55,7 +55,7 @@ export const GameSetup = ({
   );
   const [copied, setCopied] = useState(false);
 
-  const gameUrl = gameCode ? `${window.location.origin}?join=${gameCode}` : "";
+  const gameUrl = gameCode ? `${window.location.origin}${window.location.pathname}?join=${gameCode}` : "";
   const maxCourts = Math.max(1, Math.floor(playerCount / 2));
   const totalTimeOptions = Array.from({ length: 12 }, (_, i) => (i + 1) * 15);
 
