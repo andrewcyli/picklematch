@@ -15,6 +15,7 @@ const PrototypeLab = lazy(() => import("@/prototypes/PrototypeLab"));
 const ClubhousePrototype = lazy(() => import("@/prototypes/clubhouse/ClubhousePrototype"));
 const ArenaPrototype = lazy(() => import("@/prototypes/ArenaPrototype"));
 const QuickCourtPrototype = lazy(() => import("@/prototypes/QuickCourtPrototype"));
+const QuickCourtVariant = lazy(() => import("@/variants/quickcourt/QuickCourtVariant"));
 const ClassicVariant = lazy(() => import("@/variants/classic/ClassicVariant"));
 const TournamentVariant = lazy(() => import("@/variants/tournament/TournamentVariant"));
 const QualifierVariant = lazy(() => import("@/variants/qualifier/QualifierVariant"));
@@ -53,7 +54,8 @@ const App = () => {
                 <Route path="/prototypes" element={<PrototypeLab />} />
                 <Route path="/clubhouse/*" element={<ClubhousePrototype />} />
                 <Route path="/arena/*" element={<ArenaPrototype />} />
-                <Route path="/quick-court/*" element={<QuickCourtPrototype />} />
+                <Route path="/quick-court/prototype" element={<QuickCourtPrototype />} />
+                <Route path="/quick-court/*" element={<QuickCourtVariant />} />
                 
                 {/* Scheduling-mode foundations */}
                 <Route path="/classic/*" element={<ClassicVariant />} />
