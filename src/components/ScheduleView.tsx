@@ -1,18 +1,14 @@
-import { useState, useMemo, useEffect, useRef } from "react";
-import { Match, regenerateScheduleFromSlot, CourtConfig } from "@/lib/scheduler";
+import { useEffect, useMemo, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Clock, Users, Trophy, Target, Timer, UserCircle } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { Match, CourtConfig, regenerateScheduleFromSlot } from "@/lib/scheduler";
 import { validateMatchScore } from "@/lib/validation";
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from "@/components/ui/carousel";
-import { TournamentBracketDialog } from "./TournamentBracketDialog";
-import { advanceWinnerToNextMatch } from "@/lib/tournament-progression";
-import { advanceGroupWinnersToKnockout, advanceWithinGroupBrackets } from "@/lib/qualifier-progression";
+import { Clock3, Edit3, PlayCircle, Target, Timer, Trophy, Users } from "lucide-react";
+import { toast } from "sonner";
+
 interface ScheduleViewProps {
   matches: Match[];
   onBack: () => void;
@@ -25,28 +21,36 @@ interface ScheduleViewProps {
       player2: string;
     }[];
     courtConfigs?: CourtConfig[];
-    schedulingType?: 'round-robin' | 'single-elimination' | 'double-elimination' | 'qualifier-tournament';
-    tournamentPlayStyle?: 'singles' | 'doubles';
+    schedulingType?: "round-robin" | "single-elimination" | "double-elimination" | "qualifier-tournament";
+    tournamentPlayStyle?: "singles" | "doubles";
   };
   allPlayers: string[];
   onScheduleUpdate: (newMatches: Match[], newPlayers: string[]) => void;
-  matchScores: Map<string, {
-    team1: number;
-    team2: number;
-  }>;
-  onMatchScoresUpdate: (scores: Map<string, {
-    team1: number;
-    team2: number;
-  }>) => void;
+  matchScores: Map<string, { team1: number; team2: number }>;
+  onMatchScoresUpdate: (scores: Map<string, { team1: number; team2: number }>) => void;
   onCourtConfigUpdate?: (configs: CourtConfig[]) => void;
   isPlayerView?: boolean;
-  playerName?: string;
+  playerName?: string | null;
   onReleaseIdentity?: () => void;
   onShowPlayerSelector?: () => void;
 }
+
+type ScoreDraft = { team1: number | string; team2: number | string };
+
+const formatClock = (seconds: number) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+};
+
+const getMatchLabel = (matches: Match[], match: Match) => {
+  const courtMatches = matches.filter((entry) => entry.court === match.court);
+  const index = courtMatches.findIndex((entry) => entry.id === match.id) + 1;
+  return `Court ${match.court} · M${index}`;
+};
+
 export const ScheduleView = ({
   matches,
-  onBack,
   gameConfig,
   allPlayers,
   onScheduleUpdate,
@@ -56,1209 +60,385 @@ export const ScheduleView = ({
   isPlayerView = false,
   playerName,
   onReleaseIdentity,
-  onShowPlayerSelector
+  onShowPlayerSelector,
 }: ScheduleViewProps) => {
-  const {
-    toast
-  } = useToast();
-  const [currentTime, setCurrentTime] = useState<number>(0);
-  const [pendingScores, setPendingScores] = useState<Map<string, {
-    team1: number | string;
-    team2: number | string;
-  }>>(new Map());
-  const [courtConfigs, setCourtConfigs] = useState<CourtConfig[]>(gameConfig.courtConfigs || Array.from({
-    length: gameConfig.courts
-  }, (_, i) => ({
-    courtNumber: i + 1,
-    type: 'doubles' as const
-  })));
-  const [carouselApis, setCarouselApis] = useState<Map<number, CarouselApi>>(new Map());
-  const [editingMatch, setEditingMatch] = useState<string | null>(null);
-  const [editedTeams, setEditedTeams] = useState<{
-    team1: string[];
-    team2: string[];
-  }>({
-    team1: [],
-    team2: []
-  });
-  const [matchStartTimes, setMatchStartTimes] = useState<Map<string, number>>(new Map());
-  const [courtTimers, setCourtTimers] = useState<Map<number, {
-    startTime: number;
-    matchId: string;
-  }>>(new Map());
-  const [showBracketDialog, setShowBracketDialog] = useState(false);
+  const [pendingScores, setPendingScores] = useState<Map<string, ScoreDraft>>(new Map());
+  const [courtConfigs, setCourtConfigs] = useState<CourtConfig[]>(
+    gameConfig.courtConfigs || Array.from({ length: gameConfig.courts }, (_, index) => ({ courtNumber: index + 1, type: "doubles" as const }))
+  );
+  const [selectedCourt, setSelectedCourt] = useState(1);
+  const [elapsed, setElapsed] = useState<Map<number, number>>(new Map());
 
-  // Check if tournament mode
-  const isTournamentMode = gameConfig.schedulingType && gameConfig.schedulingType !== 'round-robin';
-
-  // Helper to normalize scores to numbers
-  const normalizeScore = (score: {
-    team1: number | string;
-    team2: number | string;
-  } | undefined) => {
-    if (!score) return undefined;
-    return {
-      team1: typeof score.team1 === 'number' ? score.team1 : Number(score.team1) || 0,
-      team2: typeof score.team2 === 'number' ? score.team2 : Number(score.team2) || 0
-    };
-  };
-
-  // Issue #2: Helper to get stage label for qualifier tournaments
-  const getStageLabel = (match: Match): string | null => {
-    if (!isTournamentMode || gameConfig.schedulingType !== 'qualifier-tournament') return null;
-    
-    if (match.qualifierMetadata?.isGroupStage) {
-      if (match.qualifierMetadata.isGroupSemifinal) return 'Group Semi';
-      if (match.qualifierMetadata.isGroupFinal) return 'Group Final';
-      return `Group ${match.qualifierMetadata.groupId}`;
-    }
-    
-    // Knockout stage labels based on tournament metadata
-    if (match.tournamentMetadata) {
-      const { roundName } = match.tournamentMetadata;
-      if (roundName) return roundName;
-    }
-    
-    return 'Knockout';
-  };
-
-  // Find current match based on scores
-  const currentMatch = useMemo(() => {
-    const unscoredMatch = matches.find(m => !matchScores.has(m.id));
-    if (unscoredMatch) {
-      return unscoredMatch.id;
-    }
-    return null;
-  }, [matches, matchScores]);
-
-  // Get current matches per court (first unscored match on each court)
-  const currentMatchesPerCourt = useMemo(() => {
-    const matchMap = new Map<number, Match>();
-    matches.forEach(match => {
-      if (!matchScores.has(match.id) && !matchMap.has(match.court)) {
-        matchMap.set(match.court, match);
-      }
-    });
-    return matchMap;
-  }, [matches, matchScores]);
-
-  // Initialize or restore timers from database when matches change
   useEffect(() => {
-    currentMatchesPerCourt.forEach((match, court) => {
-      // Check if this match already has a timer in the database
-      if (match.timerStartTime && !courtTimers.has(court)) {
-        // Restore timer from database
-        setCourtTimers(prev => new Map(prev).set(court, {
-          startTime: match.timerStartTime,
-          matchId: match.id
-        }));
-      } else if (!match.timerStartTime && !courtTimers.has(court)) {
-        // Start new timer and save to database
-        const startTime = Date.now();
-        setCourtTimers(prev => new Map(prev).set(court, {
-          startTime,
-          matchId: match.id
-        }));
+    setCourtConfigs(
+      gameConfig.courtConfigs || Array.from({ length: gameConfig.courts }, (_, index) => ({ courtNumber: index + 1, type: "doubles" as const }))
+    );
+  }, [gameConfig.courtConfigs, gameConfig.courts]);
 
-        // Save timer start to database
-        const updatedMatches = matches.map(m => m.id === match.id ? {
-          ...m,
-          timerStartTime: startTime
-        } : m);
-        onScheduleUpdate(updatedMatches, allPlayers);
-      }
-    });
-  }, [currentMatchesPerCourt, matches]);
+  const unscoredMatches = useMemo(() => matches.filter((match) => !matchScores.has(match.id)), [matches, matchScores]);
 
-  // Calculate elapsed time for each court
-  const [courtElapsedTimes, setCourtElapsedTimes] = useState<Map<number, number>>(new Map());
+  const currentByCourt = useMemo(() => {
+    const map = new Map<number, Match>();
+    for (const match of unscoredMatches) {
+      if (!map.has(match.court)) map.set(match.court, match);
+    }
+    return map;
+  }, [unscoredMatches]);
+
+  const nextByCourt = useMemo(() => {
+    const map = new Map<number, Match>();
+    for (let court = 1; court <= gameConfig.courts; court += 1) {
+      const queue = unscoredMatches.filter((match) => match.court === court);
+      if (queue[1]) map.set(court, queue[1]);
+    }
+    return map;
+  }, [gameConfig.courts, unscoredMatches]);
+
   useEffect(() => {
-    const interval = setInterval(() => {
-      const newElapsedTimes = new Map<number, number>();
-      courtTimers.forEach((timer, court) => {
-        const elapsed = Math.floor((Date.now() - timer.startTime) / 1000);
-        newElapsedTimes.set(court, elapsed);
+    const interval = window.setInterval(() => {
+      const next = new Map<number, number>();
+      currentByCourt.forEach((match, court) => {
+        const startBasis = match.timerStartTime ? match.timerStartTime : Date.now();
+        next.set(court, Math.max(0, Math.floor((Date.now() - startBasis) / 1000)));
       });
-      setCourtElapsedTimes(newElapsedTimes);
+      setElapsed(next);
     }, 1000);
-    return () => clearInterval(interval);
-  }, [courtTimers]);
 
-  // Format time helper
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+    return () => window.clearInterval(interval);
+  }, [currentByCourt]);
+
+  const waitingPlayers = useMemo(() => {
+    const occupied = new Set<string>();
+    currentByCourt.forEach((match) => [...match.team1, ...match.team2].forEach((player) => occupied.add(player)));
+    nextByCourt.forEach((match) => [...match.team1, ...match.team2].forEach((player) => occupied.add(player)));
+    return allPlayers.filter((player) => !occupied.has(player));
+  }, [allPlayers, currentByCourt, nextByCourt]);
+
+  const selectedCourtMatches = useMemo(() => matches.filter((match) => match.court === selectedCourt), [matches, selectedCourt]);
+
   const updatePendingScore = (matchId: string, team: "team1" | "team2", value: string) => {
-    // Allow empty string for partial input
-    if (value === '') {
-      const current = pendingScores.get(matchId) || matchScores.get(matchId) || {
-        team1: '',
-        team2: ''
-      };
-      const newPending = new Map(pendingScores);
-      newPending.set(matchId, {
-        ...current,
-        [team]: ''
-      });
-      setPendingScores(newPending);
+    if (value === "") {
+      const next = new Map(pendingScores);
+      next.set(matchId, { ...(next.get(matchId) || matchScores.get(matchId) || { team1: "", team2: "" }), [team]: "" });
+      setPendingScores(next);
       return;
     }
 
-    // Validate the score
     const validation = validateMatchScore(value);
     if (!validation.valid) {
-      toast({
-        title: "Invalid score",
-        description: validation.error,
-        variant: "destructive"
-      });
+      toast.error(validation.error || "Invalid score");
       return;
     }
-    const current = pendingScores.get(matchId) || matchScores.get(matchId) || {
-      team1: '',
-      team2: ''
-    };
-    const newPending = new Map(pendingScores);
-    newPending.set(matchId, {
-      ...current,
-      [team]: validation.value!
-    });
-    setPendingScores(newPending);
-  };
-  const startEditingPlayers = (matchId: string) => {
-    const match = matches.find(m => m.id === matchId);
-    if (match) {
-      setEditingMatch(matchId);
-      setEditedTeams({
-        team1: [...match.team1],
-        team2: [...match.team2]
-      });
-    }
-  };
-  const updateEditedPlayer = (team: 'team1' | 'team2', index: number, value: string) => {
-    setEditedTeams(prev => ({
-      ...prev,
-      [team]: prev[team].map((p, i) => i === index ? value : p)
-    }));
-  };
-  const saveEditedPlayers = () => {
-    if (!editingMatch) return;
-    const match = matches.find(m => m.id === editingMatch);
-    if (!match) return;
 
-    // Validate no duplicate players within the same team
-    if (!match.isSingles) {
-      if (editedTeams.team1[0] && editedTeams.team1[1] && editedTeams.team1[0] === editedTeams.team1[1]) {
-        toast({
-          title: "Invalid team 1",
-          description: "Team members must be different",
-          variant: "destructive"
-        });
-        return;
-      }
-      if (editedTeams.team2[0] && editedTeams.team2[1] && editedTeams.team2[0] === editedTeams.team2[1]) {
-        toast({
-          title: "Invalid team 2",
-          description: "Team members must be different",
-          variant: "destructive"
-        });
-        return;
-      }
-    }
+    const next = new Map(pendingScores);
+    next.set(matchId, { ...(next.get(matchId) || matchScores.get(matchId) || { team1: "", team2: "" }), [team]: validation.value! });
+    setPendingScores(next);
+  };
 
-    // Validate no cross-team duplicates
-    const allMatchPlayers = [...editedTeams.team1, ...editedTeams.team2].filter(p => p.trim());
-    const uniqueMatchPlayers = new Set(allMatchPlayers);
-    if (allMatchPlayers.length !== uniqueMatchPlayers.size) {
-      toast({
-        title: "Invalid match",
-        description: "Players cannot be on both teams",
-        variant: "destructive"
-      });
+  const confirmScore = (match: Match) => {
+    const pending = pendingScores.get(match.id) || matchScores.get(match.id);
+    if (!pending || pending.team1 === "" || pending.team2 === "") {
+      toast.error("Enter both scores first");
       return;
     }
-    const allEditedPlayers = [...editedTeams.team1, ...editedTeams.team2].filter(p => p.trim());
-    const updatedPlayers = [...new Set([...allEditedPlayers, ...allPlayers])];
-    const matchIndex = matches.findIndex(m => m.id === editingMatch);
-    const playedMatches = matches.slice(0, matchIndex).map(m => {
-      const score = matchScores.get(m.id);
-      return {
-        ...m,
-        score: score ? normalizeScore(score) : m.score ? normalizeScore(m.score) : undefined
-      };
-    });
-    const updatedMatch = {
-      ...match,
-      team1: match.isSingles ? [editedTeams.team1[0]] as [string] : editedTeams.team1 as [string, string],
-      team2: match.isSingles ? [editedTeams.team2[0]] as [string] : editedTeams.team2 as [string, string],
-      isLocked: true // Lock this manually edited match
-    };
-    const newMatches = regenerateScheduleFromSlot(updatedPlayers, [...playedMatches, updatedMatch], match.endTime, gameConfig.gameDuration, gameConfig.totalTime, gameConfig.courts, undefined, gameConfig.teammatePairs, courtConfigs, matches);
-    onScheduleUpdate(newMatches, updatedPlayers);
-    setEditingMatch(null);
-    const matchIdx = matches.filter(m => m.court === match.court && m.endTime <= match.endTime).length;
-    const matchNumber = `${String.fromCharCode(64 + match.court)}${matchIdx}`;
-    toast({
-      title: "Players updated",
-      description: `Match ${matchNumber} locked, schedule regenerated from next slot`
-    });
-  };
-  const cancelEditingPlayers = () => {
-    setEditingMatch(null);
-    setEditedTeams({
-      team1: [],
-      team2: []
-    });
-  };
 
-  // Helper to check if a match is current or next-up on any court
-  const isCurrentOrNextMatch = (matchId: string, scores: Map<string, {
-    team1: number;
-    team2: number;
-  }>) => {
-    const unplayedMatches = matches.filter(m => !scores.has(m.id));
-    const courtGroups = new Map<number, Match[]>();
-    unplayedMatches.forEach(match => {
-      if (!courtGroups.has(match.court)) {
-        courtGroups.set(match.court, []);
-      }
-      courtGroups.get(match.court)!.push(match);
-    });
-    for (const courtMatches of courtGroups.values()) {
-      const currentAndNext = courtMatches.slice(0, 2).map(m => m.id);
-      if (currentAndNext.includes(matchId)) {
-        return true;
-      }
-    }
-    return false;
-  };
-  const confirmScore = (matchId: string) => {
-    const pending = pendingScores.get(matchId);
-    if (!pending || pending.team1 === '' || pending.team2 === '' || pending.team1 === undefined || pending.team2 === undefined) {
-      toast({
-        title: "Please enter both scores",
-        variant: "destructive"
-      });
-      return;
-    }
-    const team1Score = typeof pending.team1 === 'number' ? pending.team1 : Number(pending.team1);
-    const team2Score = typeof pending.team2 === 'number' ? pending.team2 : Number(pending.team2);
-    
-    // Prevent ties in tournament mode
-    if (isTournamentMode && team1Score === team2Score) {
-      toast({
-        title: "No ties allowed",
-        description: "Tournament matches must have a winner",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    const match = matches.find(m => m.id === matchId);
-    const wasAlreadyScored = matchScores.has(matchId);
-
-    // Progression integrity check: block edits that would change winner when downstream matches exist
-    if (wasAlreadyScored && isTournamentMode && match) {
-      const currentScore = matchScores.get(matchId)!;
-      if (wouldWinnerChange(currentScore, team1Score, team2Score) && hasDownstreamMatches(match)) {
-        toast({
-          title: "Cannot change winner",
-          description: "Downstream matches are already scheduled. Reset those matches first or contact an organizer.",
-          variant: "destructive"
-        });
-        return;
-      }
-    }
-
-    // Update scores state
+    const team1 = Number(pending.team1);
+    const team2 = Number(pending.team2);
     const newScores = new Map(matchScores);
-    newScores.set(matchId, {
-      team1: team1Score,
-      team2: team2Score
-    });
+    newScores.set(match.id, { team1, team2 });
     onMatchScoresUpdate(newScores);
 
-    // Get elapsed time for this court
-    const elapsedTime = match ? courtElapsedTimes.get(match.court) || 0 : 0;
-    const formattedElapsedTime = formatTime(elapsedTime);
-
-    // Calculate actual end time for schedule adjustment (Issue #2)
-    // Fixed: Use compatible time basis - add elapsed time to scheduled start time
-    // so actualEndTime is comparable to scheduledEndTime (both absolute from session start)
-    const now = Date.now();
-    const completedMatchRef = matches.find(m => m.id === matchId);
-    const actualEndTime = match?.timerStartTime && completedMatchRef
-      ? completedMatchRef.startTime + Math.floor((now - match.timerStartTime) / 60000)
-      : (completedMatchRef ? completedMatchRef.endTime : 0);
-
-    // Build updated matches atomically - single update path (Issue #1)
-    let updatedMatches = matches.map(m => {
-      if (m.id === matchId) {
-        const updated: Match = {
-          ...m,
-          score: {
-            team1: team1Score,
-            team2: team2Score
-          },
-          clockStartTime: formattedElapsedTime,
-          actualEndTime: actualEndTime, // Issue #2: proper actual end time
-          status: 'completed' as const,
-        };
-        // Remove timerStartTime when match is completed (not in edit mode)
-        if (!wasAlreadyScored) {
-          const { timerStartTime, ...rest } = updated;
-          return rest as Match;
-        }
-        return updated;
-      }
-      // Preserve existing scores using the latest scores map
-      const existingScore = newScores.get(m.id);
-      if (existingScore) {
-        return {
-          ...m,
-          score: existingScore
-        };
-      }
-      return m;
-    });
-
-    // Handle tournament progression atomically (Issue #1)
-    if (!wasAlreadyScored && isTournamentMode && match) {
-      const winner: 'team1' | 'team2' = team1Score > team2Score ? 'team1' : 'team2';
-      
-      // For qualifier tournaments, handle group progression
-      if (match.qualifierMetadata?.isGroupStage) {
-        // First, advance within group brackets (for groups of 4)
-        updatedMatches = advanceWithinGroupBrackets(updatedMatches, newScores);
-        
-        // Then, check if any groups are complete and advance to knockout
-        updatedMatches = advanceGroupWinnersToKnockout(updatedMatches, newScores);
-      } else {
-        // Standard tournament progression
-        updatedMatches = advanceWinnerToNextMatch(match, winner, updatedMatches);
-      }
-    }
-
-    // Reset court timer state (not part of schedule update)
-    if (match && !wasAlreadyScored) {
-      const newCourtTimers = new Map(courtTimers);
-      newCourtTimers.delete(match.court);
-      setCourtTimers(newCourtTimers);
-    }
-
-    // Single atomic schedule update (Issue #1)
-    onScheduleUpdate(updatedMatches, allPlayers);
-    
-    const newPending = new Map(pendingScores);
-    newPending.delete(matchId);
-    setPendingScores(newPending);
-
-    // Only check conflicts and schedule adjustments for newly completed matches, not edited ones
-    if (!wasAlreadyScored) {
-      // Only check conflicts for round-robin mode
-      if (!isTournamentMode) {
-        checkScheduleAdjustment(matchId, actualEndTime, newScores);
-        checkPlayerConflicts(newScores);
-      }
-
-      // Auto-scroll to next match on the same court
-      if (match) {
-        setTimeout(() => {
-          const courtMatches = matches.filter(m => m.court === match.court);
-          const nextMatchIndex = courtMatches.findIndex(m => !newScores.has(m.id));
-          const api = carouselApis.get(match.court);
-          if (api && nextMatchIndex >= 0) {
-            api.scrollTo(nextMatchIndex, true);
+    const updatedMatches = matches.map((entry) =>
+      entry.id === match.id
+        ? {
+            ...entry,
+            score: { team1, team2 },
+            status: "completed" as const,
+            actualEndTime: match.endTime,
+            clockStartTime: formatClock(elapsed.get(match.court) || 0),
           }
-        }, 100);
-      }
-    }
-    toast({
-      title: wasAlreadyScored ? "Score updated" : "Score confirmed"
-    });
-  };
-  const editScore = (matchId: string) => {
-    const current = matchScores.get(matchId);
-    if (current) {
-      // Just move score to pending without removing it from matchScores
-      // This keeps the match as "completed" and doesn't trigger conflict checks
-      const newPending = new Map(pendingScores);
-      newPending.set(matchId, current);
-      setPendingScores(newPending);
-    }
-  };
-
-  // Helper to check if a match has downstream dependent matches that are already populated
-  // Issue #3: Complete integrity checks for qualifier group->knockout dependencies
-  const hasDownstreamMatches = (match: Match): boolean => {
-    if (!match.tournamentMetadata && !match.qualifierMetadata) return false;
-    
-    // Check tournament progression (standard bracket advancement)
-    if (match.tournamentMetadata?.advancesTo) {
-      const nextMatch = matches.find(m => m.id === match.tournamentMetadata?.advancesTo);
-      if (nextMatch && !nextMatch.team1.includes('TBD') && !nextMatch.team2.includes('TBD')) {
-        return true;
-      }
-    }
-    
-    // Check qualifier group progression (within-group advancement)
-    if (match.qualifierMetadata?.advancesToGroupMatch) {
-      const nextMatch = matches.find(m => m.id === match.qualifierMetadata?.advancesToGroupMatch);
-      if (nextMatch && !nextMatch.team1.includes('TBD') && !nextMatch.team2.includes('TBD')) {
-        return true;
-      }
-    }
-    
-    // Issue #3 fix: Check qualifier group->knockout dependencies via sourceMatch metadata
-    // When a group winner advances to knockout, the knockout match has sourceMatch1/sourceMatch2
-    // pointing to the group ID. We need to check if this match's group has been advanced.
-    if (match.qualifierMetadata?.isGroupStage) {
-      const groupId = match.qualifierMetadata.groupId;
-      
-      // Find any knockout match that sources from this group
-      const dependentKnockoutMatch = matches.find(m => 
-        !m.qualifierMetadata?.isGroupStage && // It's a knockout match
-        m.tournamentMetadata && 
-        (m.tournamentMetadata.sourceMatch1 === groupId || 
-         m.tournamentMetadata.sourceMatch2 === groupId)
-      );
-      
-      if (dependentKnockoutMatch) {
-        // Check if the knockout match has been populated (not TBD)
-        const hasRealTeam1 = !dependentKnockoutMatch.team1.includes('TBD');
-        const hasRealTeam2 = !dependentKnockoutMatch.team2.includes('TBD');
-        
-        // If either slot is filled and this match is the source, it's downstream
-        if (dependentKnockoutMatch.tournamentMetadata?.sourceMatch1 === groupId && hasRealTeam1) {
-          return true;
-        }
-        if (dependentKnockoutMatch.tournamentMetadata?.sourceMatch2 === groupId && hasRealTeam2) {
-          return true;
-        }
-      }
-    }
-    
-    // Issue #3 fix: Also check if this specific match is a source for knockout advancement
-    // This handles the case where sourceMatch references the match ID directly
-    const knockoutMatchBySourceId = matches.find(m =>
-      !m.qualifierMetadata?.isGroupStage &&
-      m.tournamentMetadata &&
-      (m.tournamentMetadata.sourceMatch1 === match.id || 
-       m.tournamentMetadata.sourceMatch2 === match.id)
+        : newScores.has(entry.id)
+          ? { ...entry, score: newScores.get(entry.id) }
+          : entry
     );
-    
-    if (knockoutMatchBySourceId) {
-      const hasRealTeam1 = !knockoutMatchBySourceId.team1.includes('TBD');
-      const hasRealTeam2 = !knockoutMatchBySourceId.team2.includes('TBD');
-      
-      if (knockoutMatchBySourceId.tournamentMetadata?.sourceMatch1 === match.id && hasRealTeam1) {
-        return true;
-      }
-      if (knockoutMatchBySourceId.tournamentMetadata?.sourceMatch2 === match.id && hasRealTeam2) {
-        return true;
-      }
-    }
-    
-    return false;
+
+    onScheduleUpdate(updatedMatches, allPlayers);
+
+    const next = new Map(pendingScores);
+    next.delete(match.id);
+    setPendingScores(next);
+    toast.success(matchScores.has(match.id) ? "Score updated" : "Score confirmed");
   };
 
-  // Helper to check if the winner would change with new scores
-  const wouldWinnerChange = (
-    currentScore: { team1: number; team2: number },
-    newTeam1Score: number,
-    newTeam2Score: number
-  ): boolean => {
-    const currentWinner = currentScore.team1 > currentScore.team2 ? 'team1' : 'team2';
-    const newWinner = newTeam1Score > newTeam2Score ? 'team1' : 'team2';
-    return currentWinner !== newWinner;
-  };
-  const checkPlayerConflicts = (scores: Map<string, {
-    team1: number;
-    team2: number;
-  }>) => {
-    const currentMatches = matches.filter(m => !scores.has(m.id));
-    const currentMatchesByCourt = new Map<number, Match>();
-    const upcomingMatchesByCourt = new Map<number, Match>();
-
-    // Get current match (first unplayed) and upcoming match (second unplayed) for each court
-    currentMatches.forEach(match => {
-      if (!currentMatchesByCourt.has(match.court)) {
-        currentMatchesByCourt.set(match.court, match);
-      } else if (!upcomingMatchesByCourt.has(match.court)) {
-        upcomingMatchesByCourt.set(match.court, match);
-      }
-    });
-
-    // Check conflicts between current matches on different courts
-    const currentList = Array.from(currentMatchesByCourt.values());
-    if (currentList.length > 1) {
-      for (let i = 0; i < currentList.length; i++) {
-        for (let j = i + 1; j < currentList.length; j++) {
-          const m1 = currentList[i];
-          const m2 = currentList[j];
-          const set1 = new Set<string>([...m1.team1, ...m1.team2]);
-          const set2 = new Set<string>([...m2.team1, ...m2.team2]);
-          const conflicts = Array.from(set1).filter(p => set2.has(p));
-          if (conflicts.length > 0) {
-            resolveConflictByAdvancing(m1, m2, conflicts, scores);
-            return;
-          }
-        }
-      }
-    }
-
-    // Check conflicts between court A's current game and court B's upcoming game (and vice versa)
-    currentMatchesByCourt.forEach((currentMatch, courtA) => {
-      upcomingMatchesByCourt.forEach((upcomingMatch, courtB) => {
-        if (courtA !== courtB) {
-          const currentPlayers = new Set<string>([...currentMatch.team1, ...currentMatch.team2]);
-          const upcomingPlayers = new Set<string>([...upcomingMatch.team1, ...upcomingMatch.team2]);
-          const conflicts = Array.from(currentPlayers).filter(p => upcomingPlayers.has(p));
-          if (conflicts.length > 0) {
-            // Adjust the upcoming match to resolve conflicts
-            adjustUpcomingMatch(upcomingMatch, conflicts, currentPlayers, scores);
-            return;
-          }
-        }
-      });
-    });
-  };
-  const resolveConflictByAdvancing = (m1: Match, m2: Match, conflicts: string[], scores: Map<string, {
-    team1: number;
-    team2: number;
-  }>) => {
-    // Find which match to advance (the one with more conflicts or later in the list)
-    const [keepMatch, advanceMatch] = m1.startTime <= m2.startTime ? [m1, m2] : [m2, m1];
-    const playersInUse = new Set<string>([...keepMatch.team1, ...keepMatch.team2]);
-
-    // Look down the roster to find the first conflict-free match
-    const courtMatches = matches.filter(m => m.court === advanceMatch.court && !scores.has(m.id));
-    const advanceMatchIndex = courtMatches.findIndex(m => m.id === advanceMatch.id);
-    let replacementMatch: Match | null = null;
-    let replacementIndex = -1;
-    for (let i = advanceMatchIndex + 1; i < courtMatches.length; i++) {
-      const candidate = courtMatches[i];
-      const candidatePlayers = [...candidate.team1, ...candidate.team2];
-      const hasConflict = candidatePlayers.some(p => playersInUse.has(p));
-      if (!hasConflict) {
-        replacementMatch = candidate;
-        replacementIndex = i;
-        break;
-      }
-    }
-    if (replacementMatch) {
-      // Swap the matches
-      const advanceGlobalIndex = matches.findIndex(m => m.id === advanceMatch.id);
-      const replacementGlobalIndex = matches.findIndex(m => m.id === replacementMatch.id);
-      const playedMatches = matches.slice(0, advanceGlobalIndex).map(m => {
-        const score = scores.get(m.id);
-        return {
-          ...m,
-          score: score ? normalizeScore(score) : m.score ? normalizeScore(m.score) : undefined
-        };
-      });
-
-      // Swap the rosters
-      const swappedMatch = {
-        ...advanceMatch,
-        team1: replacementMatch.team1,
-        team2: replacementMatch.team2
-      };
-      const newMatches = regenerateScheduleFromSlot(allPlayers, [...playedMatches, swappedMatch], advanceMatch.endTime, gameConfig.gameDuration, gameConfig.totalTime, gameConfig.courts, undefined, gameConfig.teammatePairs, courtConfigs, matches);
-      const merged = newMatches.map(m => {
-        const sc = scores.get(m.id);
-        return sc ? {
-          ...m,
-          score: normalizeScore(sc)
-        } : m;
-      });
-      onScheduleUpdate(merged, allPlayers);
-
-      // Only notify if it affects current or next-up matches
-      const affectedMatchIsCurrentOrNext = isCurrentOrNextMatch(advanceMatch.id, scores);
-      if (affectedMatchIsCurrentOrNext) {
-        const matchIdx = matches.filter(m => m.court === advanceMatch.court && m.endTime <= advanceMatch.endTime).length;
-        const matchNumber = `${String.fromCharCode(64 + advanceMatch.court)}${matchIdx}`;
-        toast({
-          title: "Game advanced",
-          description: `Match ${matchNumber} roster advanced to resolve conflicts for: ${conflicts.join(', ')}`
-        });
-      }
-    } else {
-      // Fallback: adjust players
-      adjustUpcomingMatch(advanceMatch, conflicts, playersInUse, scores);
-    }
-  };
-  const adjustUpcomingMatch = (upcomingMatch: Match, conflicts: string[], playersInUse: Set<string>, scores: Map<string, {
-    team1: number;
-    team2: number;
-  }>) => {
-    const usedInMatch = new Set<string>();
-    const t1 = (upcomingMatch.team1 as string[]).map(p => {
-      if (playersInUse.has(p)) return "";
-      usedInMatch.add(p);
-      return p;
-    });
-    const t2 = (upcomingMatch.team2 as string[]).map(p => {
-      if (playersInUse.has(p)) return "";
-      usedInMatch.add(p);
-      return p;
-    });
-    const candidates = allPlayers.filter(p => !playersInUse.has(p) && !usedInMatch.has(p));
-    const pickNext = (exclude: string[]) => {
-      const pick = candidates.find(c => !exclude.includes(c));
-      if (!pick) return null;
-      usedInMatch.add(pick);
-      const idx = candidates.indexOf(pick);
-      if (idx >= 0) candidates.splice(idx, 1);
-      return pick;
-    };
-    if (upcomingMatch.isSingles) {
-      if (!t1[0]) t1[0] = pickNext([]) || "";
-      if (!t2[0]) t2[0] = pickNext([]) || "";
-    } else {
-      if (!t1[0]) t1[0] = pickNext([t1[1]].filter(Boolean) as string[]) || "";
-      if (!t1[1]) t1[1] = pickNext([t1[0]].filter(Boolean) as string[]) || "";
-      if (!t2[0]) t2[0] = pickNext([t2[1]].filter(Boolean) as string[]) || "";
-      if (!t2[1]) t2[1] = pickNext([t2[0]].filter(Boolean) as string[]) || "";
-    }
-    if (t1.some(x => !x) || t2.some(x => !x)) {
-      toast({
-        title: "Conflict detected",
-        description: "Not enough available players to adjust.",
-        variant: "destructive"
-      });
-      return;
-    }
-    const updatedMatch: Match = {
-      ...upcomingMatch,
-      team1: upcomingMatch.isSingles ? [t1[0]] as [string] : [t1[0], t1[1]] as [string, string],
-      team2: upcomingMatch.isSingles ? [t2[0]] as [string] : [t2[0], t2[1]] as [string, string]
-    };
-    const matchIndex = matches.findIndex(m => m.id === upcomingMatch.id);
-    const playedMatches = matches.slice(0, matchIndex).map(m => {
-      const score = scores.get(m.id);
-      return {
-        ...m,
-        score: score ? normalizeScore(score) : m.score ? normalizeScore(m.score) : undefined
-      };
-    });
-    const newMatches = regenerateScheduleFromSlot(allPlayers, [...playedMatches, updatedMatch], upcomingMatch.endTime, gameConfig.gameDuration, gameConfig.totalTime, gameConfig.courts, undefined, gameConfig.teammatePairs, courtConfigs, matches);
-    const mergedMatches = newMatches.map(m => {
-      const sc = scores.get(m.id);
-      return sc ? {
-        ...m,
-        score: normalizeScore(sc)
-      } : m;
-    });
-    onScheduleUpdate(mergedMatches, allPlayers);
-
-    // Only notify if it affects current or next-up matches
-    const affectedMatchIsCurrentOrNext = isCurrentOrNextMatch(upcomingMatch.id, scores);
-    if (affectedMatchIsCurrentOrNext) {
-      const matchIdx = matches.filter(m => m.court === upcomingMatch.court && m.endTime <= upcomingMatch.endTime).length;
-      const matchNumber = `${String.fromCharCode(64 + upcomingMatch.court)}${matchIdx}`;
-      toast({
-        title: "Upcoming game adjusted",
-        description: `Match ${matchNumber} roster adjusted to avoid conflicts for: ${conflicts.join(', ')}`
-      });
-    }
-  };
-  const checkScheduleAdjustment = (completedMatchId: string, actualEndTime: number, scores: Map<string, {
-    team1: number;
-    team2: number;
-  }>) => {
-    const completedMatch = matches.find(m => m.id === completedMatchId);
-    if (!completedMatch) return;
-    const scheduledEndTime = completedMatch.endTime;
-    const timeDifference = actualEndTime - scheduledEndTime;
-    if (Math.abs(timeDifference) > 5) {
-      const matchIndex = matches.findIndex(m => m.id === completedMatchId);
-      const playedMatches = matches.slice(0, matchIndex + 1).map(m => {
-        const score = scores.get(m.id);
-        return {
-          ...m,
-          score: score ? normalizeScore(score) : m.score ? normalizeScore(m.score) : undefined,
-          actualEndTime: m.id === completedMatchId ? actualEndTime : m.endTime
-        };
-      });
-      const remainingTime = gameConfig.totalTime - actualEndTime;
-      const potentialNewMatches = Math.floor(remainingTime / gameConfig.gameDuration) * gameConfig.courts;
-      const currentFutureMatches = matches.length - (matchIndex + 1);
-      if (potentialNewMatches !== currentFutureMatches) {
-        const newMatches = regenerateScheduleFromSlot(allPlayers, playedMatches, actualEndTime, gameConfig.gameDuration, gameConfig.totalTime, gameConfig.courts, undefined, gameConfig.teammatePairs, courtConfigs, matches);
-
-        // Merge existing confirmed scores back into regenerated matches
-        const mergedMatches = newMatches.map(m => {
-          const sc = scores.get(m.id);
-          return sc ? {
-            ...m,
-            score: normalizeScore(sc)
-          } : m;
-        });
-        onScheduleUpdate(mergedMatches, allPlayers);
-
-        // Always notify schedule adjustments as they affect current/upcoming matches
-        const completedMatchIdx = matches.filter(m => m.court === completedMatch.court && m.endTime <= completedMatch.endTime).length;
-        const completedMatchNumber = `${String.fromCharCode(64 + completedMatch.court)}${completedMatchIdx}`;
-        const matchDiff = mergedMatches.length - matches.length;
-        if (matchDiff > 0) {
-          toast({
-            title: "Schedule adjusted",
-            description: `After match ${completedMatchNumber}, added ${matchDiff} match(es) due to faster pace`
-          });
-        } else if (matchDiff < 0) {
-          toast({
-            title: "Schedule adjusted",
-            description: `After match ${completedMatchNumber}, removed ${Math.abs(matchDiff)} match(es) due to slower pace`
-          });
-        }
-      }
-    }
-  };
   const toggleCourtType = (courtNumber: number) => {
-    const updatedConfigs = courtConfigs.map(config => config.courtNumber === courtNumber ? {
-      ...config,
-      type: config.type === 'singles' ? 'doubles' as const : 'singles' as const
-    } : config);
-    setCourtConfigs(updatedConfigs);
+    const updated = courtConfigs.map((config) =>
+      config.courtNumber === courtNumber
+        ? { ...config, type: config.type === "singles" ? ("doubles" as const) : ("singles" as const) }
+        : config
+    );
 
-    // Notify parent component of config change
-    if (onCourtConfigUpdate) {
-      onCourtConfigUpdate(updatedConfigs);
-    }
-    const firstUnplayedMatchIndex = matches.findIndex(m => !matchScores.has(m.id));
-    if (firstUnplayedMatchIndex === -1) return;
-    const firstUnplayedMatch = matches[firstUnplayedMatchIndex];
-    const playedMatches = matches.slice(0, firstUnplayedMatchIndex).map(m => {
-      const score = matchScores.get(m.id);
-      return {
-        ...m,
-        score: score ? normalizeScore(score) : m.score ? normalizeScore(m.score) : undefined
-      };
-    });
-    const newMatches = regenerateScheduleFromSlot(allPlayers, playedMatches, firstUnplayedMatch.startTime, gameConfig.gameDuration, gameConfig.totalTime, gameConfig.courts, undefined, gameConfig.teammatePairs, updatedConfigs, matches);
-    onScheduleUpdate(newMatches, allPlayers);
-    const courtLetter = String.fromCharCode(64 + courtNumber);
-    const typeText = updatedConfigs.find(c => c.courtNumber === courtNumber)?.type === 'singles' ? 'Singles' : 'Doubles';
-    toast({
-      title: "Court type updated",
-      description: `Court ${courtLetter} changed to ${typeText}, schedule regenerated`
-    });
-  };
-  const scrollToCurrentMatch = (courtNumber: number) => {
-    const api = carouselApis.get(courtNumber);
-    if (!api) return;
-    const courtMatches = matches.filter(m => m.court === courtNumber);
-    const currentMatchIndex = courtMatches.findIndex(m => !matchScores.has(m.id));
-    if (currentMatchIndex >= 0) {
-      api.scrollTo(currentMatchIndex, true);
-    }
+    setCourtConfigs(updated);
+    onCourtConfigUpdate?.(updated);
+
+    const firstUnplayedMatchIndex = matches.findIndex((match) => !matchScores.has(match.id));
+    if (firstUnplayedMatchIndex < 0) return;
+
+    const anchorMatch = matches[firstUnplayedMatchIndex];
+    const playedMatches = matches.slice(0, firstUnplayedMatchIndex).map((match) => ({
+      ...match,
+      score: matchScores.get(match.id) || match.score,
+    }));
+
+    const regenerated = regenerateScheduleFromSlot(
+      allPlayers,
+      playedMatches,
+      anchorMatch.startTime,
+      gameConfig.gameDuration,
+      gameConfig.totalTime,
+      gameConfig.courts,
+      undefined,
+      gameConfig.teammatePairs,
+      updated,
+      matches
+    );
+
+    onScheduleUpdate(regenerated, allPlayers);
+    toast.success(`Court ${courtNumber} switched to ${updated.find((config) => config.courtNumber === courtNumber)?.type}`);
   };
 
-  const scrollToMatch = (courtNumber: number, matchId: string) => {
-    const api = carouselApis.get(courtNumber);
-    if (!api) return;
-    const courtMatches = matches.filter(m => m.court === courtNumber);
-    const matchIndex = courtMatches.findIndex(m => m.id === matchId);
-    if (matchIndex >= 0) {
-      api.scrollTo(matchIndex, true);
-    }
-  };
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="border-0 bg-emerald-100 text-emerald-800">Courts board</Badge>
+            <Badge className="border-0 bg-slate-100 text-slate-700">Round robin live</Badge>
+          </div>
+          <h3 className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">Run the night from one board.</h3>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+            Current match, next match, score entry, completed edits, and per-court navigation all stay visible without dropping into an old admin-style scheduler.
+          </p>
+        </div>
 
-  // Auto-scroll to current match when component is displayed, carousels are ready, or matches change
-  useEffect(() => {
-    if (carouselApis.size > 0) {
-      // Small delay to ensure carousel is fully rendered
-      setTimeout(() => {
-        courtConfigs.forEach(config => {
-          scrollToCurrentMatch(config.courtNumber);
-        });
-      }, 100);
-    }
-  }, [carouselApis.size, matches, matchScores]);
+        <Button
+          variant={isPlayerView ? "outline" : "default"}
+          onClick={() => (isPlayerView ? onReleaseIdentity?.() : onShowPlayerSelector?.())}
+          className={isPlayerView ? "rounded-full" : "rounded-full bg-emerald-500 text-white hover:bg-emerald-400"}
+        >
+          <Users className="mr-2 h-4 w-4" />
+          {isPlayerView ? `Back to host${playerName ? ` · ${playerName}` : ""}` : "Player view"}
+        </Button>
+      </div>
 
-  // Conflict checks are performed after confirming a score to avoid render-loop adjustments
-  // useEffect(() => {
-  //   checkPlayerConflicts(matchScores);
-  // }, []);
+      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <div className="grid gap-4 md:grid-cols-2">
+          {courtConfigs.map((config) => {
+            const live = currentByCourt.get(config.courtNumber);
+            const next = nextByCourt.get(config.courtNumber);
+            const doneCount = matches.filter((match) => match.court === config.courtNumber && matchScores.has(match.id)).length;
 
-  return <div className="h-full overflow-y-auto">
-      {/* Header */}
-      <div className="sticky top-0 bg-background/95 backdrop-blur-sm z-10 pb-1 border-b mb-2">
-        {/* Tournament Mode Header */}
-        {isTournamentMode && (
-          <div className="px-2 pt-2 pb-1 border-b">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-sm font-semibold flex items-center gap-1.5">
-                  <Trophy className="w-4 h-4" />
-                  {gameConfig.schedulingType === 'single-elimination' 
-                    ? 'Single Elimination Tournament'
-                    : gameConfig.schedulingType === 'qualifier-tournament'
-                    ? 'Qualifier Tournament'
-                    : 'Double Elimination Tournament'}
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Score matches below or view full bracket
-                </p>
-              </div>
-              <Button
-                onClick={() => setShowBracketDialog(true)}
-                variant="outline"
-                size="sm"
-                className="gap-2 h-8"
+            return (
+              <Card
+                key={config.courtNumber}
+                className="overflow-hidden rounded-[1.75rem] border-white/10 bg-[linear-gradient(145deg,rgba(9,18,31,0.97),rgba(16,86,74,0.9),rgba(8,14,27,0.98))] p-5 text-white shadow-2xl shadow-emerald-950/20"
               >
-                <Trophy className="w-3.5 h-3.5" />
-                View Bracket
-              </Button>
-            </div>
-          </div>
-        )}
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-xs uppercase tracking-[0.22em] text-white/50">Court {config.courtNumber}</div>
+                    <div className="mt-2 text-xl font-semibold">{live ? "Playing now" : "Waiting for next match"}</div>
+                  </div>
+                  <div className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-medium text-white/80">{doneCount} done</div>
+                </div>
 
-        <div className="flex items-center justify-between gap-2 px-2 pt-1">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
-              <Trophy className="w-3.5 h-3.5 text-primary-foreground" />
+                <div className="mt-4 flex items-center justify-between rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm">
+                  <span className="text-white/70">Format</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs ${config.type === "singles" ? "text-white/50" : "font-medium text-white"}`}>Doubles</span>
+                    <Switch checked={config.type === "singles"} onCheckedChange={() => toggleCourtType(config.courtNumber)} />
+                    <span className={`text-xs ${config.type === "singles" ? "font-medium text-white" : "text-white/50"}`}>Singles</span>
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-[1.35rem] border border-emerald-300/20 bg-emerald-300/10 p-4">
+                    <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-emerald-100/85">
+                      <PlayCircle className="h-3.5 w-3.5" />
+                      Current
+                    </div>
+                    <div className="mt-2 text-sm leading-6 text-white/90">
+                      {live ? `${live.team1.join(" · ")} vs ${live.team2.join(" · ")}` : "No live match yet."}
+                    </div>
+                    {live ? (
+                      <div className="mt-3 flex items-center gap-2 text-xs text-white/70">
+                        <Timer className="h-3.5 w-3.5" />
+                        {formatClock(elapsed.get(config.courtNumber) || 0)}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="rounded-[1.35rem] border border-white/10 bg-white/5 p-4">
+                    <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-white/55">
+                      <Target className="h-3.5 w-3.5" />
+                      Next up
+                    </div>
+                    <div className="mt-2 text-sm leading-6 text-white/85">
+                      {next ? `${next.team1.join(" · ")} vs ${next.team2.join(" · ")}` : "No queued follow-up yet."}
+                    </div>
+                  </div>
+
+                  <Button variant="outline" onClick={() => setSelectedCourt(config.courtNumber)} className="w-full rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white">
+                    Open court {config.courtNumber} queue
+                  </Button>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+
+        <div className="space-y-4">
+          <Card className="rounded-[1.75rem] border-white/10 bg-white/95 p-5 shadow-xl shadow-slate-950/5">
+            <div className="flex items-center gap-2 text-slate-900">
+              <Users className="h-4 w-4 text-emerald-600" />
+              <h4 className="font-semibold">Waiting / bench</h4>
             </div>
-            <div className="flex-1">
-              <h2 className="text-base font-bold text-foreground">Match Schedule</h2>
-              <p className="text-[10px] text-muted-foreground">{matches.length} matches • {allPlayers.length} players</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {waitingPlayers.length > 0 ? (
+                waitingPlayers.map((player) => (
+                  <Badge key={player} variant="secondary" className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700">
+                    {player}
+                  </Badge>
+                ))
+              ) : (
+                <div className="rounded-2xl bg-slate-100 px-4 py-3 text-sm text-slate-600">Everyone is either playing now or queued next.</div>
+              )}
             </div>
-          </div>
-          
-          <Button 
-            variant={isPlayerView ? "outline" : "default"} 
-            size="sm" 
-            onClick={() => {
-              if (isPlayerView) {
-                onReleaseIdentity?.();
-              } else {
-                onShowPlayerSelector?.();
-              }
-            }} 
-            className="gap-2 flex-shrink-0"
-          >
-            {isPlayerView ? (
-              <>
-                <Users className="h-4 w-4" />
-                Organizer View
-              </>
-            ) : (
-              <>
-                <UserCircle className="h-4 w-4" />
-                Player View
-              </>
-            )}
-          </Button>
+          </Card>
+
+          <Card className="rounded-[1.75rem] border-white/10 bg-white/95 p-5 shadow-xl shadow-slate-950/5">
+            <div className="flex items-center gap-2 text-slate-900">
+              <Trophy className="h-4 w-4 text-violet-600" />
+              <h4 className="font-semibold">Quick status</h4>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-[1.25rem] bg-slate-100 px-4 py-3">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Completed</div>
+                <div className="mt-2 text-2xl font-semibold text-slate-900">{matchScores.size}</div>
+              </div>
+              <div className="rounded-[1.25rem] bg-slate-100 px-4 py-3">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Unplayed</div>
+                <div className="mt-2 text-2xl font-semibold text-slate-900">{unscoredMatches.length}</div>
+              </div>
+            </div>
+          </Card>
         </div>
       </div>
 
-      {/* Quick court queue overview */}
-      <div className="grid grid-cols-1 gap-2 px-2 pb-2 md:grid-cols-2">
-        {courtConfigs.map(courtConfig => {
-          const courtMatches = matches.filter(m => m.court === courtConfig.courtNumber);
-          const current = courtMatches.find(m => !matchScores.has(m.id));
-          const next = current ? courtMatches.find(m => !matchScores.has(m.id) && m.id !== current.id) : undefined;
-          const latestFinished = [...courtMatches].reverse().find(m => matchScores.has(m.id));
-          return (
-            <Card key={`overview-${courtConfig.courtNumber}`} className="border-slate-200 bg-white/90 p-3 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Court {String.fromCharCode(64 + courtConfig.courtNumber)}</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-900">Current + next queue</div>
-                </div>
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => scrollToCurrentMatch(courtConfig.courtNumber)}>
-                  Jump to current
-                </Button>
-              </div>
+      <Card className="rounded-[1.9rem] border-white/10 bg-white/95 p-4 shadow-2xl shadow-slate-950/5 sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Court queue</div>
+            <h4 className="mt-1 text-xl font-semibold text-slate-900">Court {selectedCourt} match navigation</h4>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {courtConfigs.map((config) => (
+              <Button
+                key={config.courtNumber}
+                variant={selectedCourt === config.courtNumber ? "default" : "outline"}
+                onClick={() => setSelectedCourt(config.courtNumber)}
+                className={selectedCourt === config.courtNumber ? "rounded-full bg-emerald-500 text-white hover:bg-emerald-400" : "rounded-full"}
+              >
+                Court {config.courtNumber}
+              </Button>
+            ))}
+          </div>
+        </div>
 
-              <div className="mt-3 grid gap-2 lg:grid-cols-3">
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-700">On court</div>
-                  {current ? (
-                    <>
-                      <div className="mt-1 font-medium text-slate-900">{current.team1.join(" + ")} vs {current.team2.join(" + ")}</div>
-                      <div className="mt-2 flex gap-2">
-                        <Button size="sm" className="h-7 text-xs" onClick={() => scrollToMatch(courtConfig.courtNumber, current.id)}>
-                          Open scoring
-                        </Button>
-                        {matchScores.has(current.id) ? (
-                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => editScore(current.id)}>
-                            Edit score
-                          </Button>
-                        ) : null}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="mt-1 text-slate-500">No live match on this court.</div>
-                  )}
-                </div>
+        <div className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          {selectedCourtMatches.map((match, index) => {
+            const confirmed = matchScores.get(match.id);
+            const pending = pendingScores.get(match.id);
+            const score = pending || confirmed || { team1: "", team2: "" };
+            const isCurrent = currentByCourt.get(selectedCourt)?.id === match.id;
+            const isNext = nextByCourt.get(selectedCourt)?.id === match.id;
+            const isDone = Boolean(confirmed);
 
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-700">Next up</div>
-                  {next ? (
-                    <>
-                      <div className="mt-1 font-medium text-slate-900">{next.team1.join(" + ")} vs {next.team2.join(" + ")}</div>
-                      <div className="mt-2 flex gap-2">
-                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => scrollToMatch(courtConfig.courtNumber, next.id)}>
-                          Preview next
-                        </Button>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="mt-1 text-slate-500">No next match queued yet.</div>
-                  )}
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600">Latest finished</div>
-                  {latestFinished ? (
-                    <>
-                      <div className="mt-1 font-medium text-slate-900">{latestFinished.team1.join(" + ")} vs {latestFinished.team2.join(" + ")}</div>
-                      <div className="mt-1 text-slate-600">
-                        {matchScores.get(latestFinished.id)?.team1} - {matchScores.get(latestFinished.id)?.team2}
-                      </div>
-                      <div className="mt-2 flex gap-2">
-                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => scrollToMatch(courtConfig.courtNumber, latestFinished.id)}>
-                          Open card
-                        </Button>
-                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => editScore(latestFinished.id)}>
-                          Edit score
-                        </Button>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="mt-1 text-slate-500">No completed score yet.</div>
-                  )}
-                </div>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Courts Grid - Vertical layout with Court A above Court B */}
-      <div className="grid grid-cols-1 gap-2 px-2 pb-2">
-        {courtConfigs.map(courtConfig => {
-        const courtMatches = matches.filter(m => m.court === courtConfig.courtNumber);
-        const currentMatchIndex = courtMatches.findIndex(m => !matchScores.has(m.id));
-        return <div key={courtConfig.courtNumber} className="space-y-2">
-              {/* Court Header - Compact */}
-              <div className={`flex items-center justify-between gap-2 rounded-lg p-2 border ${courtConfig.courtNumber === 1 ? 'bg-greenery border-greenery/30' : 'bg-pantone-493c border-pantone-493c/30'}`}>
-                <div className="flex items-center gap-2">
-                  <Badge className="bg-white/90 text-gray-800 text-xs px-1.5 py-0.5 font-semibold">
-                    Court {String.fromCharCode(64 + courtConfig.courtNumber)}
-                  </Badge>
-                  <span className="text-[10px] text-white/90 font-medium">
-                    {currentMatchIndex >= 0 ? `${currentMatchIndex + 1}/${courtMatches.length}` : `${courtMatches.length} matches`}
-                  </span>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  {/* Singles/Doubles Toggle */}
-                  <div className="flex items-center gap-1 p-1 rounded-lg border border-white/20 bg-white/90 text-[10px]">
-                    <span className={courtConfig.type === 'doubles' ? 'text-gray-800 font-medium' : 'text-gray-500'}>
-                      Doubles
-                    </span>
-                    <Switch checked={courtConfig.type === 'singles'} onCheckedChange={() => toggleCourtType(courtConfig.courtNumber)} className="scale-75" />
-                    <span className={courtConfig.type === 'singles' ? 'text-gray-800 font-medium' : 'text-gray-500'}>
-                      Singles
-                    </span>
+            return (
+              <Card
+                key={match.id}
+                className={`rounded-[1.5rem] border p-4 shadow-lg shadow-slate-950/5 ${
+                  isCurrent
+                    ? "border-emerald-300 bg-emerald-50"
+                    : isNext
+                      ? "border-amber-200 bg-amber-50"
+                      : isDone
+                        ? "border-slate-200 bg-slate-50"
+                        : "border-white/10 bg-white"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <Badge className="border-0 bg-slate-900 text-white">{getMatchLabel(matches, match)}</Badge>
+                  <div className="flex items-center gap-1 text-xs text-slate-500">
+                    <Clock3 className="h-3.5 w-3.5" />
+                    {match.startTime}m
                   </div>
-                  
-                  {/* Current Match Button */}
-                  {currentMatchIndex >= 0 && <Button onClick={() => scrollToCurrentMatch(courtConfig.courtNumber)} variant="outline" size="sm" className="gap-1 h-6 text-[10px] px-2 bg-white/90 text-gray-800 border-white/30 hover:bg-white">
-                      <Target className="w-2.5 h-2.5" />
-                      Current
-                    </Button>}
                 </div>
-              </div>
 
-              {/* Carousel - Optimized for viewport */}
-              <Carousel opts={{
-            align: "start",
-            loop: false
-          }} className="w-full" setApi={api => {
-            if (api) {
-              setCarouselApis(prev => new Map(prev).set(courtConfig.courtNumber, api));
-            }
-          }}>
-                <CarouselContent className="-ml-2 max-w-full">
-                  {courtMatches.map((match, idx) => {
-                const isCurrentMatch = idx === currentMatchIndex;
-                const isNextMatch = idx === currentMatchIndex + 1;
-                const isPreviousMatch = idx < currentMatchIndex;
-                const confirmedScores = matchScores.get(match.id);
-                const pendingForMatch = pendingScores.get(match.id);
-                const scores = pendingForMatch || confirmedScores || {
-                  team1: '',
-                  team2: ''
-                };
-                const isCompleted = matchScores.has(match.id);
-                const hasPending = pendingScores.has(match.id);
-                return <CarouselItem key={match.id} className="pl-2 basis-[80%] sm:basis-[60%] md:basis-[45%] lg:basis-[35%]">
-                        <Card className={`p-1.5 transition-all max-w-full md:aspect-[5/3] md:max-h-[220px] ${isCurrentMatch ? courtConfig.courtNumber === 1 ? 'border-2 border-greenery bg-greenery/20 shadow-lg' : 'border-2 border-pantone-493c bg-pantone-493c/20 shadow-lg' : isNextMatch ? courtConfig.courtNumber === 1 ? 'border border-gray-mist/50 bg-gray-mist/30' : 'border border-larkspur/50 bg-larkspur/20' : isPreviousMatch ? 'bg-muted/40 opacity-60' : 'bg-card opacity-80'}`}>
-                          <div className="space-y-1 max-w-full overflow-hidden">
-                            {/* Match Status Header */}
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-1">
-                                <Badge className={`text-xs py-0 ${isCurrentMatch ? 'bg-primary text-primary-foreground' : isNextMatch ? 'bg-accent text-accent-foreground' : isPreviousMatch ? 'bg-muted text-muted-foreground' : 'bg-secondary text-secondary-foreground'}`}>
-                                  {String.fromCharCode(64 + courtConfig.courtNumber)}{idx + 1} {isCurrentMatch ? '• Current' : isNextMatch ? '• Up Next' : isPreviousMatch ? '• Done' : ''}
-                                </Badge>
-                                {/* Issue #2: Stage label for qualifier tournaments */}
-                                {(() => {
-                                  const stageLabel = getStageLabel(match);
-                                  return stageLabel ? (
-                                    <Badge variant="outline" className="text-[10px] py-0 bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800">
-                                      {stageLabel}
-                                    </Badge>
-                                  ) : null;
-                                })()}
-                              </div>
-                              <Badge variant="outline" className="text-[10px] py-0">
-                                <Clock className="w-2.5 h-2.5 mr-0.5" />
-                                {match.elapsedTime || `${new Date(Date.now() + match.startTime * 60000).toLocaleTimeString('en-US', {
-                            hour: 'numeric',
-                            minute: '2-digit'
-                          })}`}
-                              </Badge>
-                            </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {isCurrent ? <Badge className="border-0 bg-emerald-500 text-white">Live</Badge> : null}
+                  {isNext ? <Badge className="border-0 bg-amber-500 text-white">Next</Badge> : null}
+                  {isDone ? <Badge className="border-0 bg-slate-700 text-white">Completed</Badge> : null}
+                  {!isCurrent && !isNext && !isDone ? <Badge variant="secondary">Queued</Badge> : null}
+                </div>
 
-                            {/* Team 1 */}
-                            <div className="flex items-center gap-2 p-1.5 rounded-lg bg-primary/50">
-                              <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                <Users className="w-3.5 h-3.5 text-primary-foreground flex-shrink-0" />
-                                {editingMatch === match.id ? <div className="flex-1 min-w-0 space-y-1">
-                                    <Select value={editedTeams.team1[0] || ""} onValueChange={v => updateEditedPlayer('team1', 0, v)}>
-                                      <SelectTrigger className="h-6 text-xs">
-                                        <SelectValue placeholder="Player 1" />
-                                      </SelectTrigger>
-                                      <SelectContent className="z-50">
-                                        {allPlayers.filter(p => p !== editedTeams.team1[1]).map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                                      </SelectContent>
-                                    </Select>
-                                    {!match.isSingles && <Select value={editedTeams.team1[1] || ""} onValueChange={v => updateEditedPlayer('team1', 1, v)}>
-                                        <SelectTrigger className="h-6 text-xs">
-                                          <SelectValue placeholder="Player 2" />
-                                        </SelectTrigger>
-                                        <SelectContent className="z-50">
-                                          {allPlayers.filter(p => p !== editedTeams.team1[0]).map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                                        </SelectContent>
-                                      </Select>}
-                                  </div> : <div className="font-semibold text-xs min-w-0">
-                                    <div className="truncate">{match.team1[0]}</div>
-                                    {!match.isSingles && match.team1[1] && <div className="text-muted-foreground text-[10px] truncate">{match.team1[1]}</div>}
-                                  </div>}
-                              </div>
-                              {isCurrentMatch || hasPending ? <Input type="number" min="0" value={scores.team1} onChange={e => updatePendingScore(match.id, "team1", e.target.value)} placeholder="0" className="w-12 h-8 text-center text-lg font-bold flex-shrink-0" disabled={isCompleted && !hasPending} /> : confirmedScores ? <div className="w-12 h-8 flex items-center justify-center text-lg font-bold">
-                                  {confirmedScores.team1}
-                                </div> : <div className="w-12 h-8 flex items-center justify-center text-muted-foreground">
-                                  -
-                                </div>}
-                            </div>
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-[1.1rem] bg-white/80 p-3 ring-1 ring-slate-200">
+                    <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Team 1</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-900">{match.team1.join(" · ")}</div>
+                  </div>
+                  <div className="rounded-[1.1rem] bg-white/80 p-3 ring-1 ring-slate-200">
+                    <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Team 2</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-900">{match.team2.join(" · ")}</div>
+                  </div>
+                </div>
 
-                            {/* VS with Change Players Button */}
-                            <div className="flex items-center justify-center gap-2">
-                              <div className="text-[10px] font-bold text-muted-foreground">VS</div>
-                              {isCurrentMatch && !editingMatch && <Button onClick={() => startEditingPlayers(match.id)} variant="outline" className="h-6 px-3 text-[10px]" size="sm">
-                                  Change Players
-                                </Button>}
-                            </div>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="mb-2 text-xs uppercase tracking-[0.18em] text-slate-500">Score</div>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={score.team1}
+                      onChange={(event) => updatePendingScore(match.id, "team1", event.target.value)}
+                      className="h-11 rounded-2xl text-center text-lg font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <div className="mb-2 text-xs uppercase tracking-[0.18em] text-slate-500">Score</div>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={score.team2}
+                      onChange={(event) => updatePendingScore(match.id, "team2", event.target.value)}
+                      className="h-11 rounded-2xl text-center text-lg font-semibold"
+                    />
+                  </div>
+                </div>
 
-                            {/* Team 2 */}
-                              <div className="flex items-center gap-2 p-1.5 rounded-lg bg-secondary/50">
-                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                  <Users className="w-3.5 h-3.5 text-accent flex-shrink-0" />
-                                  {editingMatch === match.id ? <div className="flex-1 min-w-0 space-y-1">
-                                      <Select value={editedTeams.team2[0] || ""} onValueChange={v => updateEditedPlayer('team2', 0, v)}>
-                                        <SelectTrigger className="h-6 text-xs">
-                                          <SelectValue placeholder="Player 1" />
-                                        </SelectTrigger>
-                                        <SelectContent className="z-50">
-                                          {allPlayers.filter(p => p !== editedTeams.team2[1]).map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                                        </SelectContent>
-                                      </Select>
-                                      {!match.isSingles && <Select value={editedTeams.team2[1] || ""} onValueChange={v => updateEditedPlayer('team2', 1, v)}>
-                                          <SelectTrigger className="h-6 text-xs">
-                                            <SelectValue placeholder="Player 2" />
-                                          </SelectTrigger>
-                                          <SelectContent className="z-50">
-                                            {allPlayers.filter(p => p !== editedTeams.team2[0]).map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                                          </SelectContent>
-                                        </Select>}
-                                    </div> : <div className="font-semibold text-xs min-w-0">
-                                      <div className="truncate">{match.team2[0]}</div>
-                                      {!match.isSingles && match.team2[1] && <div className="text-muted-foreground text-[10px] truncate">{match.team2[1]}</div>}
-                                    </div>}
-                                </div>
-                                {isCurrentMatch || hasPending ? <Input type="number" min="0" value={scores.team2} onChange={e => updatePendingScore(match.id, "team2", e.target.value)} placeholder="0" className="w-12 h-8 text-center text-lg font-bold flex-shrink-0" disabled={isCompleted && !hasPending} /> : confirmedScores ? <div className="w-12 h-8 flex items-center justify-center text-lg font-bold">
-                                    {confirmedScores.team2}
-                                  </div> : <div className="w-12 h-8 flex items-center justify-center text-muted-foreground">
-                                    -
-                                  </div>}
-                              </div>
+                <div className="mt-4 flex gap-2">
+                  <Button onClick={() => confirmScore(match)} className="flex-1 rounded-full bg-emerald-500 text-white hover:bg-emerald-400">
+                    {isDone ? <Edit3 className="mr-2 h-4 w-4" /> : <PlayCircle className="mr-2 h-4 w-4" />}
+                    {isDone ? "Save edit" : isCurrent ? "Confirm & next" : "Save score"}
+                  </Button>
+                </div>
 
-                            {/* Timer and Action Buttons */}
-                            {isCurrentMatch && <div className="space-y-1">
-                                {/* Stopwatch */}
-                                <div className="flex items-center justify-center gap-1.5 py-0.5 px-2 rounded-lg bg-primary/10 border border-primary/20">
-                                  <Timer className="w-3 h-3 text-primary animate-pulse" />
-                                  <span className="text-xs font-bold text-primary">
-                                    {formatTime(courtElapsedTimes.get(match.court) || 0)}
-                                  </span>
-                                </div>
-                                
-                                {editingMatch === match.id ? <div className="flex gap-1.5">
-                                    <Button onClick={saveEditedPlayers} className="flex-1 h-7 text-xs" size="sm">
-                                      Save
-                                    </Button>
-                                    <Button onClick={cancelEditingPlayers} variant="outline" className="flex-1 h-7 text-xs" size="sm">
-                                      Cancel
-                                    </Button>
-                                  </div> : <>
-                                    {!isCompleted && <Button onClick={() => confirmScore(match.id)} className="w-full h-7 text-xs" size="sm" disabled={!hasPending}>
-                                        Confirm & Next
-                                      </Button>}
-                                    {isCompleted && !hasPending && <Button onClick={() => editScore(match.id)} variant="outline" className="w-full h-7 text-xs" size="sm">
-                                        Edit Score
-                                      </Button>}
-                                  </>}
-                              </div>}
-                            
-                            {/* Edit Score Button for Completed Matches */}
-                            {!isCurrentMatch && isCompleted && !hasPending && <Button onClick={() => editScore(match.id)} variant="outline" className="w-full h-7 text-xs mt-2" size="sm">
-                                Edit Score
-                              </Button>}
-                            
-                            {/* Save Score Button for Past Matches Being Edited */}
-                            {!isCurrentMatch && hasPending && <Button onClick={() => confirmScore(match.id)} className="w-full h-7 text-xs mt-2" size="sm">
-                                Save Score
-                              </Button>}
-                          </div>
-                        </Card>
-                      </CarouselItem>;
-              })}
-                </CarouselContent>
-                <CarouselPrevious className="-left-2 h-8 w-8" />
-                <CarouselNext className="-right-2 h-8 w-8" />
-              </Carousel>
-            </div>;
-      })}
-      </div>
-
-      {/* Tournament Bracket Dialog */}
-      {isTournamentMode && gameConfig.schedulingType !== 'round-robin' && (
-        <TournamentBracketDialog
-          open={showBracketDialog}
-          onOpenChange={setShowBracketDialog}
-          matches={matches}
-          matchScores={matchScores}
-          allPlayers={allPlayers}
-          schedulingType={gameConfig.schedulingType}
-        />
-      )}
-    </div>;
+                <div className="mt-3 text-xs text-slate-500">
+                  {index === 0 ? "First match in this court queue." : "You can edit completed scores here too."}
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      </Card>
+    </div>
+  );
 };

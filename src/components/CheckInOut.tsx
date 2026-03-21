@@ -30,7 +30,6 @@ interface CheckInOutProps {
 }
 
 export const CheckInOut = ({
-  gameCode,
   players,
   onPlayersChange,
   onPlayersUpdate,
@@ -42,22 +41,18 @@ export const CheckInOut = ({
   minimumPlayersRequired = 2,
 }: CheckInOutProps) => {
   return (
-    <div className="min-h-0 flex-1">
-      <PlayerSetup
-        onPlayersChange={onPlayersChange}
-        onComplete={async (playerList, pairs) => {
-          const success = await onPlayersUpdate(playerList, pairs);
-          if (success && onNavigateToMatches) {
-            onNavigateToMatches();
-          }
-        }}
-        initialPlayers={players}
-        initialTeammatePairs={teammatePairs}
-        matches={matches}
-        matchScores={matchScores}
-        hasStartedMatches={hasStartedMatches}
-        minimumPlayersRequired={minimumPlayersRequired}
-      />
-    </div>
+    <PlayerSetup
+      onPlayersChange={onPlayersChange}
+      onComplete={async (playerList, pairs) => {
+        const success = await onPlayersUpdate(playerList, pairs);
+        if (success) onNavigateToMatches?.();
+      }}
+      initialPlayers={players}
+      initialTeammatePairs={teammatePairs}
+      matches={matches}
+      matchScores={matchScores}
+      hasStartedMatches={hasStartedMatches}
+      minimumPlayersRequired={minimumPlayersRequired}
+    />
   );
 };

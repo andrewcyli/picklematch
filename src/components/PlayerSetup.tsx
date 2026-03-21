@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { X, Plus, Users, Link2, Unlink, Zap } from "lucide-react";
-import { toast } from "sonner";
 import { Match } from "@/lib/scheduler";
 import { validatePlayerName } from "@/lib/validation";
+import { Check, Link2, Plus, Sparkles, Unlink, UserMinus, Users, X, Zap } from "lucide-react";
+import { toast } from "sonner";
 
 interface PlayerSetupProps {
   onPlayersChange?: (
@@ -58,15 +59,13 @@ export const PlayerSetup = ({
   const [teammatePairs, setTeammatePairs] = useState<{ player1: string; player2: string }[]>(initialTeammatePairs);
   const [selectedForPairing, setSelectedForPairing] = useState<string | null>(null);
 
+  useEffect(() => setPlayers(initialPlayers), [initialPlayers]);
+  useEffect(() => setTeammatePairs(initialTeammatePairs), [initialTeammatePairs]);
+
   const bulkParsed = useMemo(() => parseBulkNames(bulkNames), [bulkNames]);
 
-  useEffect(() => {
-    setPlayers(initialPlayers);
-  }, [initialPlayers]);
-
-  useEffect(() => {
-    setTeammatePairs(initialTeammatePairs);
-  }, [initialTeammatePairs]);
+  const pairCount = teammatePairs.length;
+  const ready = players.length >= minimumPlayersRequired;
 
   const syncPlayers = (updatedPlayers: string[], updatedPairs = teammatePairs) => {
     setPlayers(updatedPlayers);
@@ -83,8 +82,8 @@ export const PlayerSetup = ({
       return;
     }
 
-    if (players.some((p) => p.toLowerCase() === trimmedName.toLowerCase())) {
-      toast.error("This player name already exists");
+    if (players.some((player) => player.toLowerCase() === trimmedName.toLowerCase())) {
+      toast.error("That player is already in the roster");
       return;
     }
 
@@ -113,9 +112,8 @@ export const PlayerSetup = ({
     toast.success(`${additions.length} player${additions.length === 1 ? "" : "s"} added`);
   };
 
-  const removePlayer = (index: number) => {
-    const playerToRemove = players[index];
-    const updatedPlayers = players.filter((_, i) => i !== index);
+  const removePlayer = (playerToRemove: string) => {
+    const updatedPlayers = players.filter((player) => player !== playerToRemove);
     const updatedPairs = teammatePairs.filter((pair) => pair.player1 !== playerToRemove && pair.player2 !== playerToRemove);
 
     setTeammatePairs(updatedPairs);
@@ -123,32 +121,8 @@ export const PlayerSetup = ({
     syncPlayers(updatedPlayers, updatedPairs);
   };
 
-  const togglePairSelection = (player: string) => {
-    if (selectedForPairing === player) {
-      setSelectedForPairing(null);
-    } else if (selectedForPairing === null) {
-      setSelectedForPairing(player);
-    } else {
-      const existingPair = teammatePairs.find(
-        (pair) =>
-          (pair.player1 === selectedForPairing && pair.player2 === player) ||
-          (pair.player1 === player && pair.player2 === selectedForPairing)
-      );
-
-      if (existingPair) {
-        toast.error("These players are already paired");
-      } else {
-        const updatedPairs = [...teammatePairs, { player1: selectedForPairing, player2: player }];
-        setTeammatePairs(updatedPairs);
-        onPlayersChange?.(players, updatedPairs);
-        toast.success(`${selectedForPairing} & ${player} are now teammates`);
-      }
-      setSelectedForPairing(null);
-    }
-  };
-
   const removePair = (pair: { player1: string; player2: string }) => {
-    const updatedPairs = teammatePairs.filter((p) => p !== pair);
+    const updatedPairs = teammatePairs.filter((p) => !(p.player1 === pair.player1 && p.player2 === pair.player2));
     setTeammatePairs(updatedPairs);
     onPlayersChange?.(players, updatedPairs);
     toast.success("Pair removed");
@@ -157,143 +131,225 @@ export const PlayerSetup = ({
   const isPaired = (player: string) => teammatePairs.some((pair) => pair.player1 === player || pair.player2 === player);
 
   const getPairPartner = (player: string) => {
-    const pair = teammatePairs.find((p) => p.player1 === player || p.player2 === player);
+    const pair = teammatePairs.find((entry) => entry.player1 === player || entry.player2 === player);
     if (!pair) return null;
     return pair.player1 === player ? pair.player2 : pair.player1;
   };
 
-  const unpairPlayer = (player: string) => {
-    const pair = teammatePairs.find((p) => p.player1 === player || p.player2 === player);
-    if (pair) removePair(pair);
+  const togglePairSelection = (player: string) => {
+    const existingPartner = getPairPartner(player);
+    if (existingPartner) {
+      removePair({ player1: player, player2: existingPartner });
+      return;
+    }
+
+    if (selectedForPairing === player) {
+      setSelectedForPairing(null);
+      return;
+    }
+
+    if (!selectedForPairing) {
+      setSelectedForPairing(player);
+      return;
+    }
+
+    if (selectedForPairing === player) return;
+
+    const updatedPairs = [...teammatePairs, { player1: selectedForPairing, player2: player }];
+    setTeammatePairs(updatedPairs);
+    onPlayersChange?.(players, updatedPairs);
+    toast.success(`${selectedForPairing} & ${player} locked together`);
+    setSelectedForPairing(null);
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") addPlayer();
-  };
+  const activePlayers = useMemo(() => {
+    const active = new Set(players);
+    return players.filter((player) => active.has(player));
+  }, [players]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex-shrink-0 space-y-4">
-        <div className="grid gap-3 lg:grid-cols-[0.9fr_1.1fr]">
-          <Card className="border-slate-200 bg-white p-4 shadow-sm">
+    <div className="space-y-5">
+      <Card className="overflow-hidden border-white/10 bg-[linear-gradient(145deg,rgba(12,20,34,0.98),rgba(18,82,74,0.88),rgba(7,12,24,0.98))] p-5 text-white shadow-2xl shadow-emerald-950/25 sm:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="border-0 bg-white/12 text-white">Players</Badge>
+              <Badge className={`border-0 ${ready ? "bg-lime-400 text-slate-950" : "bg-white/10 text-white"}`}>
+                {ready ? "Ready to start" : `${minimumPlayersRequired - players.length} more needed`}
+              </Badge>
+            </div>
+            <h3 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Fast roster control for a real club night.</h3>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-white/72">
+              Add names, paste a full group, lock teammate pairs when needed, and update the roster mid-session without leaving the flow.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-[1.4rem] border border-white/10 bg-white/10 px-4 py-3">
+              <div className="text-[10px] uppercase tracking-[0.22em] text-white/50">Roster</div>
+              <div className="mt-2 text-3xl font-semibold">{players.length}</div>
+            </div>
+            <div className="rounded-[1.4rem] border border-white/10 bg-white/10 px-4 py-3">
+              <div className="text-[10px] uppercase tracking-[0.22em] text-white/50">Locked pairs</div>
+              <div className="mt-2 text-3xl font-semibold">{pairCount}</div>
+            </div>
+            <div className="rounded-[1.4rem] border border-white/10 bg-white/10 px-4 py-3">
+              <div className="text-[10px] uppercase tracking-[0.22em] text-white/50">Status</div>
+              <div className="mt-2 text-sm font-semibold text-lime-200">{ready ? "Can start now" : "Add more players"}</div>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+        <div className="space-y-4">
+          <Card className="border-white/10 bg-white/95 p-5 shadow-xl shadow-slate-950/5">
             <div className="flex items-center gap-2 text-slate-900">
-              <Plus className="h-4 w-4" />
-              <h3 className="font-semibold">Add one player</h3>
+              <Plus className="h-4 w-4 text-emerald-600" />
+              <h4 className="font-semibold">Add one player</h4>
             </div>
             <div className="mt-3 flex gap-2">
               <Input
                 placeholder="Enter player name"
                 value={currentName}
-                onChange={(e) => setCurrentName(e.target.value)}
-                onKeyDown={handleKeyPress}
-                className="h-12 text-base"
+                onChange={(event) => setCurrentName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") addPlayer();
+                }}
+                className="h-12 rounded-2xl border-slate-200"
                 maxLength={50}
               />
-              <Button onClick={addPlayer} disabled={!currentName.trim()} size="lg" className="h-12 px-6">
-                <Plus className="h-5 w-5" />
+              <Button onClick={addPlayer} disabled={!currentName.trim()} className="h-12 rounded-2xl bg-emerald-500 px-5 text-white hover:bg-emerald-400">
+                <Plus className="h-4 w-4" />
               </Button>
             </div>
           </Card>
 
-          <Card className="border-slate-200 bg-white p-4 shadow-sm">
+          <Card className="border-white/10 bg-white/95 p-5 shadow-xl shadow-slate-950/5">
             <div className="flex items-center gap-2 text-slate-900">
-              <Zap className="h-4 w-4" />
-              <h3 className="font-semibold">Paste a whole group</h3>
+              <Zap className="h-4 w-4 text-sky-600" />
+              <h4 className="font-semibold">Paste a batch</h4>
             </div>
             <Textarea
               value={bulkNames}
-              onChange={(e) => setBulkNames(e.target.value)}
+              onChange={(event) => setBulkNames(event.target.value)}
               placeholder="Maya, Theo, Jules, Iris"
-              className="mt-3 min-h-[88px] border-slate-200 bg-slate-50"
+              className="mt-3 min-h-[120px] rounded-2xl border-slate-200 bg-slate-50"
             />
             <div className="mt-3 flex items-center justify-between gap-3">
-              <p className="text-xs text-muted-foreground">Comma or line break separated.</p>
-              <Button onClick={addBulkPlayers} disabled={bulkParsed.length === 0} variant="secondary">
+              <p className="text-xs text-slate-500">Comma or line-break separated.</p>
+              <Button onClick={addBulkPlayers} disabled={bulkParsed.length === 0} variant="outline" className="rounded-full">
                 Add batch
               </Button>
             </div>
           </Card>
-        </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          <div>
-            {players.length} players added{teammatePairs.length > 0 ? ` · ${teammatePairs.length} locked pair${teammatePairs.length === 1 ? "" : "s"}` : ""}
-            <span className="ml-2 text-xs text-slate-500">Need at least {minimumPlayersRequired} to load the courts.</span>
-          </div>
-          <Button onClick={() => onComplete(players, teammatePairs)} disabled={players.length < minimumPlayersRequired} size="lg" className="h-11 min-w-[220px] text-base font-semibold bg-gradient-to-r from-primary to-accent text-white shadow-sport">
-            {hasStartedMatches ? "Update courts" : "Start session"}
-          </Button>
-        </div>
-      </div>
-
-      <div className="mt-4 flex-1 min-h-0 overflow-y-auto">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {players.map((player, index) => {
-            const partner = getPairPartner(player);
-            return (
-              <Card
-                key={index}
-                className={`flex flex-col gap-2 p-4 transition-all hover:shadow-md ${
-                  selectedForPairing === player
-                    ? "border-2 border-primary bg-primary/5"
-                    : isPaired(player)
-                      ? "border border-accent/50 bg-accent/5"
-                      : ""
-                }`}
+          <Card className="border-white/10 bg-slate-950/80 p-5 text-white shadow-xl shadow-emerald-950/10">
+            <div className="flex items-center gap-2 text-lime-300">
+              <Sparkles className="h-4 w-4" />
+              <h4 className="font-semibold">Session action</h4>
+            </div>
+            <div className="mt-4 flex flex-col gap-3 rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
+              <div className="flex items-center justify-between gap-3 text-sm text-white/72">
+                <span>Minimum players required</span>
+                <span className="font-semibold text-white">{minimumPlayersRequired}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 text-sm text-white/72">
+                <span>Current roster</span>
+                <span className="font-semibold text-white">{players.length}</span>
+              </div>
+              <Button
+                onClick={() => onComplete(players, teammatePairs)}
+                disabled={!ready}
+                size="lg"
+                className="mt-1 h-12 rounded-2xl bg-lime-400 text-base font-semibold text-slate-950 hover:bg-lime-300"
               >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium text-foreground">{player}</span>
-                  <div className="flex gap-2">
-                    {isPaired(player) ? (
-                      <Button variant="ghost" size="sm" onClick={() => unpairPlayer(player)} className="h-8 w-8 p-0 text-accent hover:text-destructive" title="Unpair teammates">
-                        <Unlink className="h-4 w-4" />
-                      </Button>
-                    ) : (
-                      <Button variant="ghost" size="sm" onClick={() => togglePairSelection(player)} className="h-8 w-8 p-0 text-muted-foreground hover:text-primary" title="Link as teammates">
-                        <Link2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                    <Button variant="ghost" size="sm" onClick={() => removePlayer(index)} className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive">
+                {hasStartedMatches ? "Update session" : "Start session"}
+              </Button>
+            </div>
+          </Card>
+        </div>
+
+        <div className="space-y-4">
+          {selectedForPairing ? (
+            <Card className="border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Check className="h-4 w-4" />
+                Pairing mode on
+              </div>
+              <p className="mt-2 text-sm text-emerald-800">Choose another player to lock with {selectedForPairing}, or tap {selectedForPairing} again to cancel.</p>
+            </Card>
+          ) : null}
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {activePlayers.map((player) => {
+              const partner = getPairPartner(player);
+              const paired = Boolean(partner);
+              const selected = selectedForPairing === player;
+
+              return (
+                <Card
+                  key={player}
+                  className={`rounded-[1.5rem] border p-4 shadow-lg shadow-slate-950/5 transition ${
+                    selected
+                      ? "border-emerald-400 bg-emerald-50"
+                      : paired
+                        ? "border-sky-200 bg-sky-50"
+                        : "border-white/10 bg-white/95"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-base font-semibold text-slate-900">{player}</div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Badge variant="secondary" className="rounded-full bg-slate-100 text-slate-700">In roster</Badge>
+                        {partner ? (
+                          <Badge className="rounded-full border-0 bg-sky-600 text-white">Paired with {partner}</Badge>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removePlayer(player)}
+                      className="h-8 w-8 rounded-full p-0 text-slate-500 hover:bg-red-50 hover:text-red-600"
+                    >
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
-                </div>
-                {partner ? (
-                  <div className="flex items-center gap-1 text-xs font-medium text-accent">
-                    <Users className="h-3 w-3" />
-                    Paired with {partner}
+
+                  <div className="mt-4 flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => togglePairSelection(player)}
+                      className="flex-1 rounded-full"
+                    >
+                      {paired ? <Unlink className="mr-2 h-4 w-4" /> : <Link2 className="mr-2 h-4 w-4" />}
+                      {paired ? "Unpair" : selected ? "Cancel pair" : "Pair"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => removePlayer(player)}
+                      className="rounded-full"
+                    >
+                      <UserMinus className="h-4 w-4" />
+                    </Button>
                   </div>
-                ) : null}
-              </Card>
-            );
-          })}
+                </Card>
+              );
+            })}
+          </div>
+
+          {players.length === 0 ? (
+            <Card className="rounded-[1.75rem] border border-dashed border-slate-200 bg-white/80 px-6 py-12 text-center">
+              <Users className="mx-auto h-8 w-8 text-slate-400" />
+              <p className="mt-3 text-sm font-medium text-slate-700">No players added yet.</p>
+            </Card>
+          ) : null}
         </div>
-
-        {selectedForPairing ? (
-          <div className="mt-4 rounded-lg border border-primary/20 bg-primary/10 p-3">
-            <p className="text-sm text-foreground">
-              Select another player to pair with <strong>{selectedForPairing}</strong>
-            </p>
-          </div>
-        ) : null}
-
-        {teammatePairs.length > 0 ? (
-          <div className="mt-4 space-y-2 border-t pt-4">
-            <h4 className="text-sm font-semibold text-foreground">Teammate Pairs</h4>
-            <div className="max-h-48 overflow-y-auto pr-1">
-              {teammatePairs.map((pair, idx) => (
-                <div key={idx} className="flex items-center justify-between rounded-lg border border-accent/20 bg-accent/10 p-3">
-                  <span className="text-sm font-medium">
-                    {pair.player1} & {pair.player2}
-                  </span>
-                  <Button variant="ghost" size="sm" onClick={() => removePair(pair)} className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive">
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
       </div>
     </div>
   );
