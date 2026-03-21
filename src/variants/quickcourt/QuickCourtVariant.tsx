@@ -368,11 +368,13 @@ const QuickSetupBuilder: React.FC<{
 
   return (
     <div className="space-y-4">
-      <ScreenHeader
-        eyebrow="Quick Court • Setup"
-        title="Set the session in under a minute."
-        description="Round-robin is locked in. Just choose courts, game length, and total session time."
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div>
+          <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Setup</div>
+          <div className="mt-1 text-sm font-medium text-slate-700">Choose courts, game length, and session time.</div>
+        </div>
+        <Badge className="border-0 bg-slate-100 text-slate-700">Round robin locked</Badge>
+      </div>
 
       <Card className="border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div className="space-y-6">
@@ -413,8 +415,8 @@ const QuickSetupBuilder: React.FC<{
               onClick={() => setAdvancedOpen((open) => !open)}
             >
               <div>
-                <div className="text-sm font-semibold text-slate-900">More options</div>
-                <div className="mt-1 text-sm text-slate-500">Optional court-by-court singles or doubles mix.</div>
+                <div className="text-sm font-semibold text-slate-900">Court types</div>
+                <div className="mt-1 text-sm text-slate-500">Optional singles or doubles mix per court.</div>
               </div>
               {advancedOpen ? <ChevronUp className="h-5 w-5 text-slate-500" /> : <ChevronDown className="h-5 w-5 text-slate-500" />}
             </button>
@@ -492,19 +494,12 @@ const QuickPlayersScreen: React.FC<{
 
   return (
     <div className="space-y-4">
-      <ScreenHeader
-        eyebrow="Quick Court • Players"
-        title="Load the roster, then push it live."
-        description="Bulk paste works, walk-ins stay easy, and locked teammate pairs still feed the same scheduling engine underneath."
-        stats={
-          <>
-            <StatCard label="Code" value={gameCode} />
-            <StatCard label="Players" value={String(players.length)} />
-            <StatCard label="Courts" value={String(gameConfig.courts)} />
-            <StatCard label="Completed" value={String(completedMatches)} />
-          </>
-        }
-      />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Code" value={gameCode} />
+        <StatCard label="Players" value={String(players.length)} />
+        <StatCard label="Courts" value={String(gameConfig.courts)} />
+        <StatCard label="Completed" value={String(completedMatches)} />
+      </div>
 
       <Card className="border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -574,7 +569,6 @@ const QuickCourtBoard: React.FC<{
   onCourtConfigUpdate,
 }) => {
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [waitingOpen, setWaitingOpen] = useState(false);
 
   const board = useMemo(() => {
     const courtIds = Array.from({ length: gameConfig.courts }, (_, index) => index + 1);
@@ -596,50 +590,20 @@ const QuickCourtBoard: React.FC<{
     return { courtIds, liveByCourt, nextByCourt, waitingPlayers, upcoming };
   }, [gameConfig.courts, matchScores, matches, players]);
 
-  const leaderboardPreview = useMemo(() => {
-    const stats = players.map((player) => {
-      let wins = 0;
-      let played = 0;
-
-      matches.forEach((match) => {
-        const score = matchScores.get(match.id);
-        if (!score) return;
-        const in1 = match.team1.includes(player);
-        const in2 = match.team2.includes(player);
-        if (!in1 && !in2) return;
-        played += 1;
-        if ((in1 && score.team1 > score.team2) || (in2 && score.team2 > score.team1)) wins += 1;
-      });
-
-      return { player, wins, played, rate: played ? wins / played : 0 };
-    });
-
-    return stats.sort((a, b) => b.rate - a.rate || b.wins - a.wins).slice(0, 5);
-  }, [matchScores, matches, players]);
-
   return (
     <div className="space-y-4">
-      <ScreenHeader
-        eyebrow="Quick Court • Courts"
-        title="Run both courts from one board."
-        description="Now and next stay visible up top. Detailed score entry and schedule controls are still here, just not stealing the whole screen."
-        actions={
-          <>
-            <Button variant="secondary" className="bg-white" onClick={onShowPlayerSelector}>
-              <UserCircle className="mr-2 h-4 w-4" />
-              Find my matches
-            </Button>
-          </>
-        }
-        stats={
-          <>
-            <StatCard label="Courts" value={String(gameConfig.courts)} />
-            <StatCard label="Players" value={String(players.length)} />
-            <StatCard label="Waiting" value={String(board.waitingPlayers.length)} />
-            <StatCard label="Left" value={String(Math.max(matches.length - matchScores.size, 0))} />
-          </>
-        }
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div className="flex flex-wrap gap-3">
+          <Badge className="border-0 bg-slate-900 text-white">Courts</Badge>
+          <div className="text-sm text-slate-600">{players.length} players</div>
+          <div className="text-sm text-slate-600">{board.waitingPlayers.length} waiting</div>
+          <div className="text-sm text-slate-600">{Math.max(matches.length - matchScores.size, 0)} left</div>
+        </div>
+        <Button variant="secondary" className="bg-slate-100" onClick={onShowPlayerSelector}>
+          <UserCircle className="mr-2 h-4 w-4" />
+          Find my matches
+        </Button>
+      </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
@@ -668,30 +632,21 @@ const QuickCourtBoard: React.FC<{
 
         <div className="space-y-4">
           <Card className="border-slate-200 bg-white p-5 shadow-sm">
-            <button type="button" className="flex w-full items-center justify-between gap-3 text-left" onClick={() => setWaitingOpen((open) => !open)}>
-              <div>
-                <div className="flex items-center gap-2 text-slate-900">
-                  <Users className="h-5 w-5" />
-                  <h3 className="font-semibold">Bench / waiting</h3>
-                </div>
-                <p className="mt-2 text-sm text-slate-600">Who is free right now and not already queued next.</p>
-              </div>
-              {waitingOpen ? <ChevronUp className="h-5 w-5 text-slate-500" /> : <ChevronDown className="h-5 w-5 text-slate-500" />}
-            </button>
-
-            {waitingOpen ? (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {board.waitingPlayers.length > 0 ? (
-                  board.waitingPlayers.map((player) => (
-                    <Badge key={player} variant="secondary" className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700">
-                      {player}
-                    </Badge>
-                  ))
-                ) : (
-                  <div className="rounded-2xl bg-slate-100 px-3 py-3 text-sm text-slate-500">Everyone is either playing or next in.</div>
-                )}
-              </div>
-            ) : null}
+            <div className="flex items-center gap-2 text-slate-900">
+              <Users className="h-5 w-5" />
+              <h3 className="font-semibold">Bench / waiting</h3>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {board.waitingPlayers.length > 0 ? (
+                board.waitingPlayers.map((player) => (
+                  <Badge key={player} variant="secondary" className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700">
+                    {player}
+                  </Badge>
+                ))
+              ) : (
+                <div className="rounded-2xl bg-slate-100 px-3 py-3 text-sm text-slate-500">Everyone is either playing or next in.</div>
+              )}
+            </div>
           </Card>
 
           <Card className="border-slate-200 bg-white p-5 shadow-sm">
@@ -709,30 +664,6 @@ const QuickCourtBoard: React.FC<{
               {board.upcoming.length === 0 ? <div className="text-sm text-slate-500">No extra queue beyond the live pairings yet.</div> : null}
             </div>
           </Card>
-
-          <Card className="border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-2 text-slate-900">
-              <Trophy className="h-5 w-5" />
-              <h3 className="font-semibold">Live leaderboard snapshot</h3>
-            </div>
-            <div className="mt-4 space-y-2">
-              {leaderboardPreview.length > 0 ? leaderboardPreview.map((entry, index) => (
-                <div key={entry.player} className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">{index + 1}</div>
-                    <div>
-                      <div className="font-medium text-slate-900">{entry.player}</div>
-                      <div className="text-xs text-slate-500">{entry.played} match{entry.played === 1 ? "" : "es"}</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-semibold text-slate-900">{Math.round(entry.rate * 100)}%</div>
-                    <div className="text-xs text-slate-500">{entry.wins} wins</div>
-                  </div>
-                </div>
-              )) : <div className="text-sm text-slate-500">No scores yet — the table wakes up after the first finished game.</div>}
-            </div>
-          </Card>
         </div>
       </div>
 
@@ -741,7 +672,6 @@ const QuickCourtBoard: React.FC<{
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Detailed controls</p>
             <h3 className="mt-1 text-xl font-semibold text-slate-900">Score entry and schedule controls</h3>
-            <p className="mt-2 text-sm text-slate-600">Same underlying Quick Court engine, tucked below the live board instead of dominating it.</p>
           </div>
           {detailsOpen ? <ChevronUp className="h-5 w-5 text-slate-500" /> : <ChevronDown className="h-5 w-5 text-slate-500" />}
         </button>
