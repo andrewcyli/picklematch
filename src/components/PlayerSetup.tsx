@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -31,6 +31,7 @@ interface PlayerSetupProps {
   matches?: Match[];
   matchScores?: Map<string, { team1: number; team2: number }>;
   hasStartedMatches?: boolean;
+  minimumPlayersRequired?: number;
 }
 
 const parseBulkNames = (value: string) =>
@@ -49,6 +50,7 @@ export const PlayerSetup = ({
   initialPlayers = [],
   initialTeammatePairs = [],
   hasStartedMatches = false,
+  minimumPlayersRequired = 2,
 }: PlayerSetupProps) => {
   const [players, setPlayers] = useState<string[]>(initialPlayers);
   const [currentName, setCurrentName] = useState("");
@@ -57,6 +59,14 @@ export const PlayerSetup = ({
   const [selectedForPairing, setSelectedForPairing] = useState<string | null>(null);
 
   const bulkParsed = useMemo(() => parseBulkNames(bulkNames), [bulkNames]);
+
+  useEffect(() => {
+    setPlayers(initialPlayers);
+  }, [initialPlayers]);
+
+  useEffect(() => {
+    setTeammatePairs(initialTeammatePairs);
+  }, [initialTeammatePairs]);
 
   const syncPlayers = (updatedPlayers: string[], updatedPairs = teammatePairs) => {
     setPlayers(updatedPlayers);
@@ -206,9 +216,12 @@ export const PlayerSetup = ({
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          <div>{players.length} players added{teammatePairs.length > 0 ? ` · ${teammatePairs.length} locked pair${teammatePairs.length === 1 ? "" : "s"}` : ""}</div>
-          <Button onClick={() => onComplete(players, teammatePairs)} disabled={players.length < 2} size="lg" className="h-11 min-w-[220px] text-base font-semibold bg-gradient-to-r from-primary to-accent text-white shadow-sport">
-            {hasStartedMatches ? "Update Matches" : "Continue to Matches"}
+          <div>
+            {players.length} players added{teammatePairs.length > 0 ? ` · ${teammatePairs.length} locked pair${teammatePairs.length === 1 ? "" : "s"}` : ""}
+            <span className="ml-2 text-xs text-slate-500">Need at least {minimumPlayersRequired} to load the courts.</span>
+          </div>
+          <Button onClick={() => onComplete(players, teammatePairs)} disabled={players.length < minimumPlayersRequired} size="lg" className="h-11 min-w-[220px] text-base font-semibold bg-gradient-to-r from-primary to-accent text-white shadow-sport">
+            {hasStartedMatches ? "Update courts" : "Start session"}
           </Button>
         </div>
       </div>

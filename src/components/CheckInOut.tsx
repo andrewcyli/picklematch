@@ -23,6 +23,7 @@ interface CheckInOutProps {
   }[];
   onNavigateToMatches?: () => void;
   hasStartedMatches?: boolean;
+  minimumPlayersRequired?: number;
 }
 export const CheckInOut = ({
   gameCode,
@@ -33,7 +34,8 @@ export const CheckInOut = ({
   matchScores = new Map(),
   teammatePairs = [],
   onNavigateToMatches,
-  hasStartedMatches = false
+  hasStartedMatches = false,
+  minimumPlayersRequired = 2
 }: CheckInOutProps) => {
   return <div className="flex flex-col min-h-0 flex-1 h-full">
       <div className="flex-shrink-0 mb-3">
@@ -57,7 +59,6 @@ export const CheckInOut = ({
         <PlayerSetup 
           onPlayersChange={onPlayersChange}
           onComplete={async (playerList, pairs) => {
-            // Issue #1 fix: Only navigate if generation/save succeeds
             const success = await onPlayersUpdate(playerList, pairs);
             if (success && onNavigateToMatches) {
               onNavigateToMatches();
@@ -67,7 +68,8 @@ export const CheckInOut = ({
           initialTeammatePairs={teammatePairs} 
           matches={matches} 
           matchScores={matchScores} 
-          hasStartedMatches={hasStartedMatches} 
+          hasStartedMatches={hasStartedMatches}
+          minimumPlayersRequired={minimumPlayersRequired}
         />
       </div>
     </div>;

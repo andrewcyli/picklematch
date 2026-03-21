@@ -326,6 +326,7 @@ const PlayersScreen = ({
   matches,
   matchScores,
   teammatePairs,
+  minimumPlayersRequired,
   onPlayersChange,
   onPlayersUpdate,
   onNavigateToCourts,
@@ -335,6 +336,7 @@ const PlayersScreen = ({
   matches: Match[];
   matchScores: Map<string, { team1: number; team2: number }>;
   teammatePairs?: { player1: string; player2: string }[];
+  minimumPlayersRequired: number;
   onPlayersChange: (players: string[], pairs?: { player1: string; player2: string }[]) => void;
   onPlayersUpdate: (players: string[], pairs?: { player1: string; player2: string }[]) => Promise<boolean>;
   onNavigateToCourts: () => void;
@@ -364,6 +366,7 @@ const PlayersScreen = ({
         teammatePairs={teammatePairs}
         onNavigateToMatches={onNavigateToCourts}
         hasStartedMatches={matches.length > 0}
+        minimumPlayersRequired={minimumPlayersRequired}
       />
     </Card>
 
@@ -594,6 +597,7 @@ const Index = () => {
   const [joinCode, setJoinCode] = useState("");
   const [isJoining, setIsJoining] = useState(false);
   const [showPlayerSelector, setShowPlayerSelector] = useState(false);
+  const [isSetupDraftOpen, setIsSetupDraftOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
   const restoreRef = useRef(false);
@@ -634,6 +638,11 @@ const Index = () => {
     safeStorage.removeItem(STORAGE_GAME_ID);
     safeStorage.removeItem(STORAGE_GAME_CODE);
   }, []);
+
+  const minimumPlayersRequired = useMemo(() => {
+    if (!gameConfig?.courtConfigs?.length) return 2;
+    return Math.min(...gameConfig.courtConfigs.map((config) => (config.type === "singles" ? 2 : 4)));
+  }, [gameConfig]);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -682,6 +691,7 @@ const Index = () => {
             });
             setGameId(data.id);
             setGameCode(data.game_code);
+            setIsSetupDraftOpen(false);
             setPlayers(data.players || []);
             setGameConfig(loadedConfig);
             setMatches(loadedMatches);
@@ -755,6 +765,7 @@ const Index = () => {
     setGameCode("");
     setMatchScores(new Map());
     setJoinCode("");
+    setIsSetupDraftOpen(true);
     setActiveStep("setup");
   }, [clearSessionStorage]);
 
@@ -775,6 +786,7 @@ const Index = () => {
       const loadedMatches = sanitizeMatches((data.matches as unknown as Match[]) || []);
       setGameId(data.id);
       setGameCode(data.game_code);
+      setIsSetupDraftOpen(false);
       setPlayers(data.players || []);
       setGameConfig(data.game_config as unknown as GameConfig);
       setMatches(loadedMatches);
@@ -819,6 +831,7 @@ const Index = () => {
         if (error) throw error;
         setGameId(data.id);
         setGameCode(newCode);
+        setIsSetupDraftOpen(false);
         saveSessionStorage(data.id, newCode);
         toast.success(`Session created · ${newCode}`);
       }
@@ -982,16 +995,16 @@ const Index = () => {
       );
     }
 
+    if (activeStep === "setup") {
+      return <SetupScreen gameCode={gameCode} onComplete={handleSetupComplete} onNewSession={gameCode ? createNewGame : undefined} hasExistingMatches={matches.length > 0} />;
+    }
+
     if (!gameConfig || !gameCode) {
       return (
         <Card className="border-white/10 bg-white/95 p-8 text-center text-slate-600">
           Create or restore a session to continue.
         </Card>
       );
-    }
-
-    if (activeStep === "setup") {
-      return <SetupScreen gameCode={gameCode} onComplete={handleSetupComplete} onNewSession={createNewGame} hasExistingMatches={matches.length > 0} />;
     }
 
     if (activeStep === "players") {
@@ -1002,6 +1015,7 @@ const Index = () => {
           matches={matches}
           matchScores={matchScores}
           teammatePairs={gameConfig.teammatePairs}
+          minimumPlayersRequired={minimumPlayersRequired}
           onPlayersChange={handlePlayersChange}
           onPlayersUpdate={handlePlayersUpdate}
           onNavigateToCourts={() => setActiveStep("courts")}
@@ -1095,7 +1109,7 @@ const Index = () => {
           ) : null}
         </div>
 
-        {activeStep !== "start" ? (
+        {activeStep !== "start" && (gameCode || gameConfig || isSetupDraftOpen) ? (
           <>
             <SessionHeader
               activeStep={activeStep}
@@ -1115,7 +1129,7 @@ const Index = () => {
 
         {renderMain()}
 
-        {activeStep !== "start" ? (
+        {activeStep !== "start" && (gameCode || gameConfig || isSetupDraftOpen) ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-[2rem] border border-white/10 bg-white/5 px-4 py-3 text-white/72">
             <Button
               variant="outline"
@@ -1128,7 +1142,11 @@ const Index = () => {
             <div className="text-sm">{STEP_LABELS[activeStep]} screen owns one job.</div>
             <Button
               onClick={() => setActiveStep(getNextStep(activeStep))}
-              disabled={activeStep === "wrap" || (activeStep === "players" && players.length === 0)}
+              disabled={
+                activeStep === "wrap" ||
+                (activeStep === "setup" && !gameCode) ||
+                (activeStep === "players" && players.length < minimumPlayersRequired)
+              }
               className="bg-lime-400 text-slate-950 hover:bg-lime-300"
             >
               Next step
