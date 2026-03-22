@@ -41,7 +41,6 @@ import { generateSchedule, Match } from "@/lib/scheduler";
 import { safeStorage } from "@/lib/safe-storage";
 import { debugLogger } from "@/lib/debug-logger";
 import { validateMatchScore, validatePlayerName } from "@/lib/validation";
-import logo from "@/assets/logo.png";
 
 const STORAGE_GAME_ID = "picklematch_game_id";
 const STORAGE_GAME_CODE = "picklematch_game_code";
@@ -1752,12 +1751,9 @@ const Index = () => {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(20,184,166,0.18),transparent_28%),linear-gradient(180deg,#08111f_0%,#0b1220_100%)] px-4 py-4 text-slate-900 sm:px-6 sm:py-5 lg:px-8">
       <div className={`mx-auto max-w-7xl space-y-3 ${showSessionNav ? "pb-28 sm:pb-32" : "pb-8"}`}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <img src={logo} alt="PickleMatch" className="h-11 w-auto sm:h-12" />
-            <div className="text-white">
-              <div className="text-[10px] uppercase tracking-[0.24em] text-white/45">Casual club-night utility</div>
-              <div className="text-base font-semibold sm:text-lg">PickleMatch</div>
-            </div>
+          <div className="text-white">
+            <div className="text-[10px] uppercase tracking-[0.24em] text-white/45">Casual club-night utility</div>
+            <div className="text-base font-semibold sm:text-lg">PickleMatch</div>
           </div>
 
           {gameCode ? (
