@@ -737,6 +737,7 @@ const CourtsScreen = ({
   const featuredCurrent = currentByCourt.get(featuredCourt);
   const featuredNext = nextByCourt.get(featuredCourt);
   const featuredQueue = queueByCourt.get(featuredCourt) || [];
+  const featuredRail = useMemo(() => matches.filter((match) => match.court === featuredCourt), [featuredCourt, matches]);
 
   const updatePendingScore = useCallback((matchId: string, team: "team1" | "team2", value: string) => {
     if (value === "") {
@@ -962,7 +963,7 @@ const CourtsScreen = ({
           <Card className="min-w-0 overflow-hidden border-white/10 bg-slate-950/85 p-4 text-white shadow-xl shadow-cyan-950/10">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-[11px] uppercase tracking-[0.2em] text-white/45">Up Next</div>
+                <div className="text-[11px] uppercase tracking-[0.2em] text-white/45">Match rail</div>
                 <h3 className="mt-1 text-lg font-semibold">Court {featuredCourt}</h3>
               </div>
               <div className="flex gap-2">
@@ -980,76 +981,68 @@ const CourtsScreen = ({
               </div>
             </div>
 
-            {featuredQueue.length === 0 ? (
-              <div className="mt-3 rounded-[1rem] border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/65">No upcoming matches on this court yet.</div>
+            {featuredRail.length === 0 ? (
+              <div className="mt-3 rounded-[1rem] border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/65">No matches scheduled on this court yet.</div>
             ) : (
               <div className="mt-3 min-w-0 overflow-hidden">
                 <div className="flex max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1 [-webkit-overflow-scrolling:touch]">
-                  {featuredQueue.slice(0, 6).map((match, index) => {
-                    const isCurrent = index === 0;
-                    const isNext = index === 1;
+                  {featuredRail.map((match) => {
+                    const isCompleted = matchScores.has(match.id);
+                    const isCurrent = featuredCurrent?.id === match.id;
+                    const isNext = !isCurrent && featuredNext?.id === match.id;
+                    const score = matchScores.get(match.id);
+                    const statusLabel = isCompleted ? "Final" : isCurrent ? "Live" : isNext ? "Next" : "Soon";
+                    const statusClass = isCompleted
+                      ? "bg-violet-500/20 text-violet-200"
+                      : isCurrent
+                        ? "bg-emerald-500 text-white"
+                        : isNext
+                          ? "bg-amber-500 text-white"
+                          : "bg-white/10 text-white";
+                    const cardClass = isCompleted
+                      ? "border-violet-300/15 bg-violet-400/10"
+                      : isCurrent
+                        ? "border-emerald-300/20 bg-emerald-300/10"
+                        : isNext
+                          ? "border-amber-300/20 bg-amber-300/10"
+                          : "border-white/10 bg-white/5";
+
                     return (
-                      <div key={match.id} className={`w-32 min-w-[8rem] shrink-0 rounded-[1rem] border p-2 ${isCurrent ? "border-emerald-300/20 bg-emerald-300/10" : isNext ? "border-amber-300/20 bg-amber-300/10" : "border-white/10 bg-white/5"}`}>
-                        <div className="flex items-center justify-between gap-1">
-                          <Badge className={`border-0 px-1.5 py-0.5 text-[10px] ${isCurrent ? "bg-emerald-500 text-white" : isNext ? "bg-amber-500 text-white" : "bg-white/10 text-white"}`}>
-                            {isCurrent ? "Live" : isNext ? "Next" : `#${index + 1}`}
-                          </Badge>
+                      <div key={match.id} className={`w-36 min-w-[9rem] shrink-0 rounded-[1rem] border p-2.5 ${cardClass}`}>
+                        <div className="flex items-center justify-between gap-1.5">
+                          <Badge className={`border-0 px-1.5 py-0.5 text-[10px] ${statusClass}`}>{statusLabel}</Badge>
                           <div className="text-[10px] text-white/55">{getMatchLabel(matches, match)}</div>
                         </div>
-                        <div className="mt-1 text-[11px] leading-4 text-white/90 line-clamp-2">{getTeamLabel(match.team1)} <span className="text-white/45">v</span> {getTeamLabel(match.team2)}</div>
+
+                        <div className="mt-2 space-y-1.5">
+                          <div className="rounded-[0.8rem] bg-black/15 px-2 py-1.5">
+                            <div className="truncate text-[11px] leading-4 text-white/90">{getTeamLabel(match.team1)}</div>
+                          </div>
+                          <div className="rounded-[0.8rem] bg-black/15 px-2 py-1.5">
+                            <div className="truncate text-[11px] leading-4 text-white/90">{getTeamLabel(match.team2)}</div>
+                          </div>
+                        </div>
+
+                        {isCompleted && score ? (
+                          <div className="mt-2 flex items-center justify-between rounded-[0.85rem] border border-white/10 bg-black/20 px-2.5 py-2">
+                            <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">Score</div>
+                            <div className="text-sm font-semibold text-white">
+                              {score.team1}
+                              <span className="px-1.5 text-white/35">—</span>
+                              {score.team2}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mt-2 text-[10px] text-white/55">
+                            {isCurrent ? "Scoring live above" : isNext ? "On deck for this court" : "Upcoming on this court"}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
               </div>
             )}
-          </Card>
-
-          <Card className="border-white/10 bg-slate-900/70 p-3 shadow-xl shadow-cyan-950/10 text-white">
-            <div className="flex items-center gap-2">
-              <Clock3 className="h-3.5 w-3.5 text-violet-400" />
-              <h3 className="text-sm font-semibold">Recent finishes</h3>
-            </div>
-            <div className="mt-2 space-y-1.5">
-              {completedMatches.slice(0, 3).map((match) => {
-                const score = pendingScores.get(match.id) || matchScores.get(match.id) || { team1: "", team2: "" };
-                return (
-                  <div key={match.id} className="rounded-[0.85rem] border border-white/10 bg-white/5 px-2.5 py-2">
-                    <div className="flex items-center gap-1 text-[10px] text-white/50 mb-1.5">
-                      <span>{getMatchLabel(matches, match)}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="min-w-0 flex-1 truncate text-xs font-medium text-white/80 text-right">{getTeamLabel(match.team1)}</span>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={score.team1}
-                        onChange={(event) => updatePendingScore(match.id, "team1", event.target.value)}
-                        className="h-9 w-9 shrink-0 rounded-lg border-white/20 bg-white/10 text-center text-sm font-bold text-white placeholder:text-white/30 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        placeholder="0"
-                      />
-                      <span className="text-xs font-bold text-white/40">—</span>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={score.team2}
-                        onChange={(event) => updatePendingScore(match.id, "team2", event.target.value)}
-                        className="h-9 w-9 shrink-0 rounded-lg border-white/20 bg-white/10 text-center text-sm font-bold text-white placeholder:text-white/30 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        placeholder="0"
-                      />
-                      <span className="min-w-0 flex-1 truncate text-xs font-medium text-white/80">{getTeamLabel(match.team2)}</span>
-                      <Button onClick={() => saveScore(match)} variant="outline" size="sm" className="h-8 w-8 shrink-0 rounded-lg border-white/15 bg-white/5 p-0 text-white hover:bg-white/10 hover:text-white">
-                        <Check className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {completedMatches.length === 0 ? (
-                <div className="rounded-[0.85rem] bg-white/5 border border-white/10 px-3 py-3 text-xs text-white/55">Completed matches will stack here as courts advance.</div>
-              ) : null}
-            </div>
           </Card>
         </div>
       </div>
