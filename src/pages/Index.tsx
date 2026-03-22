@@ -691,6 +691,8 @@ const CourtsScreen = ({
 }) => {
   const [selectedCourt, setSelectedCourt] = useState(1);
   const [pendingScores, setPendingScores] = useState<Map<string, ScoreDraft>>(new Map());
+  const railCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const lastAnchoredMatchIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (selectedCourt > courts) setSelectedCourt(1);
@@ -731,13 +733,41 @@ const CourtsScreen = ({
     return players.filter((player) => !occupied.has(player));
   }, [currentByCourt, nextByCourt, players]);
 
-  const completedMatches = useMemo(() => matches.filter((match) => matchScores.has(match.id)).slice().reverse(), [matches, matchScores]);
-
   const featuredCourt = selectedCourt;
   const featuredCurrent = currentByCourt.get(featuredCourt);
   const featuredNext = nextByCourt.get(featuredCourt);
-  const featuredQueue = queueByCourt.get(featuredCourt) || [];
-  const featuredRail = useMemo(() => matches.filter((match) => match.court === featuredCourt), [featuredCourt, matches]);
+
+  const sessionRail = useMemo(() => {
+    const liveMatchIds = new Set(Array.from(currentByCourt.values()).map((match) => match.id));
+    const firstUpcomingMatchId = matches.find((match) => !matchScores.has(match.id) && !liveMatchIds.has(match.id))?.id;
+
+    return matches.map((match) => ({
+      match,
+      isCompleted: matchScores.has(match.id),
+      isCurrent: liveMatchIds.has(match.id),
+      isNext: firstUpcomingMatchId === match.id,
+    }));
+  }, [currentByCourt, matchScores, matches]);
+
+  const nextRailAnchorId = useMemo(() => {
+    const nextUpcoming = sessionRail.find((entry) => !entry.isCompleted && !entry.isCurrent);
+    const fallbackUnscored = sessionRail.find((entry) => !entry.isCompleted);
+    const lastMatch = sessionRail.length > 0 ? sessionRail[sessionRail.length - 1].match : null;
+
+    return nextUpcoming?.match.id ?? fallbackUnscored?.match.id ?? lastMatch?.id ?? null;
+  }, [sessionRail]);
+
+  useEffect(() => {
+    if (!nextRailAnchorId || lastAnchoredMatchIdRef.current === nextRailAnchorId) return;
+
+    const targetCard = railCardRefs.current[nextRailAnchorId];
+    if (!targetCard) return;
+
+    lastAnchoredMatchIdRef.current = nextRailAnchorId;
+    requestAnimationFrame(() => {
+      targetCard.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    });
+  }, [nextRailAnchorId]);
 
   const updatePendingScore = useCallback((matchId: string, team: "team1" | "team2", value: string) => {
     if (value === "") {
@@ -964,34 +994,20 @@ const CourtsScreen = ({
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-[11px] uppercase tracking-[0.2em] text-white/45">Match rail</div>
-                <h3 className="mt-1 text-lg font-semibold">Court {featuredCourt}</h3>
+                <h3 className="mt-1 text-lg font-semibold">Session timeline</h3>
+                <p className="mt-1 text-xs text-white/55">Scroll back for finished matches, hold here for what’s next, keep moving right for later courts.</p>
               </div>
-              <div className="flex gap-2">
-                {Array.from({ length: courts }, (_, index) => index + 1).map((court) => (
-                  <Button
-                    key={court}
-                    size="sm"
-                    variant={featuredCourt === court ? "default" : "outline"}
-                    onClick={() => setSelectedCourt(court)}
-                    className={featuredCourt === court ? "rounded-full bg-lime-400 text-slate-950 hover:bg-lime-300" : "rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"}
-                  >
-                    {court}
-                  </Button>
-                ))}
-              </div>
+              <Badge className="border-0 bg-white/10 text-white">{sessionRail.length}</Badge>
             </div>
 
-            {featuredRail.length === 0 ? (
-              <div className="mt-3 rounded-[1rem] border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/65">No matches scheduled on this court yet.</div>
+            {sessionRail.length === 0 ? (
+              <div className="mt-3 rounded-[1rem] border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/65">No matches scheduled yet.</div>
             ) : (
               <div className="mt-3 min-w-0 overflow-hidden">
                 <div className="flex max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1 [-webkit-overflow-scrolling:touch]">
-                  {featuredRail.map((match) => {
-                    const isCompleted = matchScores.has(match.id);
-                    const isCurrent = featuredCurrent?.id === match.id;
-                    const isNext = !isCurrent && featuredNext?.id === match.id;
+                  {sessionRail.map(({ match, isCompleted, isCurrent, isNext }) => {
                     const score = matchScores.get(match.id);
-                    const statusLabel = isCompleted ? "Final" : isCurrent ? "Live" : isNext ? "Next" : "Soon";
+                    const statusLabel = isCompleted ? "Final" : isCurrent ? "Live" : isNext ? "Next" : "Later";
                     const statusClass = isCompleted
                       ? "bg-violet-500/20 text-violet-200"
                       : isCurrent
@@ -1004,14 +1020,25 @@ const CourtsScreen = ({
                       : isCurrent
                         ? "border-emerald-300/20 bg-emerald-300/10"
                         : isNext
-                          ? "border-amber-300/20 bg-amber-300/10"
+                          ? "border-amber-300/20 bg-amber-300/10 ring-1 ring-amber-300/25"
                           : "border-white/10 bg-white/5";
 
                     return (
-                      <div key={match.id} className={`w-36 min-w-[9rem] shrink-0 rounded-[1rem] border p-2.5 ${cardClass}`}>
+                      <div
+                        key={match.id}
+                        ref={(node) => {
+                          railCardRefs.current[match.id] = node;
+                        }}
+                        className={`w-40 min-w-[10rem] shrink-0 rounded-[1rem] border p-2.5 ${cardClass}`}
+                      >
                         <div className="flex items-center justify-between gap-1.5">
                           <Badge className={`border-0 px-1.5 py-0.5 text-[10px] ${statusClass}`}>{statusLabel}</Badge>
                           <div className="text-[10px] text-white/55">{getMatchLabel(matches, match)}</div>
+                        </div>
+
+                        <div className="mt-2 flex items-center justify-between gap-2 text-[10px] uppercase tracking-[0.16em] text-white/45">
+                          <span>Court {match.court}</span>
+                          {nextRailAnchorId === match.id ? <span className="text-amber-300">Anchor</span> : null}
                         </div>
 
                         <div className="mt-2 space-y-1.5">
@@ -1034,7 +1061,7 @@ const CourtsScreen = ({
                           </div>
                         ) : (
                           <div className="mt-2 text-[10px] text-white/55">
-                            {isCurrent ? "Scoring live above" : isNext ? "On deck for this court" : "Upcoming on this court"}
+                            {isCurrent ? "Live on court now" : isNext ? "Next match in view" : "Scheduled later in the run"}
                           </div>
                         )}
                       </div>
