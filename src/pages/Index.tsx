@@ -6,13 +6,17 @@ import {
   Clock3,
   Copy,
   Crown,
+  Flame,
   Link2,
   Loader2,
   Medal,
+  PartyPopper,
   Plus,
   QrCode,
   Share2,
   Sparkles,
+  TrendingUp,
+  Trophy,
   Unlink,
   UserMinus,
   Users,
@@ -26,9 +30,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { GameSetup, GameConfig } from "@/components/GameSetup";
-import { ScheduleView } from "@/components/ScheduleView";
-import { Leaderboard } from "@/components/Leaderboard";
-import { MatchHistory } from "@/components/MatchHistory";
 import { PlayerIdentitySelector } from "@/components/PlayerIdentitySelector";
 import { MyMatchesView } from "@/components/MyMatchesView";
 import { usePlayerIdentity } from "@/hooks/use-player-identity";
@@ -39,13 +40,26 @@ import { setSkipNextMatch } from "@/lib/player-identity";
 import { generateSchedule, Match } from "@/lib/scheduler";
 import { safeStorage } from "@/lib/safe-storage";
 import { debugLogger } from "@/lib/debug-logger";
-import { validatePlayerName } from "@/lib/validation";
+import { validateMatchScore, validatePlayerName } from "@/lib/validation";
 import logo from "@/assets/logo.png";
 
 const STORAGE_GAME_ID = "picklematch_game_id";
 const STORAGE_GAME_CODE = "picklematch_game_code";
 
 type MainStep = "start" | "setup" | "players" | "courts" | "wrap";
+type ScoreDraft = { team1: number | string; team2: number | string };
+
+type PlayerStanding = {
+  player: string;
+  wins: number;
+  losses: number;
+  matchesPlayed: number;
+  winRate: number;
+  totalScored: number;
+  totalAllowed: number;
+  differential: number;
+  differentialPerGame: number;
+};
 
 const STEP_ORDER: MainStep[] = ["start", "setup", "players", "courts", "wrap"];
 
@@ -86,6 +100,78 @@ const sanitizeMatches = (arr: Match[]): Match[] => {
 
 const getNextStep = (step: MainStep): MainStep => STEP_ORDER[Math.min(STEP_ORDER.indexOf(step) + 1, STEP_ORDER.length - 1)];
 const getPreviousStep = (step: MainStep): MainStep => STEP_ORDER[Math.max(STEP_ORDER.indexOf(step) - 1, 0)];
+
+const getTeamLabel = (team: Match["team1"] | Match["team2"]) => team.join(" · ");
+
+const getMatchLabel = (matches: Match[], match: Match) => {
+  const courtMatches = matches.filter((entry) => entry.court === match.court);
+  const index = courtMatches.findIndex((entry) => entry.id === match.id) + 1;
+  return `C${match.court}-${Math.max(index, 1)}`;
+};
+
+const buildStandings = (
+  players: string[],
+  matches: Match[],
+  matchScores: Map<string, { team1: number; team2: number }>
+): PlayerStanding[] => {
+  const stats = players.map((player) => {
+    let wins = 0;
+    let losses = 0;
+    let totalScored = 0;
+    let totalAllowed = 0;
+    let matchesPlayed = 0;
+
+    matches.forEach((match) => {
+      const score = matchScores.get(match.id);
+      if (!score) return;
+
+      const isInTeam1 = match.team1.includes(player);
+      const isInTeam2 = match.team2.includes(player);
+      if (!isInTeam1 && !isInTeam2) return;
+
+      matchesPlayed += 1;
+      const team1Score = Number(score.team1);
+      const team2Score = Number(score.team2);
+
+      if (isInTeam1) {
+        totalScored += team1Score;
+        totalAllowed += team2Score;
+        if (team1Score > team2Score) wins += 1;
+        if (team1Score < team2Score) losses += 1;
+      }
+
+      if (isInTeam2) {
+        totalScored += team2Score;
+        totalAllowed += team1Score;
+        if (team2Score > team1Score) wins += 1;
+        if (team2Score < team1Score) losses += 1;
+      }
+    });
+
+    const winRate = matchesPlayed > 0 ? wins / matchesPlayed : 0;
+    const differential = totalScored - totalAllowed;
+    const differentialPerGame = matchesPlayed > 0 ? differential / matchesPlayed : 0;
+
+    return {
+      player,
+      wins,
+      losses,
+      matchesPlayed,
+      winRate,
+      totalScored,
+      totalAllowed,
+      differential,
+      differentialPerGame,
+    };
+  });
+
+  return stats.sort((a, b) => {
+    if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+    if (b.differentialPerGame !== a.differentialPerGame) return b.differentialPerGame - a.differentialPerGame;
+    if (b.wins !== a.wins) return b.wins - a.wins;
+    return a.player.localeCompare(b.player);
+  });
+};
 
 const StartScreen = ({
   joinCode,
@@ -585,113 +671,430 @@ const PlayersScreen = ({
   );
 };
 
-const CourtsHero = ({
+const CourtsScreen = ({
   matches,
   matchScores,
   players,
   courts,
+  onScheduleUpdate,
+  onMatchScoresUpdate,
 }: {
   matches: Match[];
   matchScores: Map<string, { team1: number; team2: number }>;
   players: string[];
   courts: number;
+  onScheduleUpdate: (updatedMatches: Match[], updatedPlayers: string[]) => void;
+  onMatchScoresUpdate: (scores: Map<string, { team1: number; team2: number }>) => void;
 }) => {
+  const [selectedCourt, setSelectedCourt] = useState(1);
+  const [pendingScores, setPendingScores] = useState<Map<string, ScoreDraft>>(new Map());
+
+  useEffect(() => {
+    if (selectedCourt > courts) setSelectedCourt(1);
+  }, [courts, selectedCourt]);
+
+  const unscoredMatches = useMemo(() => matches.filter((match) => !matchScores.has(match.id)), [matches, matchScores]);
+
+  const queueByCourt = useMemo(() => {
+    const next = new Map<number, Match[]>();
+    for (let court = 1; court <= courts; court += 1) {
+      next.set(court, unscoredMatches.filter((match) => match.court === court));
+    }
+    return next;
+  }, [courts, unscoredMatches]);
+
   const currentByCourt = useMemo(() => {
-    const map = new Map<number, Match>();
-    matches.forEach((match) => {
-      if (!matchScores.has(match.id) && !map.has(match.court)) map.set(match.court, match);
-    });
-    return map;
-  }, [matchScores, matches]);
+    const next = new Map<number, Match>();
+    for (let court = 1; court <= courts; court += 1) {
+      const queue = queueByCourt.get(court) || [];
+      if (queue[0]) next.set(court, queue[0]);
+    }
+    return next;
+  }, [courts, queueByCourt]);
 
   const nextByCourt = useMemo(() => {
-    const map = new Map<number, Match>();
+    const next = new Map<number, Match>();
     for (let court = 1; court <= courts; court += 1) {
-      const queue = matches.filter((match) => match.court === court && !matchScores.has(match.id));
-      if (queue[1]) map.set(court, queue[1]);
+      const queue = queueByCourt.get(court) || [];
+      if (queue[1]) next.set(court, queue[1]);
     }
-    return map;
-  }, [courts, matchScores, matches]);
+    return next;
+  }, [courts, queueByCourt]);
 
   const waitingPlayers = useMemo(() => {
-    const occupied = new Set([
-      ...Array.from(currentByCourt.values()).flatMap((match) => [...match.team1, ...match.team2]),
-      ...Array.from(nextByCourt.values()).flatMap((match) => [...match.team1, ...match.team2]),
-    ]);
+    const occupied = new Set<string>();
+    currentByCourt.forEach((match) => [...match.team1, ...match.team2].forEach((player) => occupied.add(player)));
+    nextByCourt.forEach((match) => [...match.team1, ...match.team2].forEach((player) => occupied.add(player)));
     return players.filter((player) => !occupied.has(player));
   }, [currentByCourt, nextByCourt, players]);
 
-  return (
-    <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-      <Card className="border-white/10 bg-[linear-gradient(135deg,rgba(17,24,39,0.96),rgba(17,94,89,0.88),rgba(17,24,39,0.96))] p-5 text-white sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge className="border-0 bg-lime-400 text-slate-950">Live courts</Badge>
-            <Badge className="border-0 bg-white/10 text-white">{courts} {courts === 1 ? "court" : "courts"}</Badge>
-            <Badge className="border-0 bg-white/10 text-white">{matches.filter((match) => !matchScores.has(match.id)).length} queued</Badge>
-          </div>
-          <div className="text-sm text-white/72">Now · next · waiting</div>
-        </div>
+  const completedMatches = useMemo(() => matches.filter((match) => matchScores.has(match.id)).slice().reverse(), [matches, matchScores]);
 
-        <div className="mt-5 grid gap-3 lg:grid-cols-2">
-          {Array.from({ length: courts }, (_, index) => index + 1).map((court) => {
-            const live = currentByCourt.get(court);
-            const next = nextByCourt.get(court);
-            return (
-              <div key={court} className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-xs uppercase tracking-[0.18em] text-white/55">Court {court}</div>
-                    <div className="mt-1 text-lg font-semibold">{live ? "Playing now" : "Ready for next match"}</div>
-                  </div>
-                  <div className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/75">{live ? "Live" : "Standby"}</div>
-                </div>
-                <div className="mt-4 space-y-3">
-                  <div className="rounded-2xl bg-slate-950/35 p-3 text-sm leading-6">
-                    {live ? (
-                      <>
-                        <div className="text-xs uppercase tracking-[0.18em] text-white/45">Current</div>
-                        <div className="mt-2 font-medium">{live.team1.join(" · ")} <span className="text-white/45">vs</span> {live.team2.join(" · ")}</div>
-                      </>
-                    ) : (
-                      <div className="text-white/65">No live match on this court yet.</div>
-                    )}
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm leading-6">
-                    <div className="text-xs uppercase tracking-[0.18em] text-white/45">Next up</div>
-                    <div className="mt-2 font-medium text-white/80">
-                      {next ? `${next.team1.join(" · ")} vs ${next.team2.join(" · ")}` : "No queued follow-up yet."}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+  const featuredCourt = selectedCourt;
+  const featuredCurrent = currentByCourt.get(featuredCourt);
+  const featuredNext = nextByCourt.get(featuredCourt);
+  const featuredQueue = queueByCourt.get(featuredCourt) || [];
+
+  const updatePendingScore = useCallback((matchId: string, team: "team1" | "team2", value: string) => {
+    if (value === "") {
+      const next = new Map(pendingScores);
+      next.set(matchId, { ...(next.get(matchId) || matchScores.get(matchId) || { team1: "", team2: "" }), [team]: "" });
+      setPendingScores(next);
+      return;
+    }
+
+    const validation = validateMatchScore(value);
+    if (!validation.valid) {
+      toast.error(validation.error || "Invalid score");
+      return;
+    }
+
+    const next = new Map(pendingScores);
+    next.set(matchId, { ...(next.get(matchId) || matchScores.get(matchId) || { team1: "", team2: "" }), [team]: validation.value! });
+    setPendingScores(next);
+  }, [matchScores, pendingScores]);
+
+  const saveScore = useCallback((match: Match) => {
+    const pending = pendingScores.get(match.id) || matchScores.get(match.id);
+    if (!pending || pending.team1 === "" || pending.team2 === "") {
+      toast.error("Enter both scores first");
+      return;
+    }
+
+    const team1 = Number(pending.team1);
+    const team2 = Number(pending.team2);
+    const nextScores = new Map(matchScores);
+    nextScores.set(match.id, { team1, team2 });
+    onMatchScoresUpdate(nextScores);
+
+    const updatedMatches = matches.map((entry) => {
+      if (entry.id === match.id) {
+        return {
+          ...entry,
+          score: { team1, team2 },
+          status: "completed" as const,
+          actualEndTime: entry.endTime,
+        };
+      }
+
+      if (nextScores.has(entry.id)) {
+        return { ...entry, score: nextScores.get(entry.id) };
+      }
+
+      return entry;
+    });
+
+    onScheduleUpdate(updatedMatches, players);
+
+    const nextPending = new Map(pendingScores);
+    nextPending.delete(match.id);
+    setPendingScores(nextPending);
+    toast.success(matchScores.has(match.id) ? "Score updated" : `Court ${match.court} advanced`);
+  }, [matchScores, matches, onMatchScoresUpdate, onScheduleUpdate, pendingScores, players]);
+
+  return (
+    <div className="space-y-4">
+      <Card className="overflow-hidden border-white/10 bg-[linear-gradient(135deg,rgba(17,24,39,0.98),rgba(13,94,88,0.92),rgba(9,14,27,0.98))] p-5 text-white sm:p-6">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="border-0 bg-lime-400 text-slate-950">Live session</Badge>
+              <Badge className="border-0 bg-white/10 text-white">{courts} {courts === 1 ? "court" : "courts"}</Badge>
+              <Badge className="border-0 bg-white/10 text-white">{unscoredMatches.length} unplayed</Badge>
+              <Badge className="border-0 bg-white/10 text-white">{waitingPlayers.length} bench</Badge>
+            </div>
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">Courts stay live, queue stays obvious, scores stay one tap away.</h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-white/72">
+              Mobile centers one featured court at a time for fast host taps. Larger screens open into a room board with both live courts visible at once.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3 xl:min-w-[360px]">
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4 text-center">
+              <div className="text-[10px] uppercase tracking-[0.2em] text-white/50">Live now</div>
+              <div className="mt-2 text-3xl font-semibold">{Array.from(currentByCourt.values()).length}</div>
+            </div>
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4 text-center">
+              <div className="text-[10px] uppercase tracking-[0.2em] text-white/50">On deck</div>
+              <div className="mt-2 text-3xl font-semibold">{Array.from(nextByCourt.values()).length}</div>
+            </div>
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4 text-center">
+              <div className="text-[10px] uppercase tracking-[0.2em] text-white/50">Done</div>
+              <div className="mt-2 text-3xl font-semibold">{matchScores.size}</div>
+            </div>
+          </div>
         </div>
       </Card>
 
-      <div className="space-y-4">
-        <Card className="border-white/10 bg-white/95 p-5">
-          <div className="flex items-center gap-2 text-emerald-700">
-            <Waves className="h-5 w-5" />
-            <h3 className="text-lg font-semibold text-slate-900">Waiting / bench</h3>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {waitingPlayers.length > 0 ? waitingPlayers.map((player) => (
-              <Badge key={player} variant="secondary" className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700">{player}</Badge>
-            )) : <div className="rounded-2xl bg-slate-100 px-3 py-3 text-sm text-slate-600">Everyone is playing now or queued next.</div>}
-          </div>
-        </Card>
+      <div className="grid gap-4 2xl:grid-cols-[1.3fr_0.7fr]">
+        <div className="space-y-4">
+          <Card className="border-white/10 bg-white/95 p-3 lg:hidden">
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {Array.from({ length: courts }, (_, index) => index + 1).map((court) => {
+                const live = currentByCourt.get(court);
+                const next = nextByCourt.get(court);
+                return (
+                  <Button
+                    key={court}
+                    variant={featuredCourt === court ? "default" : "outline"}
+                    onClick={() => setSelectedCourt(court)}
+                    className={featuredCourt === court ? "rounded-full bg-emerald-500 text-white hover:bg-emerald-400" : "rounded-full"}
+                  >
+                    Court {court}
+                    {live ? " · live" : next ? " · next" : " · idle"}
+                  </Button>
+                );
+              })}
+            </div>
+          </Card>
 
-        <Card className="border-white/10 bg-white/95 p-5">
-          <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Board hierarchy</div>
-          <ul className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">
-            <li>• Current match per court</li>
-            <li>• Next-up match per court</li>
-            <li>• Waiting players surfaced separately</li>
-            <li>• Score entry and edits still preserved below</li>
-          </ul>
-        </Card>
+          <div className="lg:hidden">
+            <Card className="overflow-hidden border-white/10 bg-white/95 p-5 shadow-xl shadow-slate-950/5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Featured court</div>
+                  <h3 className="mt-1 text-2xl font-semibold text-slate-900">Court {featuredCourt}</h3>
+                </div>
+                <Badge className="border-0 bg-slate-900 text-white">{featuredCurrent ? "Live now" : featuredNext ? "Ready next" : "Standby"}</Badge>
+              </div>
+
+              <div className="mt-4 space-y-4">
+                <div className="rounded-[1.75rem] bg-[linear-gradient(135deg,#0f172a,#115e59,#0f172a)] p-4 text-white">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-white/60">
+                    <Flame className="h-3.5 w-3.5" />
+                    Current match
+                  </div>
+                  {featuredCurrent ? (
+                    <>
+                      <div className="mt-4 grid gap-3">
+                        <div className="rounded-[1.25rem] bg-white/10 p-3">
+                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/50">Side A</div>
+                          <div className="mt-1 text-lg font-semibold">{getTeamLabel(featuredCurrent.team1)}</div>
+                        </div>
+                        <div className="rounded-[1.25rem] bg-white/10 p-3">
+                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/50">Side B</div>
+                          <div className="mt-1 text-lg font-semibold">{getTeamLabel(featuredCurrent.team2)}</div>
+                        </div>
+                      </div>
+                      <div className="mt-4 grid grid-cols-2 gap-3">
+                        <Input
+                          type="number"
+                          min="0"
+                          value={(pendingScores.get(featuredCurrent.id) || matchScores.get(featuredCurrent.id) || { team1: "", team2: "" }).team1}
+                          onChange={(event) => updatePendingScore(featuredCurrent.id, "team1", event.target.value)}
+                          className="h-14 rounded-[1.1rem] border-white/10 bg-white text-center text-2xl font-semibold text-slate-900"
+                        />
+                        <Input
+                          type="number"
+                          min="0"
+                          value={(pendingScores.get(featuredCurrent.id) || matchScores.get(featuredCurrent.id) || { team1: "", team2: "" }).team2}
+                          onChange={(event) => updatePendingScore(featuredCurrent.id, "team2", event.target.value)}
+                          className="h-14 rounded-[1.1rem] border-white/10 bg-white text-center text-2xl font-semibold text-slate-900"
+                        />
+                      </div>
+                      <Button onClick={() => saveScore(featuredCurrent)} className="mt-4 h-12 w-full rounded-full bg-lime-400 text-base font-semibold text-slate-950 hover:bg-lime-300">
+                        Confirm score and pull next up
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="mt-4 rounded-[1.25rem] border border-white/10 bg-white/5 px-4 py-5 text-sm text-white/70">
+                      No live match on this court yet.
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Next up</div>
+                  <div className="mt-2 text-base font-semibold text-slate-900">
+                    {featuredNext ? `${getTeamLabel(featuredNext.team1)} vs ${getTeamLabel(featuredNext.team2)}` : "No queued follow-up yet."}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          <div className="hidden lg:grid lg:grid-cols-2 lg:gap-4">
+            {Array.from({ length: courts }, (_, index) => index + 1).map((court) => {
+              const live = currentByCourt.get(court);
+              const next = nextByCourt.get(court);
+              const score = live ? pendingScores.get(live.id) || matchScores.get(live.id) || { team1: "", team2: "" } : null;
+
+              return (
+                <Card key={court} className="overflow-hidden border-white/10 bg-white/95 p-5 shadow-xl shadow-slate-950/5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Live court</div>
+                      <h3 className="mt-1 text-2xl font-semibold text-slate-900">Court {court}</h3>
+                    </div>
+                    <Badge className={`border-0 ${live ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-700"}`}>{live ? "Playing" : "Standby"}</Badge>
+                  </div>
+
+                  <div className="mt-4 space-y-4">
+                    <div className="rounded-[1.5rem] bg-[linear-gradient(135deg,#0f172a,#115e59,#0f172a)] p-4 text-white">
+                      <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-white/60">
+                        <Flame className="h-3.5 w-3.5" />
+                        Current match
+                      </div>
+                      {live ? (
+                        <>
+                          <div className="mt-4 grid gap-3">
+                            <div className="rounded-[1.25rem] bg-white/10 p-3">
+                              <div className="text-[10px] uppercase tracking-[0.18em] text-white/50">Side A</div>
+                              <div className="mt-1 text-lg font-semibold">{getTeamLabel(live.team1)}</div>
+                            </div>
+                            <div className="rounded-[1.25rem] bg-white/10 p-3">
+                              <div className="text-[10px] uppercase tracking-[0.18em] text-white/50">Side B</div>
+                              <div className="mt-1 text-lg font-semibold">{getTeamLabel(live.team2)}</div>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 grid grid-cols-2 gap-3">
+                            <Input
+                              type="number"
+                              min="0"
+                              value={score?.team1 ?? ""}
+                              onChange={(event) => updatePendingScore(live.id, "team1", event.target.value)}
+                              className="h-14 rounded-[1.1rem] border-white/10 bg-white text-center text-2xl font-semibold text-slate-900"
+                            />
+                            <Input
+                              type="number"
+                              min="0"
+                              value={score?.team2 ?? ""}
+                              onChange={(event) => updatePendingScore(live.id, "team2", event.target.value)}
+                              className="h-14 rounded-[1.1rem] border-white/10 bg-white text-center text-2xl font-semibold text-slate-900"
+                            />
+                          </div>
+
+                          <Button onClick={() => saveScore(live)} className="mt-4 h-12 w-full rounded-full bg-lime-400 text-base font-semibold text-slate-950 hover:bg-lime-300">
+                            Confirm score
+                          </Button>
+                        </>
+                      ) : (
+                        <div className="mt-4 rounded-[1.25rem] border border-white/10 bg-white/5 px-4 py-5 text-sm text-white/70">
+                          No live match on this court yet.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+                      <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Next up</div>
+                      <div className="mt-2 text-base font-semibold text-slate-900">
+                        {next ? `${getTeamLabel(next.team1)} vs ${getTeamLabel(next.team2)}` : "No queued follow-up yet."}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+
+          <Card className="border-white/10 bg-white/95 p-5 shadow-xl shadow-slate-950/5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Bench and ready line</div>
+                <h3 className="mt-1 text-xl font-semibold text-slate-900">Waiting players stay visible outside the queue</h3>
+              </div>
+              <Badge className="border-0 bg-slate-900 text-white">{waitingPlayers.length} on bench</Badge>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {waitingPlayers.length > 0 ? waitingPlayers.map((player) => (
+                <Badge key={player} variant="secondary" className="rounded-full bg-slate-100 px-3 py-2 text-slate-700">{player}</Badge>
+              )) : <div className="rounded-[1.25rem] bg-slate-100 px-4 py-3 text-sm text-slate-600">Everyone is either live now or first up next.</div>}
+            </div>
+          </Card>
+        </div>
+
+        <div className="space-y-4">
+          <Card className="border-white/10 bg-slate-950/85 p-5 text-white shadow-xl shadow-cyan-950/10">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs uppercase tracking-[0.2em] text-white/45">Queue rail</div>
+                <h3 className="mt-1 text-xl font-semibold">Court {featuredCourt} upcoming lane</h3>
+              </div>
+              <div className="flex gap-2">
+                {Array.from({ length: courts }, (_, index) => index + 1).map((court) => (
+                  <Button
+                    key={court}
+                    size="sm"
+                    variant={featuredCourt === court ? "default" : "outline"}
+                    onClick={() => setSelectedCourt(court)}
+                    className={featuredCourt === court ? "rounded-full bg-lime-400 text-slate-950 hover:bg-lime-300" : "rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"}
+                  >
+                    {court}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {featuredQueue.slice(0, 5).map((match, index) => {
+                const isCurrent = index === 0;
+                const isNext = index === 1;
+                return (
+                  <div key={match.id} className={`rounded-[1.35rem] border p-4 ${isCurrent ? "border-emerald-300/20 bg-emerald-300/10" : isNext ? "border-amber-300/20 bg-amber-300/10" : "border-white/10 bg-white/5"}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <Badge className={`border-0 ${isCurrent ? "bg-emerald-500 text-white" : isNext ? "bg-amber-500 text-white" : "bg-white/10 text-white"}`}>
+                        {isCurrent ? "Current" : isNext ? "Next" : `Queue ${index + 1}`}
+                      </Badge>
+                      <div className="text-xs text-white/55">{getMatchLabel(matches, match)}</div>
+                    </div>
+                    <div className="mt-3 text-sm leading-6 text-white/90">{getTeamLabel(match.team1)} <span className="text-white/45">vs</span> {getTeamLabel(match.team2)}</div>
+                  </div>
+                );
+              })}
+
+              {featuredQueue.length === 0 ? (
+                <div className="rounded-[1.35rem] border border-white/10 bg-white/5 px-4 py-5 text-sm text-white/65">
+                  No upcoming matches on this court yet.
+                </div>
+              ) : null}
+            </div>
+          </Card>
+
+          <Card className="border-white/10 bg-white/95 p-5 shadow-xl shadow-slate-950/5">
+            <div className="flex items-center gap-2 text-slate-900">
+              <Clock3 className="h-4 w-4 text-violet-600" />
+              <h3 className="font-semibold">Recent finishes</h3>
+            </div>
+            <div className="mt-4 space-y-3">
+              {completedMatches.slice(0, 4).map((match) => {
+                const score = pendingScores.get(match.id) || matchScores.get(match.id) || { team1: "", team2: "" };
+                return (
+                  <div key={match.id} className="rounded-[1.35rem] border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Court {match.court} · finished</div>
+                        <div className="mt-1 text-sm font-semibold text-slate-900">{getTeamLabel(match.team1)} vs {getTeamLabel(match.team2)}</div>
+                      </div>
+                      <Badge className="border-0 bg-slate-900 text-white">{getMatchLabel(matches, match)}</Badge>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-3">
+                      <Input
+                        type="number"
+                        min="0"
+                        value={score.team1}
+                        onChange={(event) => updatePendingScore(match.id, "team1", event.target.value)}
+                        className="h-11 rounded-2xl text-center text-lg font-semibold"
+                      />
+                      <Input
+                        type="number"
+                        min="0"
+                        value={score.team2}
+                        onChange={(event) => updatePendingScore(match.id, "team2", event.target.value)}
+                        className="h-11 rounded-2xl text-center text-lg font-semibold"
+                      />
+                    </div>
+                    <Button onClick={() => saveScore(match)} variant="outline" className="mt-3 w-full rounded-full">Save edit</Button>
+                  </div>
+                );
+              })}
+
+              {completedMatches.length === 0 ? (
+                <div className="rounded-[1.35rem] bg-slate-100 px-4 py-5 text-sm text-slate-600">Completed matches will stack here as courts advance.</div>
+              ) : null}
+            </div>
+          </Card>
+        </div>
       </div>
     </div>
   );
@@ -701,79 +1104,250 @@ const WrapScreen = ({
   players,
   matches,
   matchScores,
+  gameCode,
+  onShare,
 }: {
   players: string[];
   matches: Match[];
   matchScores: Map<string, { team1: number; team2: number }>;
+  gameCode: string;
+  onShare: () => void;
 }) => {
-  const totalPoints = useMemo(
-    () => Array.from(matchScores.values()).reduce((sum, score) => sum + score.team1 + score.team2, 0),
-    [matchScores]
-  );
+  const standings = useMemo(() => buildStandings(players, matches, matchScores), [players, matches, matchScores]);
+  const completedMatches = useMemo(() => matches.filter((match) => matchScores.has(match.id)).slice().reverse(), [matches, matchScores]);
+  const totalPoints = useMemo(() => Array.from(matchScores.values()).reduce((sum, score) => sum + score.team1 + score.team2, 0), [matchScores]);
+
+  const leader = standings[0];
+  const hottestMatch = completedMatches[0];
+
+  const handleCopyRecap = useCallback(async () => {
+    if (standings.length === 0) {
+      toast.error("Finish a match first so there’s something to recap");
+      return;
+    }
+
+    const topThree = standings.slice(0, 3)
+      .map((entry, index) => `${index + 1}. ${entry.player} (${entry.wins}-${entry.losses}, ${Math.round(entry.winRate * 100)}% WR, ${entry.differential >= 0 ? "+" : ""}${entry.differential} diff)`)
+      .join("\n");
+
+    const summary = [
+      `PickleMatch wrap${gameCode ? ` · ${gameCode}` : ""}`,
+      `Completed matches: ${matchScores.size}`,
+      `Players: ${players.length}`,
+      `Points recorded: ${totalPoints}`,
+      "",
+      "Leaderboard:",
+      topThree,
+    ].join("\n");
+
+    await navigator.clipboard.writeText(summary);
+    toast.success("Wrap summary copied");
+  }, [gameCode, matchScores.size, players.length, standings, totalPoints]);
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-        <Card className="border-white/10 bg-[linear-gradient(135deg,rgba(17,24,39,0.96),rgba(91,33,182,0.86),rgba(17,24,39,0.96))] p-5 text-white sm:p-6">
+      <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+        <Card className="overflow-hidden border-white/10 bg-[linear-gradient(135deg,rgba(17,24,39,0.98),rgba(91,33,182,0.88),rgba(17,24,39,0.98))] p-5 text-white sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-violet-200">
-              <Crown className="h-5 w-5" />
-              <span className="text-xs uppercase tracking-[0.22em]">Wrap</span>
+              <PartyPopper className="h-5 w-5" />
+              <span className="text-xs uppercase tracking-[0.22em]">Session wrap</span>
             </div>
-            <div className="text-sm text-white/72">Leaderboard · recap · share</div>
+            <div className="text-sm text-white/72">Leaderboard · recap · export</div>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-white/50">Completed matches</div>
-              <div className="mt-2 text-3xl font-semibold">{matchScores.size}</div>
+          <div className="mt-5 grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
+            <div>
+              <div className="text-xs uppercase tracking-[0.2em] text-white/55">Night winner</div>
+              <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">{leader ? leader.player : "Finish a match to crown the board"}</h2>
+              <p className="mt-3 max-w-xl text-sm leading-7 text-white/72">
+                Wrap now feels like a club-night finish: clear winner up top, room stats in one glance, then recap and match log underneath.
+              </p>
+              {leader ? (
+                <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm text-white/90">
+                  <Crown className="h-4 w-4 text-lime-300" />
+                  {leader.wins}-{leader.losses} record · {Math.round(leader.winRate * 100)}% win rate · {leader.differential >= 0 ? "+" : ""}{leader.differential} diff
+                </div>
+              ) : null}
             </div>
-            <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-white/50">Players involved</div>
-              <div className="mt-2 text-3xl font-semibold">{players.length}</div>
-            </div>
-            <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-white/50">Points recorded</div>
-              <div className="mt-2 text-3xl font-semibold">{totalPoints}</div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-white/50">Completed</div>
+                <div className="mt-2 text-3xl font-semibold">{matchScores.size}</div>
+              </div>
+              <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-white/50">Players</div>
+                <div className="mt-2 text-3xl font-semibold">{players.length}</div>
+              </div>
+              <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-white/50">Points</div>
+                <div className="mt-2 text-3xl font-semibold">{totalPoints}</div>
+              </div>
+              <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-white/50">Latest finish</div>
+                <div className="mt-2 text-lg font-semibold">{hottestMatch ? `Court ${hottestMatch.court}` : "—"}</div>
+              </div>
             </div>
           </div>
         </Card>
 
-        <div className="space-y-4">
-          <Card className="border-white/10 bg-white/95 p-5">
-            <div className="flex items-center gap-2 text-violet-700">
-              <Medal className="h-5 w-5" />
-              <h3 className="text-lg font-semibold text-slate-900">Social finish</h3>
-            </div>
-            <ul className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">
-              <li>• Leaderboard remains the hero of the wrap</li>
-              <li>• Recap and history stay on the same screen</li>
-              <li>• Reserved lower area kept for future monetization, not gameplay</li>
-            </ul>
-          </Card>
-          {adSlot("wrap lower section")}
-        </div>
+        <Card className="border-white/10 bg-white/95 p-5 shadow-xl shadow-slate-950/5">
+          <div className="flex items-center gap-2 text-violet-700">
+            <Sparkles className="h-5 w-5" />
+            <h3 className="text-lg font-semibold text-slate-900">Share the finish</h3>
+          </div>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            Keep the end moment social. Share the session link, or export a clean wrap summary to the clipboard for group chat.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <Button onClick={onShare} className="h-12 rounded-2xl bg-violet-600 text-white hover:bg-violet-500">
+              <Share2 className="mr-2 h-4 w-4" />
+              Share session link
+            </Button>
+            <Button onClick={() => void handleCopyRecap()} variant="outline" className="h-12 rounded-2xl">
+              <Copy className="mr-2 h-4 w-4" />
+              Copy wrap summary
+            </Button>
+          </div>
+        </Card>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-        <Card className="border-white/10 bg-white/95 p-5">
-          {matchScores.size > 0 ? (
-            <Leaderboard players={players} matches={matches} matchScores={matchScores} />
+      <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+        <Card className="border-white/10 bg-white/95 p-5 shadow-xl shadow-slate-950/5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Leaderboard summary</div>
+              <h3 className="mt-1 text-2xl font-semibold text-slate-900">Standings for the night</h3>
+            </div>
+            <Badge className="border-0 bg-slate-900 text-white">{standings.length} ranked</Badge>
+          </div>
+
+          {standings.length > 0 ? (
+            <div className="mt-5 space-y-3">
+              {standings.map((entry, index) => (
+                <div key={entry.player} className={`rounded-[1.5rem] border p-4 ${index === 0 ? "border-lime-300 bg-lime-50" : index < 3 ? "border-violet-200 bg-violet-50/60" : "border-slate-200 bg-slate-50"}`}>
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-full font-semibold ${index === 0 ? "bg-lime-400 text-slate-950" : "bg-white text-slate-700 ring-1 ring-slate-200"}`}>
+                        {index + 1}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="text-lg font-semibold text-slate-900">{entry.player}</div>
+                          {index === 0 ? <Crown className="h-4 w-4 text-lime-600" /> : null}
+                          {index === 1 ? <Medal className="h-4 w-4 text-violet-600" /> : null}
+                          {index === 2 ? <Trophy className="h-4 w-4 text-amber-500" /> : null}
+                        </div>
+                        <div className="text-sm text-slate-600">{entry.matchesPlayed} match{entry.matchesPlayed === 1 ? "" : "es"} played</div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3 sm:min-w-[310px]">
+                      <div className="rounded-[1rem] bg-white px-3 py-2 text-center ring-1 ring-slate-200">
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Win rate</div>
+                        <div className="mt-1 text-lg font-semibold text-slate-900">{Math.round(entry.winRate * 100)}%</div>
+                      </div>
+                      <div className="rounded-[1rem] bg-white px-3 py-2 text-center ring-1 ring-slate-200">
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500">W-L</div>
+                        <div className="mt-1 text-lg font-semibold text-slate-900">{entry.wins}-{entry.losses}</div>
+                      </div>
+                      <div className="rounded-[1rem] bg-white px-3 py-2 text-center ring-1 ring-slate-200">
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Diff</div>
+                        <div className={`mt-1 text-lg font-semibold ${entry.differential >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{entry.differential >= 0 ? "+" : ""}{entry.differential}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
-            <div className="rounded-3xl bg-slate-100 px-4 py-10 text-center text-sm text-slate-600">
-              Finish a few matches to generate the leaderboard recap.
+            <div className="mt-5 rounded-[1.5rem] bg-slate-100 px-5 py-12 text-center text-sm text-slate-600">
+              Finish a few matches to generate standings.
             </div>
           )}
         </Card>
 
-        <Card className="border-white/10 bg-white/95 p-5">
-          <div className="mb-4">
-            <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Session recap</div>
-            <h3 className="mt-1 text-xl font-semibold">Match history</h3>
-          </div>
-          <MatchHistory matches={matches} matchScores={matchScores} />
-        </Card>
+        <div className="space-y-4">
+          <Card className="border-white/10 bg-slate-950/85 p-5 text-white shadow-xl shadow-cyan-950/10">
+            <div className="flex items-center gap-2 text-lime-300">
+              <TrendingUp className="h-4 w-4" />
+              <h3 className="font-semibold">Session recap</h3>
+            </div>
+            <div className="mt-4 space-y-3">
+              <div className="rounded-[1.35rem] border border-white/10 bg-white/5 p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-white/45">Leader</div>
+                <div className="mt-2 text-lg font-semibold">{leader ? leader.player : "No winner yet"}</div>
+              </div>
+              <div className="rounded-[1.35rem] border border-white/10 bg-white/5 p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-white/45">Most recent result</div>
+                <div className="mt-2 text-sm leading-6 text-white/85">
+                  {hottestMatch ? `${getTeamLabel(hottestMatch.team1)} vs ${getTeamLabel(hottestMatch.team2)}` : "No completed match yet."}
+                </div>
+              </div>
+              <div className="rounded-[1.35rem] border border-white/10 bg-white/5 p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-white/45">Room pulse</div>
+                <div className="mt-2 text-sm leading-6 text-white/85">
+                  {matchScores.size === 0
+                    ? "The session hasn’t really started yet."
+                    : matchScores.size < 4
+                      ? "The ladder is still loose — one strong run can flip the order fast."
+                      : "The room has enough finished games to feel like a real night, not a draft board."}
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {adSlot("wrap lower section")}
+        </div>
       </div>
+
+      <Card className="border-white/10 bg-white/95 p-5 shadow-xl shadow-slate-950/5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-xs uppercase tracking-[0.2em] text-slate-500">History reel</div>
+            <h3 className="mt-1 text-2xl font-semibold text-slate-900">Completed matches</h3>
+          </div>
+          <Badge className="border-0 bg-slate-900 text-white">{completedMatches.length} finished</Badge>
+        </div>
+
+        {completedMatches.length > 0 ? (
+          <div className="mt-5 grid gap-3 xl:grid-cols-2">
+            {completedMatches.map((match) => {
+              const score = matchScores.get(match.id);
+              if (!score) return null;
+              const team1Won = score.team1 > score.team2;
+              const team2Won = score.team2 > score.team1;
+              return (
+                <div key={match.id} className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Court {match.court} · {getMatchLabel(matches, match)}</div>
+                      <div className="mt-1 text-sm text-slate-600">{match.clockStartTime || `${match.startTime} min slot`}</div>
+                    </div>
+                    <Badge className="border-0 bg-violet-100 text-violet-800">Final</Badge>
+                  </div>
+
+                  <div className="mt-4 space-y-3">
+                    <div className={`flex items-center justify-between rounded-[1.15rem] px-4 py-3 ${team1Won ? "bg-emerald-50 ring-1 ring-emerald-200" : "bg-white ring-1 ring-slate-200"}`}>
+                      <div className="text-sm font-medium text-slate-900">{getTeamLabel(match.team1)}</div>
+                      <div className={`text-2xl font-semibold ${team1Won ? "text-emerald-700" : "text-slate-700"}`}>{score.team1}</div>
+                    </div>
+                    <div className={`flex items-center justify-between rounded-[1.15rem] px-4 py-3 ${team2Won ? "bg-emerald-50 ring-1 ring-emerald-200" : "bg-white ring-1 ring-slate-200"}`}>
+                      <div className="text-sm font-medium text-slate-900">{getTeamLabel(match.team2)}</div>
+                      <div className={`text-2xl font-semibold ${team2Won ? "text-emerald-700" : "text-slate-700"}`}>{score.team2}</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mt-5 rounded-[1.5rem] bg-slate-100 px-5 py-12 text-center text-sm text-slate-600">
+            Completed matches will collect here once the night gets moving.
+          </div>
+        )}
+      </Card>
     </div>
   );
 };
@@ -1123,22 +1697,6 @@ const Index = () => {
     }
   }, [gameId]);
 
-  const handleCourtConfigUpdate = useCallback(async (courtConfigs: GameConfig["courtConfigs"]) => {
-    if (!gameConfig || !courtConfigs) return;
-    const updatedConfig = { ...gameConfig, courtConfigs };
-    setGameConfig(updatedConfig);
-
-    try {
-      if (gameId) {
-        const { error } = await supabase.from("games").update({ game_config: updatedConfig as any }).eq("id", gameId);
-        if (error) throw error;
-      }
-    } catch (error) {
-      debugLogger.log("error", "court config update failed", error);
-      toast.error("Failed to update court settings");
-    }
-  }, [gameConfig, gameId]);
-
   const handleSkipMatch = useCallback(async (matchId: string) => {
     if (!gameId || !playerName) return;
     try {
@@ -1218,49 +1776,34 @@ const Index = () => {
     }
 
     if (activeStep === "courts") {
-      return (
-        <div className="space-y-4">
-          <CourtsHero matches={matches} matchScores={matchScores} players={players} courts={gameConfig.courts} />
-
-          <Card className="border-white/10 bg-white/95 p-3 sm:p-4">
-            {isPlayerView && playerName ? (
-              <MyMatchesView
-                playerName={playerName}
-                matchGroups={playerMatches}
-                matchScores={matchScores}
-                currentTime={currentTime}
-                allMatches={matches}
-                onReleaseIdentity={() => {
-                  releaseIdentity();
-                  toast.success("Back in host view");
-                }}
-                onSkipMatch={handleSkipMatch}
-              />
-            ) : (
-              <ScheduleView
-                matches={matches}
-                onBack={() => setActiveStep("players")}
-                gameConfig={gameConfig}
-                allPlayers={players}
-                onScheduleUpdate={handleScheduleUpdate}
-                matchScores={matchScores}
-                onMatchScoresUpdate={setMatchScores}
-                onCourtConfigUpdate={(configs) => handleCourtConfigUpdate(configs)}
-                isPlayerView={isPlayerView}
-                playerName={playerName}
-                onReleaseIdentity={() => {
-                  releaseIdentity();
-                  toast.success("Back in host view");
-                }}
-                onShowPlayerSelector={() => setShowPlayerSelector(true)}
-              />
-            )}
-          </Card>
-        </div>
+      return isPlayerView && playerName ? (
+        <Card className="border-white/10 bg-white/95 p-3 sm:p-4">
+          <MyMatchesView
+            playerName={playerName}
+            matchGroups={playerMatches}
+            matchScores={matchScores}
+            currentTime={currentTime}
+            allMatches={matches}
+            onReleaseIdentity={() => {
+              releaseIdentity();
+              toast.success("Back in host view");
+            }}
+            onSkipMatch={handleSkipMatch}
+          />
+        </Card>
+      ) : (
+        <CourtsScreen
+          matches={matches}
+          matchScores={matchScores}
+          players={players}
+          courts={gameConfig.courts}
+          onScheduleUpdate={handleScheduleUpdate}
+          onMatchScoresUpdate={setMatchScores}
+        />
       );
     }
 
-    return <WrapScreen players={players} matches={matches} matchScores={matchScores} />;
+    return <WrapScreen players={players} matches={matches} matchScores={matchScores} gameCode={gameCode} onShare={handleShare} />;
   };
 
   if (isRestoringSession) {
@@ -1323,6 +1866,18 @@ const Index = () => {
 
         {renderMain()}
 
+        {showPlayerSelector ? (
+          <PlayerIdentitySelector
+            players={players}
+            onSelect={async (name) => {
+              await claimIdentity(name);
+              setShowPlayerSelector(false);
+              toast.success(`Viewing as ${name}`);
+            }}
+            onCancel={() => setShowPlayerSelector(false)}
+          />
+        ) : null}
+
         {activeStep !== "start" && (gameCode || gameConfig || isSetupDraftOpen) ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-[2rem] border border-white/10 bg-white/5 px-4 py-3 text-white/72">
             <Button
@@ -1346,18 +1901,6 @@ const Index = () => {
               Next step
             </Button>
           </div>
-        ) : null}
-
-        {showPlayerSelector ? (
-          <PlayerIdentitySelector
-            players={players}
-            onSelect={async (name) => {
-              await claimIdentity(name);
-              setShowPlayerSelector(false);
-              toast.success(`Viewing as ${name}`);
-            }}
-            onCancel={() => setShowPlayerSelector(false)}
-          />
         ) : null}
       </div>
     </div>
