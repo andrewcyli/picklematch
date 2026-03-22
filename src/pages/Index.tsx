@@ -38,6 +38,7 @@ import { usePlayerNotifications } from "@/hooks/use-player-notifications";
 import { supabase } from "@/integrations/supabase/client";
 import { setSkipNextMatch } from "@/lib/player-identity";
 import { generateSchedule, Match } from "@/lib/scheduler";
+import { computeCourtStatus } from "@/lib/court-status";
 import { safeStorage } from "@/lib/safe-storage";
 import { debugLogger } from "@/lib/debug-logger";
 import { validateMatchScore, validatePlayerName } from "@/lib/validation";
@@ -321,10 +322,8 @@ const SessionHeader = ({
   onShare: () => void;
 }) => {
   const waitingCount = useMemo(() => {
-    const livePlayers = new Set(
-      matches.filter((match) => !matchScores.has(match.id)).slice(0, 2).flatMap((match) => [...match.team1, ...match.team2])
-    );
-    return players.filter((player) => !livePlayers.has(player)).length;
+    const status = computeCourtStatus(matches, matchScores, players, 2);
+    return status.waitingPlayers.length;
   }, [matchScores, matches, players]);
 
   return (
@@ -698,40 +697,12 @@ const CourtsScreen = ({
     if (selectedCourt > courts) setSelectedCourt(1);
   }, [courts, selectedCourt]);
 
-  const unscoredMatches = useMemo(() => matches.filter((match) => !matchScores.has(match.id)), [matches, matchScores]);
+  const courtStatus = useMemo(
+    () => computeCourtStatus(matches, matchScores, players, courts),
+    [matches, matchScores, players, courts],
+  );
 
-  const queueByCourt = useMemo(() => {
-    const next = new Map<number, Match[]>();
-    for (let court = 1; court <= courts; court += 1) {
-      next.set(court, unscoredMatches.filter((match) => match.court === court));
-    }
-    return next;
-  }, [courts, unscoredMatches]);
-
-  const currentByCourt = useMemo(() => {
-    const next = new Map<number, Match>();
-    for (let court = 1; court <= courts; court += 1) {
-      const queue = queueByCourt.get(court) || [];
-      if (queue[0]) next.set(court, queue[0]);
-    }
-    return next;
-  }, [courts, queueByCourt]);
-
-  const nextByCourt = useMemo(() => {
-    const next = new Map<number, Match>();
-    for (let court = 1; court <= courts; court += 1) {
-      const queue = queueByCourt.get(court) || [];
-      if (queue[1]) next.set(court, queue[1]);
-    }
-    return next;
-  }, [courts, queueByCourt]);
-
-  const waitingPlayers = useMemo(() => {
-    const occupied = new Set<string>();
-    currentByCourt.forEach((match) => [...match.team1, ...match.team2].forEach((player) => occupied.add(player)));
-    nextByCourt.forEach((match) => [...match.team1, ...match.team2].forEach((player) => occupied.add(player)));
-    return players.filter((player) => !occupied.has(player));
-  }, [currentByCourt, nextByCourt, players]);
+  const { currentByCourt, nextByCourt, waitingPlayers } = courtStatus;
 
   const featuredCourt = selectedCourt;
   const featuredCurrent = currentByCourt.get(featuredCourt);

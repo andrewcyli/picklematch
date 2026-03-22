@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Match, CourtConfig, regenerateScheduleFromSlot } from "@/lib/scheduler";
+import { computeCourtStatus } from "@/lib/court-status";
 import { validateMatchScore } from "@/lib/validation";
 import { Clock3, Edit3, PlayCircle, Target, Timer, Trophy, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -77,22 +78,13 @@ export const ScheduleView = ({
 
   const unscoredMatches = useMemo(() => matches.filter((match) => !matchScores.has(match.id)), [matches, matchScores]);
 
-  const currentByCourt = useMemo(() => {
-    const map = new Map<number, Match>();
-    for (const match of unscoredMatches) {
-      if (!map.has(match.court)) map.set(match.court, match);
-    }
-    return map;
-  }, [unscoredMatches]);
+  const courtStatus = useMemo(
+    () => computeCourtStatus(matches, matchScores, allPlayers, gameConfig.courts),
+    [matches, matchScores, allPlayers, gameConfig.courts],
+  );
 
-  const nextByCourt = useMemo(() => {
-    const map = new Map<number, Match>();
-    for (let court = 1; court <= gameConfig.courts; court += 1) {
-      const queue = unscoredMatches.filter((match) => match.court === court);
-      if (queue[1]) map.set(court, queue[1]);
-    }
-    return map;
-  }, [gameConfig.courts, unscoredMatches]);
+  const currentByCourt = courtStatus.currentByCourt;
+  const nextByCourt = courtStatus.nextByCourt;
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -107,12 +99,7 @@ export const ScheduleView = ({
     return () => window.clearInterval(interval);
   }, [currentByCourt]);
 
-  const waitingPlayers = useMemo(() => {
-    const occupied = new Set<string>();
-    currentByCourt.forEach((match) => [...match.team1, ...match.team2].forEach((player) => occupied.add(player)));
-    nextByCourt.forEach((match) => [...match.team1, ...match.team2].forEach((player) => occupied.add(player)));
-    return allPlayers.filter((player) => !occupied.has(player));
-  }, [allPlayers, currentByCourt, nextByCourt]);
+  const waitingPlayers = courtStatus.waitingPlayers;
 
   const selectedCourtMatches = useMemo(() => matches.filter((match) => match.court === selectedCourt), [matches, selectedCourt]);
 
