@@ -5,7 +5,7 @@ export const playerNameSchema = z.string()
   .trim()
   .min(1, "Player name is required")
   .max(50, "Player name must be 50 characters or less")
-  .regex(/^[a-zA-Z0-9\s\-'\.]+$/, "Player name can only contain letters, numbers, spaces, hyphens, apostrophes, and periods");
+  .regex(/^[\p{L}\p{N}\s\-'\.]+$/u, "Player name can only contain letters, numbers, spaces, hyphens, apostrophes, and periods");
 
 // Game code validation schema  
 export const gameCodeSchema = z.string()

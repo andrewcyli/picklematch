@@ -147,6 +147,25 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: "Inter", "Noto Sans SC", "Noto Sans TC", "Noto Sans JP", "Noto Sans KR", "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", system-ui, -apple-system, sans-serif;
+  }
+
+  /* Horizontal scroll container for upcoming matches */
+  .upcoming-scroll {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 0.25rem;
+  }
+  .upcoming-scroll::-webkit-scrollbar {
+    display: none;
+  }
+  .upcoming-scroll > * {
+    scroll-snap-align: start;
+    flex-shrink: 0;
   }
 }
 

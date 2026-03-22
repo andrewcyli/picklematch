@@ -102,7 +102,7 @@ export const GameSetup = ({
           onClick={onNewSession}
           variant="outline"
           size="sm"
-          className="h-10 w-full rounded-2xl border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
+          className="h-10 w-full rounded-2xl border-emerald-400/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
         >
           New Session
         </Button>
@@ -110,7 +110,7 @@ export const GameSetup = ({
 
       {!quickCourtMode && (
         <div className="space-y-2">
-          <Label className="flex items-center gap-1.5 text-sm font-semibold">
+          <Label className="flex items-center gap-1.5 text-sm font-semibold text-white">
             <Trophy className="h-3.5 w-3.5" />
             Scheduling Type
           </Label>
@@ -140,11 +140,11 @@ export const GameSetup = ({
                   key={value}
                   className={`relative flex cursor-pointer flex-col items-center justify-center rounded-2xl border p-3 text-center transition-all ${
                     hasExistingMatches ? "cursor-not-allowed opacity-50" : ""
-                  } ${schedulingType === value ? "border-emerald-400 bg-emerald-50 shadow-sm" : "border-slate-200 bg-white hover:border-emerald-200"}`}
+                  } ${schedulingType === value ? "border-emerald-400/40 bg-emerald-500/15 shadow-sm" : "border-white/10 bg-white/5 hover:border-emerald-400/30"}`}
                 >
                   <RadioGroupItem value={value} className="sr-only" disabled={hasExistingMatches} />
-                  <span className="text-sm font-semibold text-slate-900">{title}</span>
-                  <p className="mt-1 text-xs text-slate-500">{description}</p>
+                  <span className="text-sm font-semibold text-white">{title}</span>
+                  <p className="mt-1 text-xs text-white/55">{description}</p>
                 </label>
               ))}
             </div>
@@ -154,7 +154,7 @@ export const GameSetup = ({
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
+          <Label className="flex items-center gap-1.5 text-sm font-semibold text-white">
             <Clock className="h-3.5 w-3.5" />
             Game Duration
           </Label>
@@ -164,11 +164,11 @@ export const GameSetup = ({
                 <label
                   key={duration}
                   className={`relative flex cursor-pointer items-center justify-center rounded-2xl border p-3 transition-all ${
-                    gameDuration === duration ? "border-emerald-400 bg-emerald-50 shadow-sm" : "border-slate-200 bg-white hover:border-emerald-200"
+                    gameDuration === duration ? "border-emerald-400/40 bg-emerald-500/15 shadow-sm" : "border-white/10 bg-white/5 hover:border-emerald-400/30"
                   }`}
                 >
                   <RadioGroupItem value={duration.toString()} className="sr-only" />
-                  <span className="text-sm font-semibold text-slate-900">{duration} min</span>
+                  <span className="text-sm font-semibold text-white">{duration} min</span>
                 </label>
               ))}
             </div>
@@ -176,11 +176,11 @@ export const GameSetup = ({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="total-time" className="text-sm font-semibold text-slate-900">
+          <Label htmlFor="total-time" className="text-sm font-semibold text-white">
             Total Play Time
           </Label>
           <Select value={totalTime.toString()} onValueChange={(v) => setTotalTime(Number(v))}>
-            <SelectTrigger id="total-time" className="h-11 rounded-2xl border-slate-200 bg-white text-sm">
+            <SelectTrigger id="total-time" className="h-11 rounded-2xl border-white/10 bg-white/10 text-sm text-white">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -194,11 +194,11 @@ export const GameSetup = ({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="courts" className="text-sm font-semibold text-slate-900">
+          <Label htmlFor="courts" className="text-sm font-semibold text-white">
             Number of Courts
           </Label>
           <Select value={courts.toString()} onValueChange={(v) => handleCourtsChange(Number(v))}>
-            <SelectTrigger id="courts" className="h-11 rounded-2xl border-slate-200 bg-white text-sm">
+            <SelectTrigger id="courts" className="h-11 rounded-2xl border-white/10 bg-white/10 text-sm text-white">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -212,22 +212,22 @@ export const GameSetup = ({
         </div>
 
         <div className="space-y-2 sm:col-span-2">
-          <Label className="text-sm font-semibold text-slate-900">Court Format</Label>
+          <Label className="text-sm font-semibold text-white">Court Format</Label>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {courtConfigs.map((config) => (
-              <div key={config.courtNumber} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-3">
-                <Label htmlFor={`court-${config.courtNumber}`} className="text-sm font-medium text-slate-900">
+              <div key={config.courtNumber} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-3">
+                <Label htmlFor={`court-${config.courtNumber}`} className="text-sm font-medium text-white">
                   Court {config.courtNumber}
                 </Label>
-                <div className="flex items-center gap-2 rounded-full bg-slate-50 px-2 py-1">
-                  <span className={`text-xs ${config.type === "singles" ? "text-slate-400" : "font-medium text-slate-900"}`}>Doubles</span>
+                <div className="flex items-center gap-2 rounded-full bg-white/10 px-2 py-1">
+                  <span className={`text-xs ${config.type === "singles" ? "text-white/40" : "font-medium text-white"}`}>Doubles</span>
                   <Switch
                     id={`court-${config.courtNumber}`}
                     checked={config.type === "singles"}
                     onCheckedChange={() => toggleCourtType(config.courtNumber)}
                     className="scale-90"
                   />
-                  <span className={`text-xs ${config.type === "singles" ? "font-medium text-slate-900" : "text-slate-400"}`}>Singles</span>
+                  <span className={`text-xs ${config.type === "singles" ? "font-medium text-white" : "text-white/40"}`}>Singles</span>
                 </div>
               </div>
             ))}
