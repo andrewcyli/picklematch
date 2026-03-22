@@ -1,19 +1,19 @@
 /**
  * court-status.ts — Single source of truth for live/next/waiting court state.
  *
- * P0 fix: compute ONE global activeSlotStart (the earliest unscored time slot),
- * then derive live/next/waiting from that anchor. This prevents the same player
- * appearing "Live" on two courts simultaneously.
+ * Each court advances independently to its next unscored match.
+ * Player-level constraint: a match cannot go live if any of its players
+ * are currently live on another court.
  */
 
 import type { Match } from './scheduler';
 
 export interface CourtStatus {
-  /** The global active slot start time (earliest unscored slot), or null if all scored */
+  /** The earliest live match start time, or null if all scored */
   activeSlotStart: number | null;
-  /** Live matches keyed by court number — all from the same time slot */
+  /** Live matches keyed by court number — each court advances independently */
   currentByCourt: Map<number, Match>;
-  /** Next matches keyed by court number — all from the next time slot */
+  /** Next matches keyed by court number — next unscored after the live one */
   nextByCourt: Map<number, Match>;
   /** Players not in any live or next match */
   waitingPlayers: string[];
@@ -27,13 +27,14 @@ export interface CourtStatus {
  * Derive court status from matches, scores, and player list.
  *
  * Algorithm:
- * 1. Find all unscored matches.
- * 2. activeSlotStart = min(startTime) across all unscored matches.
- * 3. Live = unscored matches at activeSlotStart (one per court max).
- * 4. Next slot = min(startTime) across unscored matches with startTime > activeSlotStart.
- * 5. Next = unscored matches at nextSlotStart (one per court max).
- * 6. Waiting = allPlayers minus players in live + next.
- * 7. Hard guard: detect if any player appears in multiple live matches.
+ * 1. Group unscored matches by court, sorted by startTime.
+ * 2. Build candidates: each court's earliest unscored match.
+ * 3. Greedily assign live matches (earliest startTime first).
+ *    A match can go live only if none of its players are already live elsewhere.
+ *    If a court's first candidate is blocked, try its next unscored matches.
+ * 4. For each court, "next" = next unscored match after the live one.
+ * 5. Waiting = players not in any live or next match.
+ * 6. Hard guard: detect player overlap in live set.
  */
 export function computeCourtStatus(
   matches: Match[],
@@ -54,39 +55,60 @@ export function computeCourtStatus(
     };
   }
 
-  // 1. Global active slot = earliest unscored startTime
-  const activeSlotStart = Math.min(...unscoredMatches.map((m) => m.startTime));
-
-  // 2. Live matches = unscored at activeSlotStart
-  const currentByCourt = new Map<number, Match>();
+  // 1. Group unscored matches by court, sorted by startTime
+  const unscoredByCourt = new Map<number, Match[]>();
   for (const m of unscoredMatches) {
-    if (m.startTime === activeSlotStart && !currentByCourt.has(m.court)) {
-      currentByCourt.set(m.court, m);
+    if (!unscoredByCourt.has(m.court)) {
+      unscoredByCourt.set(m.court, []);
     }
+    unscoredByCourt.get(m.court)!.push(m);
+  }
+  for (const [, courtMatches] of unscoredByCourt) {
+    courtMatches.sort((a, b) => a.startTime - b.startTime);
   }
 
-  // 3. Next slot = next distinct startTime after activeSlotStart among unscored
-  const nextSlotCandidates = unscoredMatches
-    .filter((m) => m.startTime > activeSlotStart)
-    .map((m) => m.startTime);
-  const nextSlotStart = nextSlotCandidates.length > 0 ? Math.min(...nextSlotCandidates) : null;
+  // 2. Build candidate courts sorted by their earliest unscored match startTime
+  const courtCandidates = Array.from(unscoredByCourt.entries())
+    .map(([court, courtMatches]) => ({ court, matches: courtMatches }))
+    .sort((a, b) => a.matches[0].startTime - b.matches[0].startTime);
 
-  const nextByCourt = new Map<number, Match>();
-  if (nextSlotStart !== null) {
-    for (const m of unscoredMatches) {
-      if (m.startTime === nextSlotStart && !nextByCourt.has(m.court)) {
-        nextByCourt.set(m.court, m);
+  // 3. Greedily assign live matches — player-level constraint
+  const livePlayers = new Set<string>();
+  const currentByCourt = new Map<number, Match>();
+
+  for (const { court, matches: courtMatches } of courtCandidates) {
+    for (const match of courtMatches) {
+      const players = [...match.team1, ...match.team2];
+      const blocked = players.some((p) => livePlayers.has(p));
+      if (!blocked) {
+        currentByCourt.set(court, match);
+        players.forEach((p) => livePlayers.add(p));
+        break;
       }
     }
   }
 
-  // 4. Waiting = not in live and not in next
+  // 4. Next match per court = next unscored match after the live one
+  const nextByCourt = new Map<number, Match>();
+  for (const { court, matches: courtMatches } of courtCandidates) {
+    const liveMatch = currentByCourt.get(court);
+    const startIdx = liveMatch
+      ? courtMatches.findIndex((m) => m.id === liveMatch.id) + 1
+      : 0;
+    for (let i = startIdx; i < courtMatches.length; i++) {
+      // Next is informational — no player constraint needed
+      nextByCourt.set(court, courtMatches[i]);
+      break;
+    }
+  }
+
+  // 5. Waiting = not in live and not in next
   const occupied = new Set<string>();
   currentByCourt.forEach((m) => [...m.team1, ...m.team2].forEach((p) => occupied.add(p)));
   nextByCourt.forEach((m) => [...m.team1, ...m.team2].forEach((p) => occupied.add(p)));
   const waitingPlayers = allPlayers.filter((p) => !occupied.has(p));
 
-  // 5. Hard guard — detect player overlap in live set
+  // 6. Hard guard — detect player overlap in live set
   const livePlayerCounts = new Map<string, number>();
   currentByCourt.forEach((m) => {
     [...m.team1, ...m.team2].forEach((p) => {
@@ -96,6 +118,10 @@ export function computeCourtStatus(
   const overlappingPlayers = Array.from(livePlayerCounts.entries())
     .filter(([, count]) => count > 1)
     .map(([name]) => name);
+
+  // activeSlotStart = earliest live match startTime (for backward compat)
+  const liveStartTimes = Array.from(currentByCourt.values()).map((m) => m.startTime);
+  const activeSlotStart = liveStartTimes.length > 0 ? Math.min(...liveStartTimes) : null;
 
   return {
     activeSlotStart,
