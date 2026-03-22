@@ -344,7 +344,7 @@ const SessionHeader = ({
         {!isPlayerView ? (
           <Button size="sm" onClick={onShowPlayerSelector} className="h-9 bg-lime-400 px-3 text-slate-950 hover:bg-lime-300">
             <UserCircle2 className="mr-2 h-4 w-4" />
-            I’m playing
+            I'm playing
           </Button>
         ) : (
           <Button variant="outline" size="sm" onClick={onReleaseIdentity} className="h-9 border-white/15 bg-white/5 px-3 text-white hover:bg-white/10 hover:text-white">
@@ -395,7 +395,7 @@ const SetupScreen = ({
         </div>
         <div className="mt-3 grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
           <div className="rounded-[1rem] border border-white/10 bg-white/5 px-3 py-3 text-sm text-white/78">Round robin only</div>
-          <div className="rounded-[1rem] border border-white/10 bg-white/5 px-3 py-3 text-sm text-white/78">1–2 courts only</div>
+          <div className="rounded-[1rem] border border-white/10 bg-white/5 px-3 py-3 text-sm text-white/78">1-2 courts only</div>
           <div className="rounded-[1rem] border border-white/10 bg-white/5 px-3 py-3 text-sm text-white/78">Save here, roster next</div>
         </div>
       </Card>
@@ -559,7 +559,7 @@ const PlayersScreen = ({
         <Card className="border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-emerald-300">
           <div className="flex items-center gap-2 text-sm font-semibold">
             <Check className="h-4 w-4" />
-            Pairing {selectedForPairing} — tap a partner card next.
+            Pairing {selectedForPairing} - tap a partner card next.
           </div>
         </Card>
       ) : null}
@@ -944,20 +944,11 @@ const CourtsScreen = ({
         </div>
 
         <div className="min-w-0 space-y-3">
-          <Card className="min-w-0 overflow-hidden border-white/10 bg-slate-950/85 p-4 text-white shadow-xl shadow-cyan-950/10">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-[11px] uppercase tracking-[0.2em] text-white/45">Match rail</div>
-                <h3 className="mt-1 text-lg font-semibold">Session timeline</h3>
-                <p className="mt-1 text-xs text-white/55">Scroll back for finished matches, hold here for what’s next, keep moving right for later courts.</p>
-              </div>
-              <Badge className="border-0 bg-white/10 text-white">{sessionRail.length}</Badge>
-            </div>
-
+          <div className="min-w-0">
             {sessionRail.length === 0 ? (
-              <div className="mt-3 rounded-[1rem] border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/65">No matches scheduled yet.</div>
+              <div className="rounded-[1rem] border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/65">No matches scheduled yet.</div>
             ) : (
-              <div className="mt-3 min-w-0 overflow-hidden">
+              <div className="min-w-0 overflow-hidden">
                 <div className="flex max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1 [-webkit-overflow-scrolling:touch]">
                   {sessionRail.map(({ match, isCompleted, isCurrent, isNext }) => {
                     const score = matchScores.get(match.id);
@@ -1009,7 +1000,7 @@ const CourtsScreen = ({
                             <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">Score</div>
                             <div className="text-sm font-semibold text-white">
                               {score.team1}
-                              <span className="px-1.5 text-white/35">—</span>
+                              <span className="px-1.5 text-white/35">-</span>
                               {score.team2}
                             </div>
                           </div>
@@ -1024,7 +1015,7 @@ const CourtsScreen = ({
                 </div>
               </div>
             )}
-          </Card>
+          </div>
         </div>
       </div>
     </div>
@@ -1053,7 +1044,7 @@ const WrapScreen = ({
 
   const handleCopyRecap = useCallback(async () => {
     if (standings.length === 0) {
-      toast.error("Finish a match first so there’s something to recap");
+      toast.error("Finish a match first so there's something to recap");
       return;
     }
 
@@ -1117,7 +1108,7 @@ const WrapScreen = ({
             </div>
             <div className="rounded-[1rem] bg-slate-950 px-3 py-3 text-center">
               <div className="text-[10px] uppercase tracking-[0.18em] text-white/50">Latest</div>
-              <div className="mt-1 text-base font-semibold">{hottestMatch ? `Court ${hottestMatch.court}` : "—"}</div>
+              <div className="mt-1 text-base font-semibold">{hottestMatch ? `Court ${hottestMatch.court}` : "-"}</div>
             </div>
           </div>
         </Card>
@@ -1599,13 +1590,13 @@ const Index = () => {
     if (!gameId || !playerName) return;
     try {
       await setSkipNextMatch(gameId, playerName, true);
-      toast.success("You’re marked to skip your next match");
+      toast.success("You're marked to skip your next match");
       window.setTimeout(async () => {
         await setSkipNextMatch(gameId, playerName, false);
       }, 5 * 60 * 1000);
     } catch (error) {
       debugLogger.log("error", `skip failed for ${matchId}`, error);
-      toast.error("Couldn’t update skip status");
+      toast.error("Couldn't update skip status");
     }
   }, [gameId, playerName]);
 
