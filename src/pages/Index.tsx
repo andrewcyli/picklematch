@@ -960,7 +960,7 @@ const CourtsScreen = ({
         </div>
 
         <div className="space-y-3">
-          <Card className="border-white/10 bg-slate-950/85 p-4 text-white shadow-xl shadow-cyan-950/10">
+          <Card className="overflow-hidden border-white/10 bg-slate-950/85 p-4 text-white shadow-xl shadow-cyan-950/10">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-[11px] uppercase tracking-[0.2em] text-white/45">Up Next</div>
@@ -986,20 +986,20 @@ const CourtsScreen = ({
                 const isCurrent = index === 0;
                 const isNext = index === 1;
                 return (
-                  <div key={match.id} className={`w-40 min-w-[10rem] rounded-[1rem] border p-2.5 ${isCurrent ? "border-emerald-300/20 bg-emerald-300/10" : isNext ? "border-amber-300/20 bg-amber-300/10" : "border-white/10 bg-white/5"}`}>
+                  <div key={match.id} className={`w-36 min-w-[9rem] flex-shrink-0 rounded-[1rem] border p-2.5 ${isCurrent ? "border-emerald-300/20 bg-emerald-300/10" : isNext ? "border-amber-300/20 bg-amber-300/10" : "border-white/10 bg-white/5"}`}>
                     <div className="flex items-center justify-between gap-1">
                       <Badge className={`border-0 text-[10px] px-1.5 py-0.5 ${isCurrent ? "bg-emerald-500 text-white" : isNext ? "bg-amber-500 text-white" : "bg-white/10 text-white"}`}>
                         {isCurrent ? "Live" : isNext ? "Next" : `#${index + 1}`}
                       </Badge>
                       <div className="text-[10px] text-white/55">{getMatchLabel(matches, match)}</div>
                     </div>
-                    <div className="mt-1.5 text-xs leading-5 text-white/90">{getTeamLabel(match.team1)} <span className="text-white/45">v</span> {getTeamLabel(match.team2)}</div>
+                    <div className="mt-1.5 text-xs leading-5 text-white/90 line-clamp-2">{getTeamLabel(match.team1)} <span className="text-white/45">v</span> {getTeamLabel(match.team2)}</div>
                   </div>
                 );
               })}
 
               {featuredQueue.length === 0 ? (
-                <div className="w-full rounded-[1rem] border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/65">No upcoming matches on this court yet.</div>
+                <div className="w-full flex-shrink rounded-[1rem] border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/65">No upcoming matches on this court yet.</div>
               ) : null}
             </div>
           </Card>
@@ -1014,29 +1014,32 @@ const CourtsScreen = ({
                 const score = pendingScores.get(match.id) || matchScores.get(match.id) || { team1: "", team2: "" };
                 return (
                   <div key={match.id} className="rounded-[0.85rem] border border-white/10 bg-white/5 px-2.5 py-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-white/50">{getMatchLabel(matches, match)}</span>
-                      <span className="min-w-0 flex-1 truncate text-xs text-white/80">{getTeamLabel(match.team1)} v {getTeamLabel(match.team2)}</span>
+                    <div className="flex items-center gap-1 text-[10px] text-white/50 mb-1.5">
+                      <span>{getMatchLabel(matches, match)}</span>
                     </div>
-                    <div className="mt-1.5 flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="min-w-0 flex-1 truncate text-xs font-medium text-white/80 text-right">{getTeamLabel(match.team1)}</span>
                       <Input
                         type="number"
                         min="0"
                         value={score.team1}
                         onChange={(event) => updatePendingScore(match.id, "team1", event.target.value)}
-                        className="h-8 flex-1 rounded-lg border-white/20 bg-white/10 text-center text-sm font-semibold text-white placeholder:text-white/30"
+                        className="h-9 w-9 shrink-0 rounded-lg border-white/20 bg-white/10 text-center text-sm font-bold text-white placeholder:text-white/30 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         placeholder="0"
                       />
-                      <span className="text-[10px] text-white/40">–</span>
+                      <span className="text-xs font-bold text-white/40">—</span>
                       <Input
                         type="number"
                         min="0"
                         value={score.team2}
                         onChange={(event) => updatePendingScore(match.id, "team2", event.target.value)}
-                        className="h-8 flex-1 rounded-lg border-white/20 bg-white/10 text-center text-sm font-semibold text-white placeholder:text-white/30"
+                        className="h-9 w-9 shrink-0 rounded-lg border-white/20 bg-white/10 text-center text-sm font-bold text-white placeholder:text-white/30 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         placeholder="0"
                       />
-                      <Button onClick={() => saveScore(match)} variant="outline" size="sm" className="h-8 rounded-lg border-white/15 bg-white/5 px-2.5 text-[10px] text-white hover:bg-white/10 hover:text-white">Save</Button>
+                      <span className="min-w-0 flex-1 truncate text-xs font-medium text-white/80">{getTeamLabel(match.team2)}</span>
+                      <Button onClick={() => saveScore(match)} variant="outline" size="sm" className="h-8 w-8 shrink-0 rounded-lg border-white/15 bg-white/5 p-0 text-white hover:bg-white/10 hover:text-white">
+                        <Check className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </div>
                 );
