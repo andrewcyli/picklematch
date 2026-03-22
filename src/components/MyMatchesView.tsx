@@ -36,84 +36,71 @@ export const MyMatchesView = ({
       ((team1HasPlayer && score.team1 > score.team2) || 
        (!team1HasPlayer && score.team2 > score.team1));
 
-    // Court/match labeling to match schedule cards (A1, A2, B1...)
     const courtLetter = String.fromCharCode(64 + (match.court || 1));
     const perCourtIndex = allMatches.filter(m => m.court === match.court && m.endTime <= match.endTime).length;
     const matchLabel = `${courtLetter}${perCourtIndex}`;
 
-    // Calculate estimated start time for upcoming matches
-    const getEstimatedTime = () => {
-      if (status === "current" || status === "completed") return null;
-      
-      // Estimate 15 minutes per match
-      const minutesPerMatch = 15;
-      const estimatedMinutes = matchIndex * minutesPerMatch;
-      const estimatedTime = new Date(currentTime.getTime() + estimatedMinutes * 60000);
-      
-      return estimatedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    };
-
     return (
       <Card
         key={match.id}
-        className={`p-4 transition-all ${
+        className={`p-3 transition-all border-white/10 ${
           status === "current"
-            ? "border-2 border-green-500 bg-green-500/5 animate-pulse"
+            ? "border-emerald-500/40 bg-emerald-500/10 animate-pulse"
             : status === "upnext"
-            ? "border-2 border-yellow-500 bg-yellow-500/5"
+            ? "border-amber-500/30 bg-amber-500/10"
             : status === "completed" && isWinner
-            ? "border-green-500/50 bg-green-500/5"
-            : ""
+            ? "border-emerald-500/20 bg-emerald-500/5"
+            : "bg-white/5"
         }`}
       >
-        <div className="space-y-3">
+        <div className="space-y-2">
           {/* Header */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Badge variant="outline" className="font-mono">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="font-mono border-white/20 text-white/80 text-xs">
                 {matchLabel}
               </Badge>
-              <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-muted-foreground" />
-                <span className="font-semibold">Court {courtLetter}</span>
+              <div className="flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5 text-white/50" />
+                <span className="text-sm font-semibold text-white">Court {courtLetter}</span>
               </div>
             </div>
             {status === "current" && (
-              <Badge className="bg-green-500">Playing Now</Badge>
+              <Badge className="bg-emerald-500 text-white border-0">Playing Now</Badge>
             )}
             {status === "upnext" && (
-              <Badge className="bg-yellow-500">Up Next</Badge>
+              <Badge className="bg-amber-500 text-white border-0">Up Next</Badge>
             )}
             {status === "completed" && score && (
-              <Badge variant={isWinner ? "default" : "secondary"}>
+              <Badge className={`border-0 ${isWinner ? "bg-emerald-500 text-white" : "bg-white/10 text-white/70"}`}>
                 {isWinner ? "Won" : "Lost"}
               </Badge>
             )}
           </div>
 
           {/* Match Details */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className={`space-y-1 ${team1HasPlayer ? "font-bold" : ""}`}>
-              <p className="text-sm text-muted-foreground">Team 1</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className={`space-y-0.5 ${team1HasPlayer ? "font-bold" : ""}`}>
+              <p className="text-xs text-white/50">Team 1</p>
               {match.team1.map((p) => (
-                <p key={p} className={`text-sm ${p === playerName ? "text-primary font-bold" : ""}`}>
+                <p key={p} className={`text-sm ${p === playerName ? "text-lime-300 font-bold" : "text-white/80"}`}>
                   {p === playerName ? "You" : p}
                 </p>
               ))}
               {score && (
-                <p className="text-2xl font-bold">{score.team1}</p>
+                <p className="text-xl font-bold text-white">{score.team1}</p>
               )}
             </div>
 
-            <div className={`space-y-1 ${!team1HasPlayer ? "font-bold" : ""}`}>
-              <p className="text-sm text-muted-foreground">Team 2</p>
+            <div className={`space-y-0.5 ${!team1HasPlayer ? "font-bold" : ""}`}>
+              <p className="text-xs text-white/50">Team 2</p>
               {match.team2.map((p) => (
-                <p key={p} className={`text-sm ${p === playerName ? "text-primary font-bold" : ""}`}>
+                <p key={p} className={`text-sm ${p === playerName ? "text-lime-300 font-bold" : "text-white/80"}`}>
                   {p === playerName ? "You" : p}
                 </p>
               ))}
               {score && (
-                <p className="text-2xl font-bold">{score.team2}</p>
+                <p className="text-xl font-bold text-white">{score.team2}</p>
               )}
             </div>
           </div>
@@ -123,7 +110,7 @@ export const MyMatchesView = ({
               variant="outline"
               size="sm"
               onClick={() => onSkipMatch(match.id)}
-              className="text-xs"
+              className="text-xs border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
             >
               Skip Match
             </Button>
@@ -138,20 +125,20 @@ export const MyMatchesView = ({
     : matchGroups.upNext.length + matchGroups.later.length + matchGroups.completed.length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Header with Organizer View Button */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
-          <UserCircle className="h-5 w-5 text-primary" />
-          <span className="text-sm font-medium">
-            Playing as: <span className="text-primary font-bold">{playerName}</span>
+          <UserCircle className="h-4 w-4 text-lime-400" />
+          <span className="text-sm font-medium text-white/70">
+            Playing as: <span className="text-lime-300 font-bold">{playerName}</span>
           </span>
         </div>
         <Button
           variant="outline"
           size="sm"
           onClick={onReleaseIdentity}
-          className="gap-2"
+          className="gap-2 border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
         >
           <Users className="h-4 w-4" />
           Organizer View
@@ -170,8 +157,8 @@ export const MyMatchesView = ({
       {/* Current Match */}
       {matchGroups.current && (
         <div className="space-y-2">
-          <h2 className="text-base font-bold text-foreground flex items-center gap-2">
-            <Users className="h-4 w-4 text-green-500" />
+          <h2 className="text-sm font-bold text-white flex items-center gap-2">
+            <Users className="h-4 w-4 text-emerald-400" />
             Playing Now
           </h2>
           {renderMatch(matchGroups.current, "current", 0)}
@@ -181,8 +168,8 @@ export const MyMatchesView = ({
       {/* Up Next */}
       {matchGroups.upNext.length > 0 && (
         <div className="space-y-2">
-          <h2 className="text-base font-bold text-foreground flex items-center gap-2">
-            <Clock className="h-4 w-4 text-yellow-500" />
+          <h2 className="text-sm font-bold text-white flex items-center gap-2">
+            <Clock className="h-4 w-4 text-amber-400" />
             Up Next
           </h2>
           {matchGroups.upNext.map((match, idx) => renderMatch(match, "upnext", idx + 1))}
@@ -195,12 +182,12 @@ export const MyMatchesView = ({
           <Button
             variant="ghost"
             onClick={() => setShowLater(!showLater)}
-            className="w-full justify-between p-2"
+            className="w-full justify-between p-2 text-white hover:bg-white/10 hover:text-white"
           >
-            <span className="text-base font-bold text-foreground">
+            <span className="text-sm font-bold text-white">
               Later ({matchGroups.later.length})
             </span>
-            {showLater ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {showLater ? <ChevronUp className="h-4 w-4 text-white/60" /> : <ChevronDown className="h-4 w-4 text-white/60" />}
           </Button>
           {showLater && (
             <div className="space-y-2">
@@ -218,12 +205,12 @@ export const MyMatchesView = ({
           <Button
             variant="ghost"
             onClick={() => setShowCompleted(!showCompleted)}
-            className="w-full justify-between p-2"
+            className="w-full justify-between p-2 text-white hover:bg-white/10 hover:text-white"
           >
-            <span className="text-base font-bold text-foreground">
+            <span className="text-sm font-bold text-white">
               Completed ({matchGroups.completed.length})
             </span>
-            {showCompleted ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {showCompleted ? <ChevronUp className="h-4 w-4 text-white/60" /> : <ChevronDown className="h-4 w-4 text-white/60" />}
           </Button>
           {showCompleted && (
             <div className="space-y-2">
@@ -237,8 +224,8 @@ export const MyMatchesView = ({
 
       {/* No matches */}
       {!matchGroups.current && matchGroups.upNext.length === 0 && matchGroups.later.length === 0 && (
-        <Card className="p-6 sm:p-8 text-center">
-          <p className="text-sm text-muted-foreground">No upcoming matches. Check back later!</p>
+        <Card className="p-6 text-center border-white/10 bg-white/5">
+          <p className="text-sm text-white/50">No upcoming matches. Check back later!</p>
         </Card>
       )}
     </div>

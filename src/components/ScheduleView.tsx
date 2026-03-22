@@ -409,7 +409,8 @@ export const ScheduleView = ({
                       min="0"
                       value={score.team1}
                       onChange={(event) => updatePendingScore(match.id, "team1", event.target.value)}
-                      className="h-11 rounded-2xl text-center text-lg font-semibold"
+                      className="h-11 rounded-2xl border-2 border-slate-300 bg-white text-center text-lg font-semibold text-slate-900 placeholder:text-slate-400"
+                      placeholder="0"
                     />
                   </div>
                   <div>
@@ -419,7 +420,8 @@ export const ScheduleView = ({
                       min="0"
                       value={score.team2}
                       onChange={(event) => updatePendingScore(match.id, "team2", event.target.value)}
-                      className="h-11 rounded-2xl text-center text-lg font-semibold"
+                      className="h-11 rounded-2xl border-2 border-slate-300 bg-white text-center text-lg font-semibold text-slate-900 placeholder:text-slate-400"
+                      placeholder="0"
                     />
                   </div>
                 </div>
