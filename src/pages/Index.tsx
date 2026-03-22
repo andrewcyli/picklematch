@@ -959,10 +959,10 @@ const CourtsScreen = ({
           </div>
         </div>
 
-        <div className="space-y-3">
-          <Card className="overflow-hidden border-white/10 bg-slate-950/85 p-4 text-white shadow-xl shadow-cyan-950/10">
+        <div className="min-w-0 space-y-3">
+          <Card className="min-w-0 overflow-hidden border-white/10 bg-slate-950/85 p-4 text-white shadow-xl shadow-cyan-950/10">
             <div className="flex items-center justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <div className="text-[11px] uppercase tracking-[0.2em] text-white/45">Up Next</div>
                 <h3 className="mt-1 text-lg font-semibold">Court {featuredCourt}</h3>
               </div>
@@ -981,27 +981,29 @@ const CourtsScreen = ({
               </div>
             </div>
 
-            <div className="mt-3 upcoming-scroll">
-              {featuredQueue.slice(0, 6).map((match, index) => {
-                const isCurrent = index === 0;
-                const isNext = index === 1;
-                return (
-                  <div key={match.id} className={`w-36 min-w-[9rem] flex-shrink-0 rounded-[1rem] border p-2.5 ${isCurrent ? "border-emerald-300/20 bg-emerald-300/10" : isNext ? "border-amber-300/20 bg-amber-300/10" : "border-white/10 bg-white/5"}`}>
-                    <div className="flex items-center justify-between gap-1">
-                      <Badge className={`border-0 text-[10px] px-1.5 py-0.5 ${isCurrent ? "bg-emerald-500 text-white" : isNext ? "bg-amber-500 text-white" : "bg-white/10 text-white"}`}>
-                        {isCurrent ? "Live" : isNext ? "Next" : `#${index + 1}`}
-                      </Badge>
-                      <div className="text-[10px] text-white/55">{getMatchLabel(matches, match)}</div>
-                    </div>
-                    <div className="mt-1.5 text-xs leading-5 text-white/90 line-clamp-2">{getTeamLabel(match.team1)} <span className="text-white/45">v</span> {getTeamLabel(match.team2)}</div>
-                  </div>
-                );
-              })}
-
-              {featuredQueue.length === 0 ? (
-                <div className="w-full flex-shrink rounded-[1rem] border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/65">No upcoming matches on this court yet.</div>
-              ) : null}
-            </div>
+            {featuredQueue.length === 0 ? (
+              <div className="mt-3 rounded-[1rem] border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/65">No upcoming matches on this court yet.</div>
+            ) : (
+              <div className="mt-3 min-w-0 overflow-hidden">
+                <div className="flex max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1 [-webkit-overflow-scrolling:touch]">
+                  {featuredQueue.slice(0, 6).map((match, index) => {
+                    const isCurrent = index === 0;
+                    const isNext = index === 1;
+                    return (
+                      <div key={match.id} className={`w-32 min-w-[8rem] shrink-0 rounded-[1rem] border p-2 ${isCurrent ? "border-emerald-300/20 bg-emerald-300/10" : isNext ? "border-amber-300/20 bg-amber-300/10" : "border-white/10 bg-white/5"}`}>
+                        <div className="flex items-center justify-between gap-1">
+                          <Badge className={`border-0 px-1.5 py-0.5 text-[10px] ${isCurrent ? "bg-emerald-500 text-white" : isNext ? "bg-amber-500 text-white" : "bg-white/10 text-white"}`}>
+                            {isCurrent ? "Live" : isNext ? "Next" : `#${index + 1}`}
+                          </Badge>
+                          <div className="text-[10px] text-white/55">{getMatchLabel(matches, match)}</div>
+                        </div>
+                        <div className="mt-1 text-[11px] leading-4 text-white/90 line-clamp-2">{getTeamLabel(match.team1)} <span className="text-white/45">v</span> {getTeamLabel(match.team2)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </Card>
 
           <Card className="border-white/10 bg-slate-900/70 p-3 shadow-xl shadow-cyan-950/10 text-white">
