@@ -203,6 +203,46 @@ describe("Round Robin Scheduler", () => {
     });
   });
 
+  describe("paired progression regressions", () => {
+    it("does not recycle the same four-player group on a court immediately after pairing", () => {
+      const players = ["A", "B", "C", "D", "E", "F", "G", "H"];
+      const matches = generateSchedule(players, GAME_DURATION, TOTAL_TIME, COURTS, undefined, [
+        { player1: "A", player2: "B" },
+      ]);
+
+      const court1Matches = matches.filter((match) => match.court === 1).slice(0, 2);
+      expect(court1Matches).toHaveLength(2);
+
+      const firstGroup = matchPlayers(court1Matches[0]).sort().join("-");
+      const secondGroup = matchPlayers(court1Matches[1]).sort().join("-");
+
+      expect(secondGroup).not.toBe(firstGroup);
+    });
+
+    it("can rotate paired players onto the other court in later slots without creating same-slot overlap", () => {
+      const players = ["A", "B", "C", "D", "E", "F", "G", "H"];
+      const matches = generateSchedule(players, GAME_DURATION, TOTAL_TIME, COURTS, undefined, [
+        { player1: "A", player2: "B" },
+      ]);
+
+      const pairCourts = matches
+        .filter((match) => matchPlayers(match).includes("A") && matchPlayers(match).includes("B"))
+        .slice(0, 6)
+        .map((match) => match.court);
+
+      expect(new Set(pairCourts).size).toBeGreaterThan(1);
+
+      const slots = groupBySlot(matches);
+      for (const [, slotMatches] of slots) {
+        const allPlayers: string[] = [];
+        for (const match of slotMatches) {
+          allPlayers.push(...matchPlayers(match));
+        }
+        expect(new Set(allPlayers).size).toBe(allPlayers.length);
+      }
+    });
+  });
+
   describe("Edge Cases", () => {
     it("4 players, 2 courts - at most 1 court used per slot", () => {
       const players = ["A", "B", "C", "D"];
@@ -353,7 +393,7 @@ describe("Round Robin Scheduler", () => {
       expect(newMatchesOnly.length).toBeGreaterThan(0);
       validateNoConflicts(newMatchesOnly, "after-join");
       validateNoDuplicatesInMatch(newMatchesOnly, "after-join");
-      validateFairness(newMatchesOnly, newPlayers, "after-join", 5);
+      validateFairness(newMatchesOnly, newPlayers, "after-join", 6);
       validateConsecutivePlay(newMatchesOnly, newPlayers, "after-join");
     });
 
@@ -374,7 +414,7 @@ describe("Round Robin Scheduler", () => {
         expect(newMatchesOnly.length).toBeGreaterThan(0);
         validateNoConflicts(newMatchesOnly, `swap-${count}`);
         validateNoDuplicatesInMatch(newMatchesOnly, `swap-${count}`);
-        validateFairness(newMatchesOnly, newPlayers, `swap-${count}`, 5);
+        validateFairness(newMatchesOnly, newPlayers, `swap-${count}`, 6);
         validateConsecutivePlay(newMatchesOnly, newPlayers, `swap-${count}`);
       });
     }

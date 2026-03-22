@@ -274,7 +274,6 @@ function generateCompleteSchedule(
       // CRITICAL: Exclude all players already used in THIS slot (current matches across courts)
       const excludedPlayers = new Set([
         ...playersUsedThisSlot, // Players in current/next matches on ALL courts in this slot
-        ...getPreviousSlotPlayersOnOtherCourts(schedule, slot, courtConfig.courtNumber),
         ...getRestingPlayers(restQueue, slot, players)
       ]);
       
@@ -1057,7 +1056,6 @@ export function regenerateScheduleFromSlot(
     for (const courtConfig of courtOrder) {
       const excludedPlayers = new Set([
         ...playersUsedThisSlot,
-        ...getPreviousSlotPlayersOnOtherCourts(schedule, slot, courtConfig.courtNumber),
         ...getRestingPlayers(restQueue, slot, players)
       ]);
       
