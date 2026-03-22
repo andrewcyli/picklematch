@@ -109,6 +109,29 @@ const getMatchLabel = (matches: Match[], match: Match) => {
   return `C${match.court}-${Math.max(index, 1)}`;
 };
 
+const normalizeRoundRobinConfig = (config: GameConfig): GameConfig => {
+  const safeCourts = Math.max(1, Number.isFinite(config.courts) ? Math.round(config.courts) : 1);
+  const safeGameDuration = [5, 10, 15].includes(config.gameDuration) ? config.gameDuration : 10;
+  const safeTotalTime = Number.isFinite(config.totalTime) && config.totalTime > 0 ? Math.round(config.totalTime) : 60;
+  const normalizedCourtConfigs = Array.from({ length: safeCourts }, (_, index) => {
+    const existing = config.courtConfigs?.[index];
+    return {
+      courtNumber: index + 1,
+      type: existing?.type === "singles" ? "singles" as const : "doubles" as const,
+    };
+  });
+
+  return {
+    gameDuration: safeGameDuration,
+    totalTime: safeTotalTime,
+    courts: safeCourts,
+    courtConfigs: normalizedCourtConfigs,
+    teammatePairs: config.teammatePairs,
+    schedulingType: "round-robin",
+    tournamentPlayStyle: undefined,
+  };
+};
+
 const buildStandings = (
   players: string[],
   matches: Match[],
@@ -710,15 +733,24 @@ const CourtsScreen = ({
 
   const sessionRail = useMemo(() => {
     const liveMatchIds = new Set(Array.from(currentByCourt.values()).map((match) => match.id));
+    const primaryLiveMatchId = featuredCurrent?.id ?? null;
     const firstUpcomingMatchId = matches.find((match) => !matchScores.has(match.id) && !liveMatchIds.has(match.id))?.id;
 
-    return matches.map((match) => ({
-      match,
-      isCompleted: matchScores.has(match.id),
-      isCurrent: liveMatchIds.has(match.id),
-      isNext: firstUpcomingMatchId === match.id,
-    }));
-  }, [currentByCourt, matchScores, matches]);
+    return matches.map((match) => {
+      const isCompleted = matchScores.has(match.id);
+      const isCurrent = primaryLiveMatchId === match.id;
+      const isParallelLive = !isCurrent && liveMatchIds.has(match.id);
+      const isNext = firstUpcomingMatchId === match.id;
+
+      return {
+        match,
+        isCompleted,
+        isCurrent,
+        isParallelLive,
+        isNext,
+      };
+    });
+  }, [currentByCourt, featuredCurrent, matchScores, matches]);
 
   const nextRailAnchorId = useMemo(() => {
     const nextUpcoming = sessionRail.find((entry) => !entry.isCompleted && !entry.isCurrent);
@@ -950,23 +982,27 @@ const CourtsScreen = ({
             ) : (
               <div className="min-w-0 overflow-hidden">
                 <div className="flex max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1 [-webkit-overflow-scrolling:touch]">
-                  {sessionRail.map(({ match, isCompleted, isCurrent, isNext }) => {
+                  {sessionRail.map(({ match, isCompleted, isCurrent, isParallelLive, isNext }) => {
                     const score = matchScores.get(match.id);
-                    const statusLabel = isCompleted ? "Final" : isCurrent ? "Live" : isNext ? "Next" : "Later";
+                    const statusLabel = isCompleted ? "Final" : isCurrent ? "Live" : isParallelLive ? `Live · Court ${match.court}` : isNext ? "Next" : "Later";
                     const statusClass = isCompleted
                       ? "bg-violet-500/20 text-violet-200"
                       : isCurrent
                         ? "bg-emerald-500 text-white"
-                        : isNext
-                          ? "bg-amber-500 text-white"
-                          : "bg-white/10 text-white";
+                        : isParallelLive
+                          ? "bg-cyan-500/20 text-cyan-100"
+                          : isNext
+                            ? "bg-amber-500 text-white"
+                            : "bg-white/10 text-white";
                     const cardClass = isCompleted
                       ? "border-violet-300/15 bg-violet-400/10"
                       : isCurrent
                         ? "border-emerald-300/20 bg-emerald-300/10"
-                        : isNext
-                          ? "border-amber-300/20 bg-amber-300/10 ring-1 ring-amber-300/25"
-                          : "border-white/10 bg-white/5";
+                        : isParallelLive
+                          ? "border-cyan-300/20 bg-cyan-300/10"
+                          : isNext
+                            ? "border-amber-300/20 bg-amber-300/10 ring-1 ring-amber-300/25"
+                            : "border-white/10 bg-white/5";
 
                     return (
                       <div
@@ -1006,7 +1042,13 @@ const CourtsScreen = ({
                           </div>
                         ) : (
                           <div className="mt-2 text-[10px] text-white/55">
-                            {isCurrent ? "Live on court now" : isNext ? "Next match in view" : "Scheduled later in the run"}
+                            {isCurrent
+                              ? `Live on selected court ${featuredCourt}`
+                              : isParallelLive
+                                ? `Live now on court ${match.court}`
+                                : isNext
+                                  ? "Next match in view"
+                                  : "Scheduled later in the run"}
                           </div>
                         )}
                       </div>
@@ -1460,29 +1502,47 @@ const Index = () => {
   }, [determineStep, saveSessionStorage, syncMatchScoresFromMatches, userId]);
 
   const handleSetupComplete = useCallback(async (config: GameConfig) => {
-    if (!userId) {
-      toast.error("Please wait for authentication");
-      return;
-    }
-
-    const roundRobinConfig: GameConfig = {
-      ...config,
-      schedulingType: "round-robin",
-      tournamentPlayStyle: undefined,
-    };
-
+    const roundRobinConfig = normalizeRoundRobinConfig(config);
     setGameConfig(roundRobinConfig);
 
     try {
-      if (gameId) {
-        const { error } = await supabase.from("games").update({ game_config: roundRobinConfig as any }).eq("id", gameId);
+      let activeUserId = userId;
+      if (!activeUserId) {
+        const { data: { session } } = await supabase.auth.getSession();
+        activeUserId = session?.user?.id || null;
+      }
+
+      if (!activeUserId) {
+        const { data, error } = await supabase.auth.signInAnonymously();
         if (error) throw error;
+        activeUserId = data.user?.id || null;
+      }
+
+      if (!activeUserId) {
+        toast.error("Please wait for authentication");
+        return;
+      }
+
+      setUserId(activeUserId);
+
+      if (gameId) {
+        const { data, error } = await supabase
+          .from("games")
+          .update({ game_config: roundRobinConfig as any })
+          .eq("id", gameId)
+          .select("id")
+          .maybeSingle();
+
+        if (error) throw error;
+        if (!data) throw new Error("setup update returned no game row");
       } else {
-        const { data: codeData } = await supabase.rpc("generate_game_code");
+        const { data: codeData, error: codeError } = await supabase.rpc("generate_game_code");
+        if (codeError) throw codeError;
+
         const newCode = codeData as string;
         const { data, error } = await supabase
           .from("games")
-          .insert([{ game_code: newCode, game_config: roundRobinConfig as any, players: [], matches: [], creator_id: userId }])
+          .insert([{ game_code: newCode, game_config: roundRobinConfig as any, players: [], matches: [], creator_id: activeUserId }])
           .select()
           .single();
         if (error) throw error;
@@ -1495,7 +1555,12 @@ const Index = () => {
 
       setActiveStep("players");
     } catch (error) {
-      debugLogger.log("error", "setup save failed", error);
+      debugLogger.log("error", "setup save failed", {
+        error,
+        gameId,
+        userId,
+        config: roundRobinConfig,
+      });
       toast.error("Failed to save setup");
     }
   }, [gameId, saveSessionStorage, userId]);
