@@ -883,20 +883,7 @@ const CourtsScreen = ({
                 )}
               </div>
 
-              <div className="mt-3 grid gap-2 sm:grid-cols-[1.15fr_0.85fr]">
-                <div className="rounded-[1.1rem] border border-white/10 bg-white/5 p-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/50">Next up</div>
-                  <div className="mt-1 text-sm font-semibold text-white/85">{featuredNext ? `${getTeamLabel(featuredNext.team1)} vs ${getTeamLabel(featuredNext.team2)}` : "No queued follow-up yet."}</div>
-                </div>
-                <div className="rounded-[1.1rem] border border-white/10 bg-white/5 p-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/50">Bench</div>
-                  <div className="mt-1 flex flex-wrap gap-1.5">
-                    {waitingPlayers.length > 0 ? waitingPlayers.slice(0, 6).map((player) => (
-                      <Badge key={player} variant="secondary" className="rounded-full bg-white/10 text-white/80">{player}</Badge>
-                    )) : <span className="text-sm text-white/55">Everyone is live or next.</span>}
-                  </div>
-                </div>
-              </div>
+
             </Card>
           </div>
 
@@ -950,10 +937,6 @@ const CourtsScreen = ({
                     )}
                   </div>
 
-                  <div className="mt-3 rounded-[1.1rem] border border-white/10 bg-white/5 p-3">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/50">Next up</div>
-                    <div className="mt-1 text-sm font-semibold text-white/85">{next ? `${getTeamLabel(next.team1)} vs ${getTeamLabel(next.team2)}` : "No queued follow-up yet."}</div>
-                  </div>
                 </Card>
               );
             })}
