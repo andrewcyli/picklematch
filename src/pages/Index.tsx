@@ -2,15 +2,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   ArrowRight,
+  Check,
   Clock3,
   Copy,
   Crown,
+  Link2,
   Loader2,
   Medal,
   Plus,
   QrCode,
   Share2,
   Sparkles,
+  Unlink,
+  UserMinus,
   Users,
   UserCircle2,
   Waves,
@@ -19,9 +23,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { GameSetup, GameConfig } from "@/components/GameSetup";
-import { CheckInOut } from "@/components/CheckInOut";
 import { ScheduleView } from "@/components/ScheduleView";
 import { Leaderboard } from "@/components/Leaderboard";
 import { MatchHistory } from "@/components/MatchHistory";
@@ -35,6 +39,7 @@ import { setSkipNextMatch } from "@/lib/player-identity";
 import { generateSchedule, Match } from "@/lib/scheduler";
 import { safeStorage } from "@/lib/safe-storage";
 import { debugLogger } from "@/lib/debug-logger";
+import { validatePlayerName } from "@/lib/validation";
 import logo from "@/assets/logo.png";
 
 const STORAGE_GAME_ID = "picklematch_game_id";
@@ -57,6 +62,16 @@ const adSlot = (label: string) => (
     Reserved AdSense space · {label}
   </div>
 );
+
+const parseBulkNames = (value: string) =>
+  Array.from(
+    new Set(
+      value
+        .split(/[\n,]+/)
+        .map((name) => name.trim())
+        .filter(Boolean)
+    )
+  );
 
 const sanitizeMatches = (arr: Match[]): Match[] => {
   const seen = new Map<string, number>();
@@ -208,54 +223,33 @@ const SessionHeader = ({
   }, [matchScores, matches, players]);
 
   return (
-    <Card className="overflow-hidden border-white/10 bg-[linear-gradient(150deg,rgba(17,24,39,0.95),rgba(19,71,72,0.88),rgba(12,18,33,0.96))] p-5 text-white shadow-2xl shadow-cyan-950/20 sm:p-6">
-      <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge className="border-0 bg-white/12 text-white">PickleMatch rebuild · milestone 1</Badge>
-            {gameCode ? <Badge className="border-0 bg-lime-400 text-slate-950">Code {gameCode}</Badge> : null}
-          </div>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">{STEP_LABELS[activeStep]} the night</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-white/72 sm:text-base">
-            A single round-robin flow: quick setup, clearer roster control, a live courts board that surfaces now/next/waiting,
-            and a wrap screen built for social closure.
-          </p>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[420px]">
-          <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4">
-            <div className="text-xs uppercase tracking-[0.2em] text-white/50">Players</div>
-            <div className="mt-2 text-3xl font-semibold">{players.length}</div>
-          </div>
-          <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4">
-            <div className="text-xs uppercase tracking-[0.2em] text-white/50">Matches done</div>
-            <div className="mt-2 text-3xl font-semibold">{matchScores.size}</div>
-          </div>
-          <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4">
-            <div className="text-xs uppercase tracking-[0.2em] text-white/50">Waiting / bench</div>
-            <div className="mt-2 text-3xl font-semibold">{waitingCount}</div>
-          </div>
-        </div>
+    <div className="flex flex-col gap-3 rounded-[1.75rem] border border-white/10 bg-slate-950/55 p-4 text-white shadow-xl shadow-cyan-950/10 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge className="border-0 bg-white/12 text-white">{STEP_LABELS[activeStep]}</Badge>
+        {gameCode ? <Badge className="border-0 bg-lime-400 text-slate-950">Code {gameCode}</Badge> : null}
+        <Badge className="border-0 bg-white/10 text-white/85">{players.length} players</Badge>
+        <Badge className="border-0 bg-white/10 text-white/85">{matchScores.size} completed</Badge>
+        <Badge className="border-0 bg-white/10 text-white/85">{waitingCount} waiting</Badge>
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <Button variant="outline" onClick={onShare} className="border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="outline" onClick={onShare} className="h-10 border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white">
           <Share2 className="mr-2 h-4 w-4" />
           Share join link
         </Button>
         {!isPlayerView ? (
-          <Button onClick={onShowPlayerSelector} className="bg-lime-400 text-slate-950 hover:bg-lime-300">
+          <Button onClick={onShowPlayerSelector} className="h-10 bg-lime-400 text-slate-950 hover:bg-lime-300">
             <UserCircle2 className="mr-2 h-4 w-4" />
             I’m playing
           </Button>
         ) : (
-          <Button variant="outline" onClick={onReleaseIdentity} className="border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white">
+          <Button variant="outline" onClick={onReleaseIdentity} className="h-10 border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white">
             <Users className="mr-2 h-4 w-4" />
-            Back to host view{playerName ? ` · ${playerName}` : ""}
+            Host view{playerName ? ` · ${playerName}` : ""}
           </Button>
         )}
       </div>
-    </Card>
+    </div>
   );
 };
 
@@ -270,19 +264,14 @@ const SetupScreen = ({
   onNewSession?: () => void;
   hasExistingMatches: boolean;
 }) => (
-  <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+  <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
     <Card className="border-white/10 bg-white/95 p-5 sm:p-6">
-      <div className="mb-5 flex items-start gap-3">
-        <div className="rounded-2xl bg-emerald-500/10 p-3 text-emerald-700">
-          <Clock3 className="h-5 w-5" />
-        </div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Setup</p>
-          <h2 className="text-2xl font-semibold tracking-tight">Round-robin only. Pick the essentials and move.</h2>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            No tournament chooser, no qualifier framing. Just session length, 1 or 2 courts, and whether each court plays singles or doubles.
-          </p>
+          <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Setup essentials</div>
+          <div className="mt-1 text-lg font-semibold text-slate-900">Court count, format, game target, session length.</div>
         </div>
+        {gameCode ? <Badge className="border-0 bg-emerald-100 text-emerald-800">Live code {gameCode}</Badge> : null}
       </div>
 
       <GameSetup
@@ -294,26 +283,32 @@ const SetupScreen = ({
       />
     </Card>
 
-    <div className="space-y-4">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
       <Card className="border-white/10 bg-slate-950/70 p-5 text-white">
-        <div className="flex items-center gap-2 text-lime-300">
-          <Sparkles className="h-5 w-5" />
-          <h3 className="text-lg font-semibold">What changed</h3>
+        <div className="text-xs uppercase tracking-[0.2em] text-white/55">Locked product rules</div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+          <div className="rounded-[1.25rem] border border-white/10 bg-white/5 p-4">
+            <div className="text-sm font-semibold">Round robin only</div>
+            <div className="mt-1 text-xs text-white/65">No tournament mode branch.</div>
+          </div>
+          <div className="rounded-[1.25rem] border border-white/10 bg-white/5 p-4">
+            <div className="text-sm font-semibold">1 or 2 courts</div>
+            <div className="mt-1 text-xs text-white/65">Built for club nights, not venue sprawl.</div>
+          </div>
+          <div className="rounded-[1.25rem] border border-white/10 bg-white/5 p-4">
+            <div className="text-sm font-semibold">Continue fast</div>
+            <div className="mt-1 text-xs text-white/65">Save here, roster next.</div>
+          </div>
         </div>
-        <ul className="mt-4 space-y-3 text-sm leading-6 text-white/75">
-          <li>• Main product path is now round robin first.</li>
-          <li>• Court choice is intentionally simple: 1 or 2.</li>
-          <li>• Setup is a distinct screen, not repeated hero copy with hidden mode logic.</li>
-        </ul>
       </Card>
 
       <Card className="border-white/10 bg-white/95 p-5">
         <div className="flex items-center gap-2 text-emerald-700">
           <QrCode className="h-5 w-5" />
-          <h3 className="text-lg font-semibold text-slate-900">Join code ready</h3>
+          <h3 className="text-lg font-semibold text-slate-900">Shareable immediately</h3>
         </div>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          As soon as you save setup, the session stays shareable across devices using the code and link.
+          Once setup is saved, the same session can be opened on phones and iPad with the code or join link.
         </p>
       </Card>
     </div>
@@ -324,12 +319,10 @@ const PlayersScreen = ({
   gameCode,
   players,
   matches,
-  matchScores,
-  teammatePairs,
+  teammatePairs = [],
   minimumPlayersRequired,
   onPlayersChange,
   onPlayersUpdate,
-  onNavigateToCourts,
 }: {
   gameCode: string;
   players: string[];
@@ -340,53 +333,257 @@ const PlayersScreen = ({
   onPlayersChange: (players: string[], pairs?: { player1: string; player2: string }[]) => void;
   onPlayersUpdate: (players: string[], pairs?: { player1: string; player2: string }[]) => Promise<boolean>;
   onNavigateToCourts: () => void;
-}) => (
-  <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-    <Card className="border-white/10 bg-white/95 p-5 sm:p-6">
-      <div className="mb-5 flex items-start gap-3">
-        <div className="rounded-2xl bg-sky-500/10 p-3 text-sky-700">
-          <Users className="h-5 w-5" />
-        </div>
-        <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Players</p>
-          <h2 className="text-2xl font-semibold tracking-tight">Build the roster without leaving the session flow.</h2>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Add one by one, paste a batch, keep in/out state obvious, then generate or refresh the night while preserving completed and current matches.
-          </p>
-        </div>
+}) => {
+  const [roster, setRoster] = useState(players);
+  const [bulkNames, setBulkNames] = useState("");
+  const [currentName, setCurrentName] = useState("");
+  const [pairings, setPairings] = useState(teammatePairs);
+  const [selectedForPairing, setSelectedForPairing] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => setRoster(players), [players]);
+  useEffect(() => setPairings(teammatePairs), [teammatePairs]);
+
+  const bulkParsed = useMemo(() => parseBulkNames(bulkNames), [bulkNames]);
+  const ready = roster.length >= minimumPlayersRequired;
+  const lockedPlayers = new Set(pairings.flatMap((pair) => [pair.player1, pair.player2]));
+
+  const syncRoster = useCallback((nextRoster: string[], nextPairings = pairings) => {
+    setRoster(nextRoster);
+    setPairings(nextPairings);
+    onPlayersChange(nextRoster, nextPairings);
+  }, [onPlayersChange, pairings]);
+
+  const addOnePlayer = useCallback(() => {
+    const trimmed = currentName.trim();
+    if (!trimmed) return;
+
+    const validation = validatePlayerName(trimmed);
+    if (!validation.valid) {
+      toast.error(validation.error || "Invalid player name");
+      return;
+    }
+
+    if (roster.some((player) => player.toLowerCase() === trimmed.toLowerCase())) {
+      toast.error("That player is already in the roster");
+      return;
+    }
+
+    syncRoster([...roster, trimmed]);
+    setCurrentName("");
+  }, [currentName, roster, syncRoster]);
+
+  const addBatchPlayers = useCallback(() => {
+    const additions: string[] = [];
+
+    for (const name of bulkParsed) {
+      const validation = validatePlayerName(name);
+      if (!validation.valid) continue;
+      if (roster.some((player) => player.toLowerCase() === name.toLowerCase())) continue;
+      if (additions.some((player) => player.toLowerCase() === name.toLowerCase())) continue;
+      additions.push(name);
+    }
+
+    if (additions.length === 0) {
+      toast.error("No new valid names to add");
+      return;
+    }
+
+    syncRoster([...roster, ...additions]);
+    setBulkNames("");
+    toast.success(`${additions.length} player${additions.length === 1 ? "" : "s"} added`);
+  }, [bulkParsed, roster, syncRoster]);
+
+  const removePlayer = useCallback((playerToRemove: string) => {
+    const nextPairings = pairings.filter((pair) => pair.player1 !== playerToRemove && pair.player2 !== playerToRemove);
+    if (selectedForPairing === playerToRemove) setSelectedForPairing(null);
+    syncRoster(roster.filter((player) => player !== playerToRemove), nextPairings);
+  }, [pairings, roster, selectedForPairing, syncRoster]);
+
+  const getPartner = useCallback((player: string) => {
+    const pair = pairings.find((entry) => entry.player1 === player || entry.player2 === player);
+    if (!pair) return null;
+    return pair.player1 === player ? pair.player2 : pair.player1;
+  }, [pairings]);
+
+  const togglePairing = useCallback((player: string) => {
+    const partner = getPartner(player);
+    if (partner) {
+      const nextPairings = pairings.filter((pair) => !(pair.player1 === player && pair.player2 === partner) && !(pair.player1 === partner && pair.player2 === player));
+      syncRoster(roster, nextPairings);
+      toast.success("Pair removed");
+      return;
+    }
+
+    if (selectedForPairing === player) {
+      setSelectedForPairing(null);
+      return;
+    }
+
+    if (!selectedForPairing) {
+      setSelectedForPairing(player);
+      return;
+    }
+
+    const nextPairings = [...pairings, { player1: selectedForPairing, player2: player }];
+    syncRoster(roster, nextPairings);
+    setSelectedForPairing(null);
+    toast.success(`${selectedForPairing} & ${player} locked together`);
+  }, [getPartner, pairings, roster, selectedForPairing, syncRoster]);
+
+  const startOrUpdateSession = useCallback(async () => {
+    if (!ready || isSaving) return;
+    setIsSaving(true);
+    try {
+      await onPlayersUpdate(roster, pairings);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [isSaving, onPlayersUpdate, pairings, ready, roster]);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-4">
+        <Card className="border-white/10 bg-white/95 p-4">
+          <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Code</div>
+          <div className="mt-2 text-2xl font-semibold text-slate-900">{gameCode || "Draft"}</div>
+        </Card>
+        <Card className="border-white/10 bg-white/95 p-4">
+          <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Roster</div>
+          <div className="mt-2 text-2xl font-semibold text-slate-900">{roster.length}</div>
+        </Card>
+        <Card className="border-white/10 bg-white/95 p-4">
+          <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Locked pairs</div>
+          <div className="mt-2 text-2xl font-semibold text-slate-900">{pairings.length}</div>
+        </Card>
+        <Card className="border-white/10 bg-slate-950/80 p-4 text-white">
+          <div className="text-[10px] uppercase tracking-[0.2em] text-white/50">Ready</div>
+          <div className="mt-2 text-sm font-semibold">{ready ? "Can start now" : `${minimumPlayersRequired - roster.length} more needed`}</div>
+        </Card>
       </div>
 
-      <CheckInOut
-        gameCode={gameCode}
-        players={players}
-        onPlayersChange={onPlayersChange}
-        onPlayersUpdate={onPlayersUpdate}
-        matches={matches}
-        matchScores={matchScores}
-        teammatePairs={teammatePairs}
-        onNavigateToMatches={onNavigateToCourts}
-        hasStartedMatches={matches.length > 0}
-        minimumPlayersRequired={minimumPlayersRequired}
-      />
-    </Card>
+      {selectedForPairing ? (
+        <Card className="border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <Check className="h-4 w-4" />
+            Pairing mode on for {selectedForPairing}
+          </div>
+          <p className="mt-1 text-sm text-emerald-800">Tap another player card to lock them together, or tap {selectedForPairing} again to cancel.</p>
+        </Card>
+      ) : null}
 
-    <div className="space-y-4">
-      <Card className="border-white/10 bg-slate-950/70 p-5 text-white">
-        <div className="text-xs uppercase tracking-[0.2em] text-white/55">Roster pulse</div>
-        <div className="mt-3 text-4xl font-semibold">{players.length}</div>
-        <p className="mt-2 text-sm leading-6 text-white/70">Current active player names in this session.</p>
-      </Card>
-      <Card className="border-white/10 bg-white/95 p-5">
-        <h3 className="text-lg font-semibold">What this screen owns</h3>
-        <ul className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">
-          <li>• Roster changes and teammate binds</li>
-          <li>• Batch add for fast club-night setup</li>
-          <li>• Clear path forward to the live courts board</li>
-        </ul>
-      </Card>
+      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        <div className="space-y-4">
+          <Card className="border-white/10 bg-white/95 p-5">
+            <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Quick add</div>
+            <div className="mt-3 flex gap-2">
+              <Input
+                value={currentName}
+                onChange={(event) => setCurrentName(event.target.value)}
+                placeholder="Add one player"
+                maxLength={50}
+                className="h-12 rounded-2xl border-slate-200"
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") addOnePlayer();
+                }}
+              />
+              <Button onClick={addOnePlayer} disabled={!currentName.trim()} className="h-12 rounded-2xl bg-emerald-500 px-5 text-white hover:bg-emerald-400">
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          </Card>
+
+          <Card className="border-white/10 bg-white/95 p-5">
+            <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Batch add</div>
+            <Textarea
+              value={bulkNames}
+              onChange={(event) => setBulkNames(event.target.value)}
+              placeholder="Maya, Theo, Jules, Iris"
+              className="mt-3 min-h-[150px] rounded-[1.25rem] border-slate-200 bg-slate-50"
+            />
+            <div className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-500">
+              <span>Comma or line-break separated.</span>
+              <Button onClick={addBatchPlayers} disabled={bulkParsed.length === 0} variant="outline" className="rounded-full">
+                Add batch
+              </Button>
+            </div>
+          </Card>
+
+          <Card className="border-white/10 bg-slate-950/80 p-5 text-white">
+            <div className="text-xs uppercase tracking-[0.2em] text-white/55">Session action</div>
+            <div className="mt-4 space-y-3 rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
+              <div className="flex items-center justify-between text-sm text-white/72">
+                <span>Minimum required</span>
+                <span className="font-semibold text-white">{minimumPlayersRequired}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm text-white/72">
+                <span>Roster now</span>
+                <span className="font-semibold text-white">{roster.length}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm text-white/72">
+                <span>Existing schedule</span>
+                <span className="font-semibold text-white">{matches.length > 0 ? "Will refresh" : "Will generate"}</span>
+              </div>
+              <Button onClick={() => void startOrUpdateSession()} disabled={!ready || isSaving} className="h-12 rounded-2xl bg-lime-400 text-base font-semibold text-slate-950 hover:bg-lime-300">
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {matches.length > 0 ? "Update session" : "Start session"}
+              </Button>
+            </div>
+          </Card>
+        </div>
+
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {roster.map((player) => {
+              const partner = getPartner(player);
+              const selected = selectedForPairing === player;
+
+              return (
+                <Card
+                  key={player}
+                  className={`rounded-[1.5rem] border p-4 shadow-lg shadow-slate-950/5 transition ${
+                    selected ? "border-emerald-400 bg-emerald-50" : partner ? "border-sky-200 bg-sky-50" : "border-white/10 bg-white/95"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-base font-semibold text-slate-900">{player}</div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Badge variant="secondary" className="rounded-full bg-slate-100 text-slate-700">In roster</Badge>
+                        {partner ? <Badge className="rounded-full border-0 bg-sky-600 text-white">Paired with {partner}</Badge> : null}
+                        {!partner && lockedPlayers.size === 0 ? <Badge variant="secondary" className="rounded-full bg-lime-100 text-lime-800">Open</Badge> : null}
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => removePlayer(player)} className="h-8 w-8 rounded-full p-0 text-slate-500 hover:bg-red-50 hover:text-red-600">
+                      <UserMinus className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <div className="mt-4 flex gap-2">
+                    <Button type="button" variant="outline" onClick={() => togglePairing(player)} className="flex-1 rounded-full">
+                      {partner ? <Unlink className="mr-2 h-4 w-4" /> : <Link2 className="mr-2 h-4 w-4" />}
+                      {partner ? "Unpair" : selected ? "Cancel pair" : "Pair"}
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => removePlayer(player)} className="rounded-full">
+                      <UserMinus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+
+          {roster.length === 0 ? (
+            <Card className="rounded-[1.75rem] border border-dashed border-slate-200 bg-white/80 px-6 py-12 text-center">
+              <Users className="mx-auto h-8 w-8 text-slate-400" />
+              <p className="mt-3 text-sm font-medium text-slate-700">No players yet. Add a few names and start the night.</p>
+            </Card>
+          ) : null}
+        </div>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const CourtsHero = ({
   matches,
@@ -427,15 +624,13 @@ const CourtsHero = ({
   return (
     <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
       <Card className="border-white/10 bg-[linear-gradient(135deg,rgba(17,24,39,0.96),rgba(17,94,89,0.88),rgba(17,24,39,0.96))] p-5 text-white sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="max-w-2xl">
-            <p className="text-xs uppercase tracking-[0.2em] text-white/55">Courts</p>
-            <h2 className="mt-2 text-3xl font-semibold tracking-tight">Live board first, detailed controls right below.</h2>
-            <p className="mt-3 text-sm leading-7 text-white/72 sm:text-base">
-              This is the main operational screen now: what’s on now, what’s next per court, and who’s waiting without hunting through old scheduling-first UI.
-            </p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="border-0 bg-lime-400 text-slate-950">Live courts</Badge>
+            <Badge className="border-0 bg-white/10 text-white">{courts} {courts === 1 ? "court" : "courts"}</Badge>
+            <Badge className="border-0 bg-white/10 text-white">{matches.filter((match) => !matchScores.has(match.id)).length} queued</Badge>
           </div>
-          <Badge className="border-0 bg-lime-400 text-slate-950">Run the night</Badge>
+          <div className="text-sm text-white/72">Now · next · waiting</div>
         </div>
 
         <div className="mt-5 grid gap-3 lg:grid-cols-2">
@@ -520,14 +715,13 @@ const WrapScreen = ({
     <div className="space-y-4">
       <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
         <Card className="border-white/10 bg-[linear-gradient(135deg,rgba(17,24,39,0.96),rgba(91,33,182,0.86),rgba(17,24,39,0.96))] p-5 text-white sm:p-6">
-          <div className="flex items-center gap-2 text-violet-200">
-            <Crown className="h-5 w-5" />
-            <span className="text-xs uppercase tracking-[0.22em]">Wrap</span>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-violet-200">
+              <Crown className="h-5 w-5" />
+              <span className="text-xs uppercase tracking-[0.22em]">Wrap</span>
+            </div>
+            <div className="text-sm text-white/72">Leaderboard · recap · share</div>
           </div>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight">Close the night with a recap worth sharing.</h2>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-white/72 sm:text-base">
-            Leaderboard, match history, and a small victory lap. This turns the end of the session into a proper social finish instead of an afterthought.
-          </p>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4">
