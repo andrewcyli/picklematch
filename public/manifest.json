@@ -1,0 +1,19 @@
+{
+  "name": "PickleballMatch.Fun — Free Round Robin Organizer",
+  "short_name": "PickleMatch",
+  "description": "Free pickleball round robin organizer with live scoring, real-time leaderboards, and smart court rotation. No download or login required.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#08111f",
+  "theme_color": "#0f172a",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["sports", "utilities"]
+}
