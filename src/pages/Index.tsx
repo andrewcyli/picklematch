@@ -1872,7 +1872,7 @@ const Index = () => {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-white">
             <div className="text-[10px] uppercase tracking-[0.24em] text-white/45">Casual club-night utility</div>
-            <div className="text-base font-semibold sm:text-lg">PickleMatch</div>
+            <div className="text-base font-semibold sm:text-lg">PickleballMatch.fun</div>
           </div>
 
           {gameCode ? (
