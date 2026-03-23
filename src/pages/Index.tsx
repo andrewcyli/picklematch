@@ -721,7 +721,7 @@ const CourtBlock = ({
   const doneCount = courtMatches.filter((m) => matchScores.has(m.id)).length;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-w-0 flex-col gap-3">
       {/* Live current match section */}
       <Card className="overflow-hidden border-white/10 bg-slate-900/80 p-4 shadow-xl shadow-cyan-950/10 text-white">
         <div className="flex items-start justify-between gap-3">
@@ -778,7 +778,7 @@ const CourtBlock = ({
       </Card>
 
       {/* Court match rail */}
-      <div className="min-w-0 overflow-hidden">
+      <div className="min-w-0 w-full overflow-hidden">
         {courtMatches.length === 0 ? (
           <div className="rounded-[1rem] border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/65">No matches for this court yet.</div>
         ) : (
@@ -960,7 +960,7 @@ const CourtsScreen = ({
       </div>
 
       {/* Court blocks: stacked on mobile, side-by-side on landscape/desktop, max-width centered */}
-      <div className="mx-auto w-full max-w-5xl grid gap-4 md:grid-cols-2">
+      <div className="mx-auto w-full max-w-5xl grid gap-4 md:grid-cols-2 overflow-hidden">
         {Array.from({ length: courts }, (_, index) => index + 1).map((court) => (
           <CourtBlock
             key={court}
