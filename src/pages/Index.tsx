@@ -2003,9 +2003,12 @@ const Index = () => {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(20,184,166,0.18),transparent_28%),linear-gradient(180deg,#08111f_0%,#0b1220_100%)] px-4 py-4 text-slate-900 sm:px-6 sm:py-5 lg:px-8">
       <div className={`mx-auto max-w-7xl space-y-3 ${showSessionNav ? "pb-28 sm:pb-32" : "pb-8"}`}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-white">
-            <div className="text-[10px] uppercase tracking-[0.24em] text-white/45">Casual club-night utility</div>
-            <div className="text-base font-semibold sm:text-lg">PickleballMatch.fun</div>
+          <div className="flex items-center gap-3 text-white">
+            <img src="/logo-mark.svg" alt="PickleballMatch.fun logo" className="h-10 w-10 rounded-2xl" />
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.24em] text-white/45">Casual club-night utility</div>
+              <div className="text-base font-semibold sm:text-lg">PickleballMatch.fun</div>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
