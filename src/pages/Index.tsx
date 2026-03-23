@@ -696,6 +696,158 @@ const PlayersScreen = ({
   );
 };
 
+const CourtBlock = ({
+  court,
+  live,
+  next,
+  courtMatches,
+  allMatches,
+  matchScores,
+  pendingScores,
+  updatePendingScore,
+  saveScore,
+}: {
+  court: number;
+  live: Match | undefined;
+  next: Match | undefined;
+  courtMatches: Match[];
+  allMatches: Match[];
+  matchScores: Map<string, { team1: number; team2: number }>;
+  pendingScores: Map<string, ScoreDraft>;
+  updatePendingScore: (matchId: string, team: "team1" | "team2", value: string) => void;
+  saveScore: (match: Match) => void;
+}) => {
+  const score = live ? pendingScores.get(live.id) || matchScores.get(live.id) || { team1: "", team2: "" } : null;
+  const doneCount = courtMatches.filter((m) => matchScores.has(m.id)).length;
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Live current match section */}
+      <Card className="overflow-hidden border-white/10 bg-slate-900/80 p-4 shadow-xl shadow-cyan-950/10 text-white">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-[11px] uppercase tracking-[0.2em] text-white/50">Court {court}</div>
+            <div className="mt-1 text-lg font-semibold">{live ? "Live match" : next ? "Next match ready" : "Standby"}</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge className="border-0 bg-white/10 text-white/70">{doneCount} done</Badge>
+            <Badge className={`border-0 ${live ? "bg-emerald-500 text-white" : "bg-white/10 text-white/60"}`}>{live ? "Playing" : "Standby"}</Badge>
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-[1.4rem] bg-[linear-gradient(135deg,#0f172a,#115e59,#0f172a)] p-4 text-white">
+          {live ? (
+            <>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 rounded-[1rem] bg-white/10 px-3 py-2.5">
+                  <div className="min-w-0 flex-1 truncate text-sm font-semibold">{getTeamLabel(live.team1)}</div>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={score?.team1 ?? ""}
+                    onChange={(event) => updatePendingScore(live.id, "team1", event.target.value)}
+                    className="h-10 w-20 shrink-0 rounded-xl border-white/10 bg-white text-center text-xl font-semibold text-slate-900"
+                  />
+                </div>
+                <div className="flex items-center gap-2 rounded-[1rem] bg-white/10 px-3 py-2.5">
+                  <div className="min-w-0 flex-1 truncate text-sm font-semibold">{getTeamLabel(live.team2)}</div>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={score?.team2 ?? ""}
+                    onChange={(event) => updatePendingScore(live.id, "team2", event.target.value)}
+                    className="h-10 w-20 shrink-0 rounded-xl border-white/10 bg-white text-center text-xl font-semibold text-slate-900"
+                  />
+                </div>
+              </div>
+              <Button onClick={() => saveScore(live)} className="mt-3 h-11 w-full rounded-full bg-lime-400 text-base font-semibold text-slate-950 hover:bg-lime-300">
+                Confirm & next
+              </Button>
+            </>
+          ) : next ? (
+            <div className="space-y-2">
+              <div className="text-xs uppercase tracking-[0.18em] text-white/55">Next up</div>
+              <div className="rounded-[1rem] bg-white/10 px-3 py-2.5 text-sm font-semibold">{getTeamLabel(next.team1)}</div>
+              <div className="text-center text-xs text-white/40">vs</div>
+              <div className="rounded-[1rem] bg-white/10 px-3 py-2.5 text-sm font-semibold">{getTeamLabel(next.team2)}</div>
+            </div>
+          ) : (
+            <div className="rounded-[1rem] border border-white/10 bg-white/5 px-4 py-5 text-sm text-white/70">No live match on this court yet.</div>
+          )}
+        </div>
+      </Card>
+
+      {/* Court match rail */}
+      <div className="min-w-0 overflow-hidden">
+        {courtMatches.length === 0 ? (
+          <div className="rounded-[1rem] border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/65">No matches for this court yet.</div>
+        ) : (
+          <div className="flex max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1 [-webkit-overflow-scrolling:touch]">
+            {courtMatches.map((match) => {
+              const isCompleted = matchScores.has(match.id);
+              const isCurrent = live?.id === match.id;
+              const isNext = next?.id === match.id;
+              const matchScore = matchScores.get(match.id);
+
+              const statusLabel = isCompleted ? "Final" : isCurrent ? "Live" : isNext ? "Next" : "Later";
+              const statusClass = isCompleted
+                ? "bg-violet-500/20 text-violet-200"
+                : isCurrent
+                  ? "bg-emerald-500 text-white"
+                  : isNext
+                    ? "bg-amber-500 text-white"
+                    : "bg-white/10 text-white";
+              const cardClass = isCompleted
+                ? "border-violet-300/15 bg-violet-400/10"
+                : isCurrent
+                  ? "border-emerald-300/20 bg-emerald-300/10"
+                  : isNext
+                    ? "border-amber-300/20 bg-amber-300/10 ring-1 ring-amber-300/25"
+                    : "border-white/10 bg-white/5";
+
+              return (
+                <div
+                  key={match.id}
+                  className={`w-40 min-w-[10rem] shrink-0 rounded-[1rem] border p-2.5 ${cardClass}`}
+                >
+                  <div className="flex items-center justify-between gap-1.5">
+                    <Badge className={`border-0 px-1.5 py-0.5 text-[10px] ${statusClass}`}>{statusLabel}</Badge>
+                    <div className="text-[10px] text-white/55">{getMatchLabel(allMatches, match)}</div>
+                  </div>
+
+                  <div className="mt-2 space-y-1.5">
+                    <div className="rounded-[0.8rem] bg-black/15 px-2 py-1.5">
+                      <div className="truncate text-[11px] leading-4 text-white/90">{getTeamLabel(match.team1)}</div>
+                    </div>
+                    <div className="rounded-[0.8rem] bg-black/15 px-2 py-1.5">
+                      <div className="truncate text-[11px] leading-4 text-white/90">{getTeamLabel(match.team2)}</div>
+                    </div>
+                  </div>
+
+                  {isCompleted && matchScore ? (
+                    <div className="mt-2 flex items-center justify-between rounded-[0.85rem] border border-white/10 bg-black/20 px-2.5 py-2">
+                      <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">Score</div>
+                      <div className="text-sm font-semibold text-white">
+                        {matchScore.team1}
+                        <span className="px-1.5 text-white/35">-</span>
+                        {matchScore.team2}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-[10px] text-white/55">
+                      {isCurrent ? "Playing now" : isNext ? "Up next" : "Scheduled"}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const CourtsScreen = ({
   matches,
   matchScores,
@@ -711,14 +863,7 @@ const CourtsScreen = ({
   onScheduleUpdate: (updatedMatches: Match[], updatedPlayers: string[]) => void;
   onMatchScoresUpdate: (scores: Map<string, { team1: number; team2: number }>) => void;
 }) => {
-  const [selectedCourt, setSelectedCourt] = useState(1);
   const [pendingScores, setPendingScores] = useState<Map<string, ScoreDraft>>(new Map());
-  const railCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const lastAnchoredMatchIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (selectedCourt > courts) setSelectedCourt(1);
-  }, [courts, selectedCourt]);
 
   const courtStatus = useMemo(
     () => computeCourtStatus(matches, matchScores, players, courts),
@@ -727,50 +872,13 @@ const CourtsScreen = ({
 
   const { currentByCourt, nextByCourt, waitingPlayers } = courtStatus;
 
-  const featuredCourt = selectedCourt;
-  const featuredCurrent = currentByCourt.get(featuredCourt);
-  const featuredNext = nextByCourt.get(featuredCourt);
-
-  const sessionRail = useMemo(() => {
-    const liveMatchIds = new Set(Array.from(currentByCourt.values()).map((match) => match.id));
-    const primaryLiveMatchId = featuredCurrent?.id ?? null;
-    const firstUpcomingMatchId = matches.find((match) => !matchScores.has(match.id) && !liveMatchIds.has(match.id))?.id;
-
-    return matches.map((match) => {
-      const isCompleted = matchScores.has(match.id);
-      const isCurrent = primaryLiveMatchId === match.id;
-      const isParallelLive = !isCurrent && liveMatchIds.has(match.id);
-      const isNext = firstUpcomingMatchId === match.id;
-
-      return {
-        match,
-        isCompleted,
-        isCurrent,
-        isParallelLive,
-        isNext,
-      };
-    });
-  }, [currentByCourt, featuredCurrent, matchScores, matches]);
-
-  const nextRailAnchorId = useMemo(() => {
-    const nextUpcoming = sessionRail.find((entry) => !entry.isCompleted && !entry.isCurrent);
-    const fallbackUnscored = sessionRail.find((entry) => !entry.isCompleted);
-    const lastMatch = sessionRail.length > 0 ? sessionRail[sessionRail.length - 1].match : null;
-
-    return nextUpcoming?.match.id ?? fallbackUnscored?.match.id ?? lastMatch?.id ?? null;
-  }, [sessionRail]);
-
-  useEffect(() => {
-    if (!nextRailAnchorId || lastAnchoredMatchIdRef.current === nextRailAnchorId) return;
-
-    const targetCard = railCardRefs.current[nextRailAnchorId];
-    if (!targetCard) return;
-
-    lastAnchoredMatchIdRef.current = nextRailAnchorId;
-    requestAnimationFrame(() => {
-      targetCard.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-    });
-  }, [nextRailAnchorId]);
+  const courtMatchesMap = useMemo(() => {
+    const map = new Map<number, Match[]>();
+    for (let c = 1; c <= courts; c++) {
+      map.set(c, matches.filter((m) => m.court === c));
+    }
+    return map;
+  }, [matches, courts]);
 
   const updatePendingScore = useCallback((matchId: string, team: "team1" | "team2", value: string) => {
     if (value === "") {
@@ -831,6 +939,7 @@ const CourtsScreen = ({
 
   return (
     <div className="space-y-3">
+      {/* Summary stats bar */}
       <div className="grid grid-cols-4 gap-2">
         <Card className="border-white/10 bg-slate-900/70 p-3 text-center text-white">
           <div className="text-[10px] uppercase tracking-[0.18em] text-white/50">Live</div>
@@ -850,216 +959,42 @@ const CourtsScreen = ({
         </Card>
       </div>
 
-      <Card className="border-white/10 bg-slate-900/70 p-3 lg:hidden">
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {Array.from({ length: courts }, (_, index) => index + 1).map((court) => {
-            const live = currentByCourt.get(court);
-            const next = nextByCourt.get(court);
-            return (
-              <Button
-                key={court}
-                variant={featuredCourt === court ? "default" : "outline"}
-                onClick={() => setSelectedCourt(court)}
-                className={featuredCourt === court ? "rounded-full bg-emerald-500 text-white hover:bg-emerald-400" : "rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"}
-              >
-                Court {court}{live ? " · live" : next ? " · next" : " · idle"}
-              </Button>
-            );
-          })}
-        </div>
-      </Card>
-
-      <div className="grid gap-3 2xl:grid-cols-[1.28fr_0.72fr]">
-        <div className="space-y-3">
-          <div className="lg:hidden">
-            <Card className="overflow-hidden border-white/10 bg-slate-900/80 p-4 shadow-xl shadow-cyan-950/10 text-white">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-[11px] uppercase tracking-[0.2em] text-white/50">Court {featuredCourt}</div>
-                  <div className="mt-1 text-lg font-semibold">{featuredCurrent ? "Score the live match" : featuredNext ? "Court ready next" : "Court standing by"}</div>
-                </div>
-                <Badge className={`border-0 ${featuredCurrent ? "bg-emerald-500 text-white" : "bg-white/10 text-white"}`}>{featuredCurrent ? "Live" : featuredNext ? "Next" : "Idle"}</Badge>
-              </div>
-
-              <div className="mt-3 rounded-[1.5rem] bg-[linear-gradient(135deg,#0f172a,#115e59,#0f172a)] p-4 text-white">
-                {featuredCurrent ? (
-                  <>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 rounded-[1rem] bg-white/10 px-3 py-2.5">
-                        <div className="min-w-0 flex-1 truncate text-sm font-semibold">{getTeamLabel(featuredCurrent.team1)}</div>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={(pendingScores.get(featuredCurrent.id) || matchScores.get(featuredCurrent.id) || { team1: "", team2: "" }).team1}
-                          onChange={(event) => updatePendingScore(featuredCurrent.id, "team1", event.target.value)}
-                          className="h-10 w-20 shrink-0 rounded-xl border-white/10 bg-white text-center text-xl font-semibold text-slate-900"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2 rounded-[1rem] bg-white/10 px-3 py-2.5">
-                        <div className="min-w-0 flex-1 truncate text-sm font-semibold">{getTeamLabel(featuredCurrent.team2)}</div>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={(pendingScores.get(featuredCurrent.id) || matchScores.get(featuredCurrent.id) || { team1: "", team2: "" }).team2}
-                          onChange={(event) => updatePendingScore(featuredCurrent.id, "team2", event.target.value)}
-                          className="h-10 w-20 shrink-0 rounded-xl border-white/10 bg-white text-center text-xl font-semibold text-slate-900"
-                        />
-                      </div>
-                    </div>
-                    <Button onClick={() => saveScore(featuredCurrent)} className="mt-3 h-11 w-full rounded-full bg-lime-400 text-base font-semibold text-slate-950 hover:bg-lime-300">
-                      Confirm score
-                    </Button>
-                  </>
-                ) : (
-                  <div className="rounded-[1rem] border border-white/10 bg-white/5 px-4 py-5 text-sm text-white/70">No live match on this court yet.</div>
-                )}
-              </div>
-
-
-            </Card>
-          </div>
-
-          <div className="hidden lg:grid lg:grid-cols-2 lg:gap-3">
-            {Array.from({ length: courts }, (_, index) => index + 1).map((court) => {
-              const live = currentByCourt.get(court);
-              const next = nextByCourt.get(court);
-              const score = live ? pendingScores.get(live.id) || matchScores.get(live.id) || { team1: "", team2: "" } : null;
-
-              return (
-                <Card key={court} className="overflow-hidden border-white/10 bg-slate-900/80 p-4 shadow-xl shadow-cyan-950/10 text-white">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-[11px] uppercase tracking-[0.2em] text-white/50">Court {court}</div>
-                      <div className="mt-1 text-lg font-semibold">{live ? "Live match" : next ? "Next match ready" : "Standby"}</div>
-                    </div>
-                    <Badge className={`border-0 ${live ? "bg-emerald-500 text-white" : "bg-white/10 text-white/60"}`}>{live ? "Playing" : "Standby"}</Badge>
-                  </div>
-
-                  <div className="mt-3 rounded-[1.4rem] bg-[linear-gradient(135deg,#0f172a,#115e59,#0f172a)] p-4 text-white">
-                    {live ? (
-                      <>
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2 rounded-[1rem] bg-white/10 px-3 py-2.5">
-                            <div className="min-w-0 flex-1 truncate text-sm font-semibold">{getTeamLabel(live.team1)}</div>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={score?.team1 ?? ""}
-                              onChange={(event) => updatePendingScore(live.id, "team1", event.target.value)}
-                              className="h-10 w-20 shrink-0 rounded-xl border-white/10 bg-white text-center text-xl font-semibold text-slate-900"
-                            />
-                          </div>
-                          <div className="flex items-center gap-2 rounded-[1rem] bg-white/10 px-3 py-2.5">
-                            <div className="min-w-0 flex-1 truncate text-sm font-semibold">{getTeamLabel(live.team2)}</div>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={score?.team2 ?? ""}
-                              onChange={(event) => updatePendingScore(live.id, "team2", event.target.value)}
-                              className="h-10 w-20 shrink-0 rounded-xl border-white/10 bg-white text-center text-xl font-semibold text-slate-900"
-                            />
-                          </div>
-                        </div>
-                        <Button onClick={() => saveScore(live)} className="mt-3 h-11 w-full rounded-full bg-lime-400 text-base font-semibold text-slate-950 hover:bg-lime-300">
-                          Confirm score
-                        </Button>
-                      </>
-                    ) : (
-                      <div className="rounded-[1rem] border border-white/10 bg-white/5 px-4 py-5 text-sm text-white/70">No live match on this court yet.</div>
-                    )}
-                  </div>
-
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="min-w-0 space-y-3">
-          <div className="min-w-0">
-            {sessionRail.length === 0 ? (
-              <div className="rounded-[1rem] border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/65">No matches scheduled yet.</div>
-            ) : (
-              <div className="min-w-0 overflow-hidden">
-                <div className="flex max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1 [-webkit-overflow-scrolling:touch]">
-                  {sessionRail.map(({ match, isCompleted, isCurrent, isParallelLive, isNext }) => {
-                    const score = matchScores.get(match.id);
-                    const statusLabel = isCompleted ? "Final" : isCurrent ? "Live" : isParallelLive ? `Live · Court ${match.court}` : isNext ? "Next" : "Later";
-                    const statusClass = isCompleted
-                      ? "bg-violet-500/20 text-violet-200"
-                      : isCurrent
-                        ? "bg-emerald-500 text-white"
-                        : isParallelLive
-                          ? "bg-cyan-500/20 text-cyan-100"
-                          : isNext
-                            ? "bg-amber-500 text-white"
-                            : "bg-white/10 text-white";
-                    const cardClass = isCompleted
-                      ? "border-violet-300/15 bg-violet-400/10"
-                      : isCurrent
-                        ? "border-emerald-300/20 bg-emerald-300/10"
-                        : isParallelLive
-                          ? "border-cyan-300/20 bg-cyan-300/10"
-                          : isNext
-                            ? "border-amber-300/20 bg-amber-300/10 ring-1 ring-amber-300/25"
-                            : "border-white/10 bg-white/5";
-
-                    return (
-                      <div
-                        key={match.id}
-                        ref={(node) => {
-                          railCardRefs.current[match.id] = node;
-                        }}
-                        className={`w-40 min-w-[10rem] shrink-0 rounded-[1rem] border p-2.5 ${cardClass}`}
-                      >
-                        <div className="flex items-center justify-between gap-1.5">
-                          <Badge className={`border-0 px-1.5 py-0.5 text-[10px] ${statusClass}`}>{statusLabel}</Badge>
-                          <div className="text-[10px] text-white/55">{getMatchLabel(matches, match)}</div>
-                        </div>
-
-                        <div className="mt-2 flex items-center justify-between gap-2 text-[10px] uppercase tracking-[0.16em] text-white/45">
-                          <span>Court {match.court}</span>
-                          {nextRailAnchorId === match.id ? <span className="text-amber-300">Anchor</span> : null}
-                        </div>
-
-                        <div className="mt-2 space-y-1.5">
-                          <div className="rounded-[0.8rem] bg-black/15 px-2 py-1.5">
-                            <div className="truncate text-[11px] leading-4 text-white/90">{getTeamLabel(match.team1)}</div>
-                          </div>
-                          <div className="rounded-[0.8rem] bg-black/15 px-2 py-1.5">
-                            <div className="truncate text-[11px] leading-4 text-white/90">{getTeamLabel(match.team2)}</div>
-                          </div>
-                        </div>
-
-                        {isCompleted && score ? (
-                          <div className="mt-2 flex items-center justify-between rounded-[0.85rem] border border-white/10 bg-black/20 px-2.5 py-2">
-                            <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">Score</div>
-                            <div className="text-sm font-semibold text-white">
-                              {score.team1}
-                              <span className="px-1.5 text-white/35">-</span>
-                              {score.team2}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="mt-2 text-[10px] text-white/55">
-                            {isCurrent
-                              ? `Live on selected court ${featuredCourt}`
-                              : isParallelLive
-                                ? `Live now on court ${match.court}`
-                                : isNext
-                                  ? "Next match in view"
-                                  : "Scheduled later in the run"}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+      {/* Court blocks: stacked on mobile, side-by-side on landscape/desktop, max-width centered */}
+      <div className="mx-auto w-full max-w-5xl grid gap-4 md:grid-cols-2">
+        {Array.from({ length: courts }, (_, index) => index + 1).map((court) => (
+          <CourtBlock
+            key={court}
+            court={court}
+            live={currentByCourt.get(court)}
+            next={nextByCourt.get(court)}
+            courtMatches={courtMatchesMap.get(court) || []}
+            allMatches={matches}
+            matchScores={matchScores}
+            pendingScores={pendingScores}
+            updatePendingScore={updatePendingScore}
+            saveScore={saveScore}
+          />
+        ))}
       </div>
+
+      {/* Waiting bench */}
+      {waitingPlayers.length > 0 && (
+        <div className="mx-auto w-full max-w-5xl">
+          <Card className="border-white/10 bg-slate-900/70 p-4 text-white">
+            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/50">
+              <Users className="h-3.5 w-3.5" />
+              Bench
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {waitingPlayers.map((player) => (
+                <Badge key={player} variant="secondary" className="rounded-full bg-white/10 px-3 py-1.5 text-white/80">
+                  {player}
+                </Badge>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
