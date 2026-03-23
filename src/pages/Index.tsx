@@ -3,6 +3,8 @@ import { toast } from "sonner";
 import {
   ArrowRight,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   Copy,
   Crown,
@@ -22,6 +24,9 @@ import {
   Users,
   UserCircle2,
   Waves,
+  Zap,
+  LayoutGrid,
+  ClipboardList,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -194,6 +199,131 @@ const buildStandings = (
     if (b.wins !== a.wins) return b.wins - a.wins;
     return a.player.localeCompare(b.player);
   });
+};
+
+const STORAGE_ONBOARDING_SEEN = "picklematch_onboarding_seen";
+
+const WELCOME_SLIDES = [
+  {
+    icon: Zap,
+    title: "Welcome to PickleMatch",
+    subtitle: "Your casual club-night companion",
+    description: "Set up a round robin session in seconds. No accounts, no fuss — just a code to share and you're playing.",
+    accent: "from-lime-400 to-emerald-500",
+  },
+  {
+    icon: LayoutGrid,
+    title: "Run 1 or 2 courts",
+    subtitle: "Singles or doubles, your call",
+    description: "Each court gets its own live scoreboard and match queue. Enter scores, confirm, and the next match auto-loads.",
+    accent: "from-cyan-400 to-blue-500",
+  },
+  {
+    icon: Users,
+    title: "Everyone stays in the loop",
+    subtitle: "Share one code, play together",
+    description: "Players join with a short code or link. Everyone sees the live board — who's playing, who's next, and the full schedule.",
+    accent: "from-violet-400 to-purple-500",
+  },
+  {
+    icon: ClipboardList,
+    title: "End-of-night recap",
+    subtitle: "Leaderboard, stats, and bragging rights",
+    description: "Win rate, point differential, head-to-head — it all adds up. Copy the recap and share it with the group.",
+    accent: "from-amber-400 to-orange-500",
+  },
+];
+
+const WelcomeSlides = ({ onDone }: { onDone: () => void }) => {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const slide = WELCOME_SLIDES[currentSlide];
+  const isLast = currentSlide === WELCOME_SLIDES.length - 1;
+  const Icon = slide.icon;
+
+  const handleNext = () => {
+    if (isLast) {
+      safeStorage.setItem(STORAGE_ONBOARDING_SEEN, "true");
+      onDone();
+    } else {
+      setCurrentSlide((prev) => prev + 1);
+    }
+  };
+
+  const handleSkip = () => {
+    safeStorage.setItem(STORAGE_ONBOARDING_SEEN, "true");
+    onDone();
+  };
+
+  return (
+    <div className="flex min-h-[70vh] items-center justify-center">
+      <div className="w-full max-w-lg space-y-6">
+        <Card className="overflow-hidden border-white/10 bg-[linear-gradient(145deg,rgba(9,18,31,0.97),rgba(16,86,74,0.85),rgba(8,14,27,0.98))] p-6 text-white shadow-2xl shadow-cyan-950/30 sm:p-8">
+          <div className="flex flex-col items-center text-center">
+            <div className={`flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${slide.accent} shadow-lg`}>
+              <Icon className="h-8 w-8 text-white" />
+            </div>
+
+            <h1 className="mt-6 text-3xl font-semibold tracking-tight sm:text-4xl">{slide.title}</h1>
+            <p className="mt-2 text-sm font-medium uppercase tracking-[0.2em] text-white/50">{slide.subtitle}</p>
+            <p className="mt-4 max-w-sm text-sm leading-7 text-white/70 sm:text-base">{slide.description}</p>
+
+            {/* Dot indicators */}
+            <div className="mt-6 flex items-center gap-2">
+              {WELCOME_SLIDES.map((_, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => setCurrentSlide(index)}
+                  className={`h-2 rounded-full transition-all ${
+                    index === currentSlide ? "w-6 bg-lime-400" : "w-2 bg-white/25 hover:bg-white/40"
+                  }`}
+                />
+              ))}
+            </div>
+
+            {/* Navigation */}
+            <div className="mt-6 flex w-full items-center justify-between gap-3">
+              {currentSlide > 0 ? (
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentSlide((prev) => prev - 1)}
+                  className="h-11 rounded-full border-white/15 bg-white/5 px-5 text-white hover:bg-white/10 hover:text-white"
+                >
+                  <ChevronLeft className="mr-1 h-4 w-4" />
+                  Back
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  onClick={handleSkip}
+                  className="h-11 rounded-full px-5 text-white/50 hover:bg-white/5 hover:text-white/80"
+                >
+                  Skip
+                </Button>
+              )}
+
+              <Button
+                onClick={handleNext}
+                className="h-11 rounded-full bg-lime-400 px-6 text-base font-semibold text-slate-950 hover:bg-lime-300"
+              >
+                {isLast ? "Get started" : "Next"}
+                {!isLast && <ChevronRight className="ml-1 h-4 w-4" />}
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        {/* Skip link at bottom */}
+        {!isLast && (
+          <div className="text-center">
+            <button type="button" onClick={handleSkip} className="text-xs text-white/35 hover:text-white/60 transition">
+              Skip intro
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };
 
 const StartScreen = ({
@@ -1216,6 +1346,7 @@ const Index = () => {
   const [showPlayerSelector, setShowPlayerSelector] = useState(false);
   const [isSetupDraftOpen, setIsSetupDraftOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [showWelcome, setShowWelcome] = useState(() => !safeStorage.getItem(STORAGE_ONBOARDING_SEEN));
 
   const restoreRef = useRef(false);
   const subscriptionRef = useRef<any>(null);
@@ -1605,6 +1736,10 @@ const Index = () => {
   }, [gameCode]);
 
   const renderMain = () => {
+    if (activeStep === "start" && showWelcome) {
+      return <WelcomeSlides onDone={() => setShowWelcome(false)} />;
+    }
+
     if (activeStep === "start") {
       return (
         <StartScreen
