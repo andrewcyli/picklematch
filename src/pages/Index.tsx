@@ -12,6 +12,7 @@ import {
   Link2,
   Loader2,
   Medal,
+  MessageSquare,
   PartyPopper,
   Plus,
   QrCode,
@@ -34,6 +35,15 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { GameSetup, GameConfig } from "@/components/GameSetup";
 import { PlayerIdentitySelector } from "@/components/PlayerIdentitySelector";
 import { MyMatchesView } from "@/components/MyMatchesView";
@@ -437,6 +447,123 @@ const StartScreen = ({
 
       {adSlot("start footer")}
     </div>
+  );
+};
+
+const FeedbackButton = ({ gameCode }: { gameCode?: string }) => {
+  const [open, setOpen] = useState(false);
+  const [category, setCategory] = useState<"improvement" | "bug">("improvement");
+  const [message, setMessage] = useState("");
+  const [contact, setContact] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    const trimmed = message.trim();
+    if (trimmed.length < 8) {
+      toast.error("Please add a bit more detail so we can use it.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.from("feedback_submissions" as any).insert({
+        category,
+        message: trimmed,
+        contact: contact.trim() || null,
+        game_code: gameCode || null,
+        page_url: typeof window !== "undefined" ? window.location.href : null,
+        user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+      });
+
+      if (error) throw error;
+
+      toast.success("Feedback sent — thank you for helping improve the app.");
+      setMessage("");
+      setContact("");
+      setCategory("improvement");
+      setOpen(false);
+    } catch (error) {
+      console.error(error);
+      toast.error("Feedback inbox is not ready yet — please try again shortly.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white">
+          <MessageSquare className="mr-2 h-4 w-4" />
+          Feedback
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="border-white/10 bg-slate-950 text-white sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Help improve PickleballMatch.fun</DialogTitle>
+          <DialogDescription className="text-white/60">
+            Suggest improvements or report bugs. It's free, and your feedback helps keep making it better.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant={category === "improvement" ? "default" : "outline"}
+              onClick={() => setCategory("improvement")}
+              className={category === "improvement" ? "flex-1 bg-lime-400 text-slate-950 hover:bg-lime-300" : "flex-1 border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"}
+            >
+              Improvement idea
+            </Button>
+            <Button
+              type="button"
+              variant={category === "bug" ? "default" : "outline"}
+              onClick={() => setCategory("bug")}
+              className={category === "bug" ? "flex-1 bg-rose-400 text-slate-950 hover:bg-rose-300" : "flex-1 border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"}
+            >
+              Bug report
+            </Button>
+          </div>
+
+          <div>
+            <div className="mb-2 text-xs uppercase tracking-[0.18em] text-white/50">Your feedback</div>
+            <Textarea
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              placeholder={category === "bug" ? "What broke? What were you trying to do?" : "What would make this better for your group?"}
+              className="min-h-[140px] rounded-[1.25rem] border-white/10 bg-white/10 text-white placeholder:text-white/30"
+            />
+          </div>
+
+          <div>
+            <div className="mb-2 text-xs uppercase tracking-[0.18em] text-white/50">Optional contact</div>
+            <Input
+              value={contact}
+              onChange={(event) => setContact(event.target.value)}
+              placeholder="Email or handle so we can follow up"
+              className="h-11 rounded-2xl border-white/10 bg-white/10 text-white placeholder:text-white/30"
+            />
+          </div>
+
+          {gameCode ? (
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/65">
+              Attached session context: <span className="font-mono text-lime-300">{gameCode}</span>
+            </div>
+          ) : null}
+        </div>
+
+        <DialogFooter>
+          <Button
+            onClick={handleSubmit}
+            disabled={isSubmitting || message.trim().length < 8}
+            className="rounded-full bg-lime-400 text-slate-950 hover:bg-lime-300"
+          >
+            {isSubmitting ? "Sending..." : "Send feedback"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 
@@ -1875,39 +2002,42 @@ const Index = () => {
             <div className="text-base font-semibold sm:text-lg">PickleballMatch.fun</div>
           </div>
 
-          {gameCode ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white">
-                Code <span className="ml-2 font-mono font-semibold text-lime-300">{gameCode}</span>
-              </div>
-              <Button variant="outline" size="sm" onClick={handleCopyCode} className="border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white">
-                <Copy className="mr-2 h-4 w-4" />
-                Copy
-              </Button>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white">
-                    <QrCode className="h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto rounded-2xl border-white/10 bg-slate-950 p-4 shadow-2xl" align="end">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="text-xs uppercase tracking-[0.2em] text-white/50">Scan to join</div>
-                    <div className="rounded-xl bg-white p-3">
-                      <QRCodeSVG
-                        value={`${window.location.origin}${window.location.pathname}?join=${gameCode}`}
-                        size={160}
-                        level="M"
-                        bgColor="#ffffff"
-                        fgColor="#0f172a"
-                      />
+          <div className="flex flex-wrap items-center gap-2">
+            {gameCode ? (
+              <>
+                <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white">
+                  Code <span className="ml-2 font-mono font-semibold text-lime-300">{gameCode}</span>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleCopyCode} className="border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white">
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copy
+                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white">
+                      <QrCode className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto rounded-2xl border-white/10 bg-slate-950 p-4 shadow-2xl" align="end">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="text-xs uppercase tracking-[0.2em] text-white/50">Scan to join</div>
+                      <div className="rounded-xl bg-white p-3">
+                        <QRCodeSVG
+                          value={`${window.location.origin}${window.location.pathname}?join=${gameCode}`}
+                          size={160}
+                          level="M"
+                          bgColor="#ffffff"
+                          fgColor="#0f172a"
+                        />
+                      </div>
+                      <div className="font-mono text-lg font-semibold text-lime-300">{gameCode}</div>
                     </div>
-                    <div className="font-mono text-lg font-semibold text-lime-300">{gameCode}</div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
-          ) : null}
+                  </PopoverContent>
+                </Popover>
+              </>
+            ) : null}
+            <FeedbackButton gameCode={gameCode} />
+          </div>
         </div>
 
         {showSessionNav ? (

@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      feedback_submissions: {
+        Row: {
+          category: string
+          contact: string | null
+          created_at: string
+          game_code: string | null
+          id: string
+          message: string
+          page_url: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          category: string
+          contact?: string | null
+          created_at?: string
+          game_code?: string | null
+          id?: string
+          message: string
+          page_url?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          category?: string
+          contact?: string | null
+          created_at?: string
+          game_code?: string | null
+          id?: string
+          message?: string
+          page_url?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       games: {
         Row: {
           created_at: string
