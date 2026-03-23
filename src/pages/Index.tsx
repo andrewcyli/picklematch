@@ -40,6 +40,8 @@ import { MyMatchesView } from "@/components/MyMatchesView";
 import { usePlayerIdentity } from "@/hooks/use-player-identity";
 import { usePlayerMatches } from "@/hooks/use-player-matches";
 import { usePlayerNotifications } from "@/hooks/use-player-notifications";
+import { QRCodeSVG } from "qrcode.react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
 import { setSkipNextMatch } from "@/lib/player-identity";
 import { generateSchedule, Match } from "@/lib/scheduler";
@@ -1848,6 +1850,28 @@ const Index = () => {
                 <Copy className="mr-2 h-4 w-4" />
                 Copy
               </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white">
+                    <QrCode className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto rounded-2xl border-white/10 bg-slate-950 p-4 shadow-2xl" align="end">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="text-xs uppercase tracking-[0.2em] text-white/50">Scan to join</div>
+                    <div className="rounded-xl bg-white p-3">
+                      <QRCodeSVG
+                        value={`${window.location.origin}${window.location.pathname}?join=${gameCode}`}
+                        size={160}
+                        level="M"
+                        bgColor="#ffffff"
+                        fgColor="#0f172a"
+                      />
+                    </div>
+                    <div className="font-mono text-lg font-semibold text-lime-300">{gameCode}</div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           ) : null}
         </div>
