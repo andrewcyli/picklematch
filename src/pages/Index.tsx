@@ -344,11 +344,6 @@ const SessionHeader = ({
   onReleaseIdentity: () => void;
   onShare: () => void;
 }) => {
-  const waitingCount = useMemo(() => {
-    const status = computeCourtStatus(matches, matchScores, players, 2);
-    return status.waitingPlayers.length;
-  }, [matchScores, matches, players]);
-
   return (
     <div className="flex flex-col gap-3 rounded-[1.4rem] border border-white/10 bg-slate-950/60 p-3 text-white shadow-xl shadow-cyan-950/10 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
@@ -356,7 +351,6 @@ const SessionHeader = ({
         {gameCode ? <Badge className="border-0 bg-lime-400 text-slate-950">{gameCode}</Badge> : null}
         <span className="rounded-full bg-white/8 px-3 py-1 text-white/75">{players.length} players</span>
         <span className="rounded-full bg-white/8 px-3 py-1 text-white/75">{matchScores.size} done</span>
-        <span className="rounded-full bg-white/8 px-3 py-1 text-white/75">{waitingCount} waiting</span>
       </div>
 
       <div className="flex items-center gap-2 self-start sm:self-auto">
@@ -427,6 +421,8 @@ const SetupScreen = ({
         <div className="text-[11px] uppercase tracking-[0.2em] text-white/55">Sharing</div>
         <p className="mt-2 text-sm leading-6 text-white/65">Once saved, the same session opens on phones and iPad with the code or join link.</p>
       </Card>
+
+      {adSlot("setup sidebar")}
     </div>
   </div>
 );
@@ -692,6 +688,8 @@ const PlayersScreen = ({
           </div>
         </Card>
       </div>
+
+      {adSlot("players footer")}
     </div>
   );
 };
@@ -870,7 +868,7 @@ const CourtsScreen = ({
     [matches, matchScores, players, courts],
   );
 
-  const { currentByCourt, nextByCourt, waitingPlayers } = courtStatus;
+  const { currentByCourt, nextByCourt } = courtStatus;
 
   const courtMatchesMap = useMemo(() => {
     const map = new Map<number, Match[]>();
@@ -940,7 +938,7 @@ const CourtsScreen = ({
   return (
     <div className="space-y-3">
       {/* Summary stats bar */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <Card className="border-white/10 bg-slate-900/70 p-3 text-center text-white">
           <div className="text-[10px] uppercase tracking-[0.18em] text-white/50">Live</div>
           <div className="mt-1 text-xl font-semibold">{Array.from(currentByCourt.values()).length}</div>
@@ -949,15 +947,13 @@ const CourtsScreen = ({
           <div className="text-[10px] uppercase tracking-[0.18em] text-white/50">Next</div>
           <div className="mt-1 text-xl font-semibold">{Array.from(nextByCourt.values()).length}</div>
         </Card>
-        <Card className="border-white/10 bg-slate-900/70 p-3 text-center text-white">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-white/50">Bench</div>
-          <div className="mt-1 text-xl font-semibold">{waitingPlayers.length}</div>
-        </Card>
         <Card className="border-white/10 bg-slate-950/85 p-3 text-center text-white">
           <div className="text-[10px] uppercase tracking-[0.18em] text-white/50">Done</div>
           <div className="mt-1 text-xl font-semibold">{matchScores.size}</div>
         </Card>
       </div>
+
+      {adSlot("courts top")}
 
       {/* Court blocks: stacked on mobile, side-by-side on landscape/desktop, max-width centered */}
       <div className="mx-auto w-full max-w-5xl grid gap-4 md:grid-cols-2 overflow-hidden">
@@ -977,24 +973,7 @@ const CourtsScreen = ({
         ))}
       </div>
 
-      {/* Waiting bench */}
-      {waitingPlayers.length > 0 && (
-        <div className="mx-auto w-full max-w-5xl">
-          <Card className="border-white/10 bg-slate-900/70 p-4 text-white">
-            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/50">
-              <Users className="h-3.5 w-3.5" />
-              Bench
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {waitingPlayers.map((player) => (
-                <Badge key={player} variant="secondary" className="rounded-full bg-white/10 px-3 py-1.5 text-white/80">
-                  {player}
-                </Badge>
-              ))}
-            </div>
-          </Card>
-        </div>
-      )}
+      {adSlot("courts bottom")}
     </div>
   );
 };
@@ -1118,6 +1097,8 @@ const WrapScreen = ({
         </Card>
       </div>
 
+      {adSlot("wrap mid")}
+
       <div className="grid gap-3 xl:grid-cols-[1.05fr_0.95fr]">
         <Card className="border-white/10 bg-slate-900/80 p-4 shadow-xl shadow-cyan-950/10 text-white">
           <div className="flex items-center justify-between gap-3">
@@ -1214,6 +1195,8 @@ const WrapScreen = ({
           )}
         </Card>
       </div>
+
+      {adSlot("wrap footer")}
     </div>
   );
 };
