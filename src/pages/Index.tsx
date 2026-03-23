@@ -493,9 +493,15 @@ const FeedbackButton = ({ gameCode }: { gameCode?: string }) => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white">
-          <MessageSquare className="mr-2 h-4 w-4" />
-          Feedback
+        <Button
+          variant="outline"
+          size="sm"
+          title="Feedback"
+          aria-label="Open feedback"
+          className="shrink-0 border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+        >
+          <MessageSquare className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Feedback</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="border-white/10 bg-slate-950 text-white sm:max-w-md">
@@ -2002,7 +2008,7 @@ const Index = () => {
             <div className="text-base font-semibold sm:text-lg">PickleballMatch.fun</div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
             {gameCode ? (
               <>
                 <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white">
