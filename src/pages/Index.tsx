@@ -78,11 +78,45 @@ const STEP_LABELS: Record<MainStep, string> = {
   wrap: "Wrap",
 };
 
-const adSlot = (label: string) => (
-  <div className="rounded-3xl border border-dashed border-white/20 bg-white/5 px-4 py-5 text-center text-xs uppercase tracking-[0.24em] text-white/55">
-    Reserved AdSense space · {label}
-  </div>
-);
+const ADSENSE_CLIENT = "ca-pub-6788044289759238";
+const ADSENSE_SLOTS: Record<string, string> = {
+  "start footer": "4310943033",
+  "setup sidebar": "3618876149",
+  "players footer": "2992190180",
+  "courts top": "4710131388",
+  "courts bottom": "3810447832",
+  "wrap mid": "4175211660",
+  "wrap footer": "8481855438",
+};
+
+const AdSlot = ({ label }: { label: keyof typeof ADSENSE_SLOTS }) => {
+  const slot = ADSENSE_SLOTS[label];
+  const isSidebar = label === "setup sidebar";
+
+  useEffect(() => {
+    try {
+      ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
+    } catch {
+      // Ignore AdSense init errors during local/dev rendering.
+    }
+  }, [slot]);
+
+  return (
+    <div className={`overflow-hidden rounded-3xl border border-white/10 bg-white/5 ${isSidebar ? "p-3" : "px-3 py-4"}`}>
+      <div className="mb-2 text-center text-[10px] uppercase tracking-[0.24em] text-white/35">Sponsored</div>
+      <ins
+        className="adsbygoogle"
+        style={{ display: "block", minHeight: isSidebar ? "280px" : "90px" }}
+        data-ad-client={ADSENSE_CLIENT}
+        data-ad-slot={slot}
+        data-ad-format="auto"
+        data-full-width-responsive="true"
+      />
+    </div>
+  );
+};
+
+const adSlot = (label: keyof typeof ADSENSE_SLOTS) => <AdSlot label={label} />;
 
 const parseBulkNames = (value: string) =>
   Array.from(
