@@ -44,8 +44,8 @@ gtag('config', 'G-GBGMEQH6N5');
     <meta property="og:url" content="https://pickleballmatch.fun/" />
     
     
-    <meta property="og:image" content="https://pickleballmatch.fun/og-image.png">
-    <meta property="og:image:secure_url" content="https://pickleballmatch.fun/og-image.png" />
+    <meta property="og:image" content="https://www.pickleballmatch.fun/og-image.png">
+    <meta property="og:image:secure_url" content="https://www.pickleballmatch.fun/og-image.png" />
     <meta property="og:image:alt" content="PickleballMatch.Fun — free pickleball round robin organizer with live scoring and QR join" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -54,10 +54,12 @@ gtag('config', 'G-GBGMEQH6N5');
     
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:url" content="https://pickleballmatch.fun/" />
-    
-    
-    <meta name="twitter:image" content="https://pickleballmatch.fun/og-image.png">
+    <meta name="twitter:site" content="@henryf1rd" />
+    <meta name="twitter:creator" content="@henryf1rd" />
+    <meta name="twitter:url" content="https://www.pickleballmatch.fun/" />
+    <meta name="twitter:title" content="PickleballMatch.Fun — Free Pickleball Round Robin Organizer" />
+    <meta name="twitter:description" content="Organize pickleball round robin nights in seconds. Free web app — no download, no login. Smart court rotation, live scoring, real-time leaderboards, QR code join." />
+    <meta name="twitter:image" content="https://www.pickleballmatch.fun/og-image.png" />
     <meta name="twitter:image:alt" content="PickleballMatch.Fun — free pickleball round robin organizer with live scoring and QR join">
     
     <!-- Additional SEO & PWA -->
@@ -217,5 +219,33 @@ gtag('config', 'G-GBGMEQH6N5');
         <p><a href="https://pickleballmatch.fun/">Launch PickleballMatch.Fun →</a></p>
       </div>
     </noscript>
+    <!-- Cookie Consent Banner -->
+    <div id="cookie-banner" style="display:none; position:fixed; bottom:0; left:0; right:0; background:#1e293b; border-top:1px solid #334155; padding:16px 20px; z-index:9999; font-family:system-ui,sans-serif; font-size:14px;">
+      <div style="max-width:1200px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+        <span style="color:#cbd5e1; flex:1 1 300px;">
+          We use cookies to improve your experience and serve personalized ads.
+          <a href="/privacy-policy" style="color:#57b883; text-decoration:underline;">Privacy Policy</a>
+        </span>
+        <div style="display:flex; gap:10px; flex-shrink:0;">
+          <button id="cookie-accept" style="background:#57b883; color:#0f172a; border:none; padding:8px 20px; border-radius:6px; font-weight:600; cursor:pointer; font-size:14px;">Accept</button>
+          <button id="cookie-prefs" style="background:transparent; color:#94a3b8; border:1px solid #475569; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:14px;">Manage Preferences</button>
+        </div>
+      </div>
+    </div>
+    <script>
+      (function() {
+        var banner = document.getElementById('cookie-banner');
+        if (!banner) return;
+        if (localStorage.getItem('cookieConsent')) { banner.style.display = 'none'; return; }
+        banner.style.display = 'block';
+        document.getElementById('cookie-accept').onclick = function() {
+          localStorage.setItem('cookieConsent', 'accepted');
+          banner.style.display = 'none';
+        };
+        document.getElementById('cookie-prefs').onclick = function() {
+          window.open('https://www.google.com/settings/ads', '_blank');
+        };
+      })();
+    </script>
   </body>
 </html>
